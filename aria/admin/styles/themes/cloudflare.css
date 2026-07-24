@@ -1,0 +1,154 @@
+/* Cloudflare Kumo palette — extracted literals from CF design tokens */
+:root {
+  /* Light */
+  --cf-light-canvas: oklch(98.75% 0 0);
+  --cf-light-elevated: oklch(98% 0 0);
+  --cf-light-recessed: oklch(90% 0 0);
+  --cf-light-base: oklch(0.90 0 0);
+  --cf-light-text-default: oklch(20.5% 0 0);
+  --cf-light-text-subtle: oklch(30% 0 0);
+  --cf-light-hairline: oklch(80% 0 0);
+  --cf-light-fill: oklch(92.2% 0 0);
+  --cf-light-fill-hover: oklch(96.5% 0 0);
+  --cf-light-control: #fff;
+  --cf-light-danger: oklch(63.7% 0.237 25.331);
+  --cf-light-link: oklch(42.4% 0.199 265.638);
+
+  /* Dark */
+  --cf-dark-canvas: oklch(0.25 0.0016 17.3);
+  --cf-dark-elevated: oklch(0.2098 0.0025 67.69);
+  --cf-dark-recessed: oklch(0.16 0.0016 17.3);
+  --cf-dark-base: oklch(17% 0 0);
+  --cf-dark-text-default: oklch(0.9248 0.0158 42.38);
+  --cf-dark-text-subtle: oklch(0.8548 0.0158 42.33);
+  --cf-dark-hairline: oklch(0.30 0.0016 17.3);
+  --cf-dark-fill: oklch(26.9% 0 0);
+  --cf-dark-fill-hover: oklch(37.1% 0 0);
+  --cf-dark-control: oklch(0.124 0.0016 17.3);
+  --cf-dark-danger: oklch(39.6% 0.141 25.723);
+  --cf-dark-link: oklch(70.7% 0.165 254.624);
+
+  /* Brand */
+  --cf-brand: oklch(0.687 0.2074 38.66);
+  --cf-brand-hover: #ff7038;
+  --cf-brand-text: #f6821f;
+  --cf-on-brand: oklch(0.9248 0.0158 42.38);
+}
+
+/* Cloudflare dark */
+:root.theme-cloudflare.dark,
+:root[data-theme="cloudflare"].dark {
+  color-scheme: dark;
+
+  --app-bg: var(--cf-dark-canvas);
+  --panel-bg: var(--cf-dark-elevated);
+  --canvas-bg: var(--cf-dark-canvas);
+
+  --background: var(--cf-dark-recessed);
+  --foreground: var(--cf-dark-text-default);
+  --card: var(--cf-dark-base);
+  --card-foreground: var(--cf-dark-text-default);
+  --popover: var(--cf-dark-elevated);
+  --popover-foreground: var(--cf-dark-text-default);
+  --primary: var(--cf-brand);
+  --preloader-fill: var(--primary);
+  --primary-foreground: var(--cf-dark-text-default);
+  --secondary: var(--cf-dark-fill);
+  --secondary-foreground: var(--cf-dark-text-default);
+  --muted: var(--cf-dark-fill);
+  --muted-foreground: var(--cf-dark-text-subtle);
+  --accent: var(--cf-dark-fill-hover);
+  --accent-foreground: var(--cf-dark-text-default);
+  --destructive: var(--cf-dark-danger);
+  --destructive-foreground: var(--cf-dark-text-default);
+  --border: var(--cf-dark-hairline);
+  --input: var(--cf-dark-control);
+  --ring: var(--cf-dark-hairline);
+
+  --sidebar: var(--cf-dark-canvas);
+  --sidebar-foreground: var(--cf-dark-text-default);
+  --sidebar-primary: var(--cf-brand);
+  --sidebar-primary-foreground: var(--cf-on-brand);
+  --sidebar-accent: var(--cf-dark-fill);
+  --sidebar-accent-foreground: var(--cf-dark-text-default);
+  --sidebar-border: var(--cf-dark-hairline);
+  --sidebar-ring: var(--cf-dark-fill-hover);
+
+  --chart-1: var(--cf-brand);
+  --chart-2: var(--cf-dark-link);
+  --chart-3: oklch(87.1% 0.15 154.449);
+  --chart-4: oklch(81.5% 0.197 76);
+  --chart-5: var(--cf-dark-text-subtle);
+
+  --color-bg: var(--cf-dark-recessed);
+  --color-surface: var(--cf-dark-elevated);
+  --color-border: var(--cf-dark-hairline);
+  --color-border-hover: var(--cf-dark-fill-hover);
+  --color-hover: oklch(26.9% 0 0 / 0.5);
+  --color-text: var(--cf-dark-text-default);
+  --color-text-secondary: var(--cf-dark-text-subtle);
+  --color-text-tertiary: oklch(55.6% 0 0);
+  --color-accent: var(--cf-brand);
+
+  --flickering-grid-color: var(--cf-dark-text-subtle);
+  --flickering-grid-accent: var(--cf-brand);
+}
+
+/* Cloudflare light */
+:root.theme-cloudflare:not(.dark),
+:root[data-theme="cloudflare"]:not(.dark) {
+  color-scheme: light;
+
+  --app-bg: var(--cf-light-canvas);
+  --panel-bg: var(--cf-light-elevated);
+  --canvas-bg: var(--cf-light-canvas);
+
+  --background: var(--cf-light-canvas);
+  --foreground: var(--cf-light-text-default);
+  --card: var(--cf-light-base);
+  --card-foreground: var(--cf-light-text-default);
+  --popover: var(--cf-light-elevated);
+  --popover-foreground: var(--cf-light-text-default);
+  --primary: var(--cf-brand);
+  --preloader-fill: var(--primary);
+  --primary-foreground: var(--cf-light-canvas);
+  --secondary: var(--cf-light-fill);
+  --secondary-foreground: var(--cf-light-text-default);
+  --muted: var(--cf-light-fill);
+  --muted-foreground: var(--cf-light-text-subtle);
+  --accent: var(--cf-light-fill-hover);
+  --accent-foreground: var(--cf-light-text-default);
+  --destructive: var(--cf-light-danger);
+  --destructive-foreground: #fff;
+  --border: var(--cf-light-hairline);
+  --input: var(--cf-light-control);
+  --ring: var(--cf-light-hairline);
+
+  --sidebar: var(--cf-light-recessed);
+  --sidebar-foreground: var(--cf-light-text-default);
+  --sidebar-primary: var(--cf-brand);
+  --sidebar-primary-foreground: var(--cf-on-brand);
+  --sidebar-accent: var(--cf-light-fill);
+  --sidebar-accent-foreground: var(--cf-light-text-default);
+  --sidebar-border: var(--cf-light-hairline);
+  --sidebar-ring: var(--cf-light-fill-hover);
+
+  --chart-1: var(--cf-brand);
+  --chart-2: var(--cf-light-link);
+  --chart-3: oklch(87.1% 0.15 154.449);
+  --chart-4: oklch(81.5% 0.197 76);
+  --chart-5: var(--cf-light-text-subtle);
+
+  --color-bg: var(--cf-light-recessed);
+  --color-surface: var(--cf-light-elevated);
+  --color-border: var(--cf-light-hairline);
+  --color-border-hover: var(--cf-light-fill-hover);
+  --color-hover: oklch(92.2% 0 0 / 0.5);
+  --color-text: var(--cf-light-text-default);
+  --color-text-secondary: var(--cf-light-text-subtle);
+  --color-text-tertiary: oklch(70.8% 0 0);
+  --color-accent: var(--cf-brand);
+
+  --flickering-grid-color: var(--cf-light-text-subtle);
+  --flickering-grid-accent: var(--cf-brand);
+}

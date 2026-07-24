@@ -1,0 +1,137 @@
+---
+import { renderPageDslToHtml } from "../../aria/lib/rendering/renderPageDslToHtml";
+import { getStorageAdapterAsync } from "../../aria/lib/storage/getStorageAdapter";
+import { getAuthAdapterAsync } from "../../aria/lib/auth";
+import { log } from "../../aria/lib/utils/logger";
+import { LayoutDSLSchema, PageDSLSchema } from "../../aria/lib/schemas/nodes";
+import {
+  normalizeContentLocalization,
+  resolveContentLocaleDirection,
+} from "../../aria/lib/localization/contentLocale";
+import {
+  renderPublicBootstrapPlaceholderHtml,
+  renderPublicNotFoundFallbackHtml,
+  resolvePublicBootstrapState,
+} from "../../aria/lib/site/publicBootstrapPlaceholder";
+
+export const prerender = false;
+
+Astro.response.headers.set("cache-control", "no-store");
+
+let html: string | null = null;
+let serveBootstrapPlaceholder = false;
+
+try {
+  const adapter = await getStorageAdapterAsync(Astro.locals);
+  const settings = await adapter.getSiteSettings();
+  const authAdapter = await getAuthAdapterAsync(Astro.locals);
+  const bootstrap = resolvePublicBootstrapState({
+    userCount: await authAdapter.countUsers(),
+    onboarding: settings?.onboarding,
+  });
+
+  if (!bootstrap.ready) {
+    serveBootstrapPlaceholder = true;
+    Astro.response.status = 200;
+    Astro.response.headers.set("x-robots-tag", "noindex, nofollow");
+    html = renderPublicBootstrapPlaceholderHtml({ ctaHref: bootstrap.ctaHref });
+  } else {
+    Astro.response.status = 404;
+    const localization = normalizeContentLocalization(settings?.localization?.content);
+    const locale = (Astro.locals as import("../../aria/lib/cloudflare/env").RuntimeLocals)
+      .publicLocale ?? localization.defaultLocale;
+    const notFoundPolicy = await adapter.getPagePolicyBySystemRole("not-found");
+
+    if (notFoundPolicy) {
+      const localizedMeta = locale === localization.defaultLocale
+        ? null
+        : await adapter.getPageLocaleMeta(notFoundPolicy.id, locale);
+      const localizedVersion = localizedMeta?.publishedVersion
+        ? await adapter.getPageLocaleVersion(notFoundPolicy.id, locale, localizedMeta.publishedVersion)
+        : null;
+      const localizedPage = localizedVersion
+        ? PageDSLSchema.safeParse(localizedVersion.dsl)
+        : null;
+      const notFoundPage = localizedPage?.success
+        ? localizedPage.data
+        : await adapter.getPublishedPageDSL(notFoundPolicy.id);
+
+      const localizedLayout = localizedVersion?.layoutId
+        ? await (async () => {
+            const layoutMeta = await adapter.getLayoutLocaleMeta(
+              localizedVersion.layoutId!,
+              locale,
+            );
+            const layoutVersion = layoutMeta?.publishedVersion
+              ? await adapter.getLayoutLocaleVersion(
+                  localizedVersion.layoutId!,
+                  locale,
+                  layoutMeta.publishedVersion,
+                )
+              : null;
+            const parsed = layoutVersion
+              ? LayoutDSLSchema.safeParse(layoutVersion.dsl)
+              : null;
+            if (parsed?.success) return parsed.data;
+            return localizedVersion.fallbackLayoutVersion
+              ? await adapter.getLayoutDSL(
+                  localizedVersion.layoutId!,
+                  localizedVersion.fallbackLayoutVersion,
+                )
+              : null;
+          })()
+        : null;
+
+      if (notFoundPage) {
+        const rendered = await renderPageDslToHtml({
+          page: notFoundPage,
+          adapter,
+          logger: (level, message, meta) => {
+            log(level, `[404] ${message}`, meta);
+          },
+          locale,
+          direction: resolveContentLocaleDirection(
+            localization.locales.find((item) => item.code === locale)!,
+          ),
+          seoOverride: localizedVersion
+            ? {
+                title: localizedVersion.seo.title ?? undefined,
+                description: localizedVersion.seo.description ?? undefined,
+                ogImage: localizedVersion.seo.ogImage ?? undefined,
+                noindex: true,
+                nofollow: localizedVersion.seo.nofollow,
+              }
+            : { noindex: true },
+          suppressCanonical: true,
+          layoutOverride: localizedLayout,
+        });
+
+        Astro.response.headers.set(
+          "content-security-policy",
+          rendered.cspHeaderValue,
+        );
+        html = rendered.html;
+      } else {
+        log("warn", "[404] Assigned 404 owner has no published page", {
+          pageId: notFoundPolicy.id,
+          slug: notFoundPolicy.slug,
+        });
+      }
+    }
+  }
+} catch (error) {
+  Astro.response.status = serveBootstrapPlaceholder ? 200 : 404;
+  log("error", "[404] Failed to render assigned 404 owner", {
+    error: error instanceof Error ? error.message : String(error),
+  });
+}
+
+if (!html) {
+  if (!serveBootstrapPlaceholder) {
+    Astro.response.status = 404;
+  }
+  html = renderPublicNotFoundFallbackHtml({ pathname: Astro.url.pathname });
+}
+---
+
+<Fragment set:html={html} />

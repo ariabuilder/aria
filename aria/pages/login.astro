@@ -1,0 +1,63 @@
+---
+/**
+ * Login Page - Aria Authentication
+ *
+ * Handles user login with optional 2FA support.
+ */
+
+import ServerPreloader from "../components/preloader/ServerPreloader.astro";
+import "../admin/styles/globals.css";
+import "../admin/styles/themes/aria.css";
+import faviconLight from "../admin/assets/favicon-light.png";
+import faviconDark from "../admin/assets/favicon-dark.png";
+import {
+  parseAcceptedLanguages,
+  resolveStudioLocale,
+} from "../lib/localization/studioLocale";
+import { getAuthDocumentTitle } from "../admin/i18n/messages/domains/authDocumentTitles";
+
+export const prerender = false;
+
+// Allow preview mode for styling (?preview=true)
+const isPreview = Astro.url.searchParams.get("preview") === "true";
+const studioLocale = resolveStudioLocale({
+  acceptedLanguages: parseAcceptedLanguages(
+    Astro.request.headers.get("accept-language"),
+  ),
+});
+
+// Server-side redirect if already logged in (from middleware)
+if (!isPreview && Astro.locals.user) {
+  return Astro.redirect("/admin");
+}
+---
+
+<!doctype html>
+<html
+  lang={studioLocale}
+  dir="ltr"
+  class="theme-aria"
+  data-theme="aria"
+  data-aria-studio-locale={studioLocale}
+>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{getAuthDocumentTitle(studioLocale, "auth.login.documentTitle")}</title>
+    <script is:inline>
+      (function () {
+        var prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+        document.documentElement.classList.toggle("dark", prefersDark);
+      })();
+    </script>
+    <link rel="icon" href={faviconLight.src} media="(prefers-color-scheme: light)" />
+    <link rel="icon" href={faviconDark.src} media="(prefers-color-scheme: dark)" />
+  </head>
+  <body class="bg-background">
+    <ServerPreloader />
+    <div id="aria-auth-app" data-auth-page="login"></div>
+    <script>
+      import "../admin/features/Auth/main.ts";
+    </script>
+  </body>
+</html>

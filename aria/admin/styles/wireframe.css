@@ -1,0 +1,105 @@
+/**
+ * Stage wireframe stylesheet.
+ * Activated by StageFrame via html[data-aria-wireframe="true"] inside the editor iframe.
+ */
+
+html[data-aria-wireframe="true"] {
+  background: #f8fafc;
+}
+
+html[data-aria-wireframe="true"] body {
+  background:
+    linear-gradient(rgba(148, 163, 184, 0.07) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(148, 163, 184, 0.07) 1px, transparent 1px),
+    #fcfcfd !important;
+  background-size: 24px 24px;
+  color: #334155 !important;
+}
+
+html[data-aria-wireframe="true"] [data-aria-id],
+html[data-aria-wireframe="true"] [data-aria-id] * {
+  background-image: none !important;
+  box-shadow: none !important;
+  text-shadow: none !important;
+  filter: none !important;
+}
+
+html[data-aria-wireframe="true"] [data-aria-id] {
+  position: relative;
+  min-height: 1.5rem;
+  border: 1px dashed rgba(71, 85, 105, 0.55) !important;
+  background: rgba(255, 255, 255, 0.84) !important;
+  color: #334155 !important;
+  outline: none !important;
+  backdrop-filter: none !important;
+}
+
+html[data-aria-wireframe="true"] [data-aria-id]:empty {
+  min-height: 2rem;
+}
+
+html[data-aria-wireframe="true"] [data-aria-id] > * {
+  color: inherit !important;
+}
+
+html[data-aria-wireframe="true"] [data-aria-id] img,
+html[data-aria-wireframe="true"] [data-aria-id] video,
+html[data-aria-wireframe="true"] [data-aria-id] iframe,
+html[data-aria-wireframe="true"] [data-aria-id] svg,
+html[data-aria-wireframe="true"] [data-aria-id] iconify-icon,
+html[data-aria-wireframe="true"] [data-aria-id] [data-aria-icon-host] {
+  opacity: 0.2 !important;
+  border: 1px dashed rgba(100, 116, 139, 0.75) !important;
+  background: repeating-linear-gradient(
+    135deg,
+    rgba(148, 163, 184, 0.18),
+    rgba(148, 163, 184, 0.18) 8px,
+    rgba(226, 232, 240, 0.4) 8px,
+    rgba(226, 232, 240, 0.4) 16px
+  ) !important;
+}
+
+html[data-aria-wireframe="true"] [data-aria-id] button,
+html[data-aria-wireframe="true"] [data-aria-id] a,
+html[data-aria-wireframe="true"] [data-aria-id] input,
+html[data-aria-wireframe="true"] [data-aria-id] textarea,
+html[data-aria-wireframe="true"] [data-aria-id] select {
+  border: 1px dashed rgba(71, 85, 105, 0.55) !important;
+  background: rgba(241, 245, 249, 0.92) !important;
+  color: #334155 !important;
+}
+
+html[data-aria-wireframe="true"] [data-aria-id] h1,
+html[data-aria-wireframe="true"] [data-aria-id] h2,
+html[data-aria-wireframe="true"] [data-aria-id] h3,
+html[data-aria-wireframe="true"] [data-aria-id] h4,
+html[data-aria-wireframe="true"] [data-aria-id] h5,
+html[data-aria-wireframe="true"] [data-aria-id] h6 {
+  color: #0f172a !important;
+  letter-spacing: 0 !important;
+  text-transform: none !important;
+}
+
+html[data-aria-wireframe="true"] [data-aria-id] p,
+html[data-aria-wireframe="true"] [data-aria-id] span,
+html[data-aria-wireframe="true"] [data-aria-id] li,
+html[data-aria-wireframe="true"] [data-aria-id] label {
+  color: #475569 !important;
+}
+
+html[data-aria-wireframe="true"] [data-aria-id] .container,
+html[data-aria-wireframe="true"] [data-aria-id] [class*="container"],
+html[data-aria-wireframe="true"] [data-aria-id] section,
+html[data-aria-wireframe="true"] [data-aria-id] article,
+html[data-aria-wireframe="true"] [data-aria-id] aside,
+html[data-aria-wireframe="true"] [data-aria-id] header,
+html[data-aria-wireframe="true"] [data-aria-id] footer,
+html[data-aria-wireframe="true"] [data-aria-id] nav {
+  border-color: rgba(100, 116, 139, 0.4) !important;
+}
+
+html[data-aria-wireframe="true"] [data-drop-zone].drop-active {
+  border: 1px solid hsl(var(--primary)) !important;
+  background: color-mix(in srgb, hsl(var(--primary)) 8%, transparent) !important;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, hsl(var(--primary)) 22%, transparent) !important;
+}

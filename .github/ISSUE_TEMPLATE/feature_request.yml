@@ -1,0 +1,61 @@
+name: Feature request
+description: Suggest a focused improvement for Aria.
+title: "[Feature]: "
+labels:
+  - enhancement
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for suggesting an improvement. For large architecture changes, describe the problem before proposing an implementation.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What user or maintainer problem does this solve?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed Solution
+      description: What should Aria do differently?
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Studio
+        - Stage / visual editor
+        - CMS
+        - Design system
+        - Agent
+        - MCP
+        - Auth / permissions
+        - Email
+        - Media
+        - Import / export
+        - Storage / migrations
+        - Cloudflare deployment
+        - Documentation
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives
+      description: What workarounds or other designs have you considered?
+    validations:
+      required: false
+  - type: checkboxes
+    id: scope
+    attributes:
+      label: Scope Check
+      options:
+        - label: This may require storage or migration changes.
+        - label: This may affect auth, capabilities, MCP, or security boundaries.
+        - label: This may affect Cloudflare runtime behavior.
+        - label: I would be interested in contributing this.

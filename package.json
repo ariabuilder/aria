@@ -1,0 +1,254 @@
+{
+  "name": "@ariabuilder/aria",
+  "description": "The Astro-native visual builder for the Cloudflare era.",
+  "type": "module",
+  "version": "0.5.7",
+  "license": "Apache-2.0",
+  "homepage": "https://ariabuilder.io",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ariabuilder/aria.git"
+  },
+  "bugs": {
+    "url": "https://github.com/ariabuilder/aria/issues"
+  },
+  "keywords": [
+    "astro",
+    "cloudflare",
+    "workers",
+    "cms",
+    "page-builder",
+    "visual-builder",
+    "mcp",
+    "ai"
+  ],
+  "engines": {
+    "node": ">=22.18.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "files": [
+    ".dev.vars.example",
+    "astro.config.ts",
+    "dist/cli/",
+    "LICENSE",
+    "licenses/",
+    "README.md",
+    "aria/actions/",
+    "aria/admin/",
+    "aria/cli/",
+    "aria/docs/openapi/",
+    "aria/docs/integrations/",
+    "aria/lib/",
+    "aria/migrations/",
+    "aria/scripts/",
+    "aria/storage/README.md",
+    "aria/worker/",
+    "public/.assetsignore",
+    "public/admin/",
+    "public/uploads/.gitkeep",
+    "public/vendor/",
+    "src/",
+    "uno.aria.config.ts",
+    "uno.css",
+    "uno.user.config.ts",
+    "wrangler.jsonc"
+  ],
+  "scripts": {
+    "dev": "ARIA_RUNTIME=node astro dev",
+    "dev:local": "ARIA_RUNTIME=node astro dev",
+    "dev:edge": "npm run db:migrate:local && ARIA_RUNTIME=cloudflare astro dev",
+    "build": "npm run build:icons && npm run build:icon-boundary && rm -rf dist && ARIA_RUNTIME=cloudflare astro build && npm run build:sanitize-config && npm run build:bundle-check && npm run build:cloudflare-free-check",
+    "build:icons": "tsx aria/scripts/generate-icon-assets.ts",
+    "build:bundle-check": "node --import tsx aria/scripts/check-vite-bundle-integrity.ts",
+    "build:icon-boundary": "tsx aria/scripts/check-icon-worker-boundary.ts",
+    "build:sanitize-config": "node --import tsx aria/scripts/sanitize-deploy-config.ts",
+    "build:cloudflare-free-check": "node --import tsx aria/scripts/check-cloudflare-free-limits.ts",
+    "preview": "astro preview",
+    "astro": "astro",
+    "check": "astro check",
+    "check:push-guards": "node scripts/check-repository-push-guards.mjs",
+    "release:check-version": "node scripts/check-release-version.mjs",
+    "db:init": "npm run db:migrate:remote",
+    "db:migrate:remote": "CI=true npx tsx aria/scripts/apply-d1-migrations.ts --remote",
+    "db:migrate:local": "CI=true npx tsx aria/scripts/apply-d1-migrations.ts --local",
+    "db:seed": "npx tsx aria/scripts/bootstrap-remote-storage.ts",
+    "db:seed:local": "npx tsx aria/scripts/bootstrap-remote-storage.ts --local",
+    "provision:remote": "npx tsx aria/scripts/provision-remote-site.ts",
+    "setup": "npm run provision:remote",
+    "storage:reset-local": "node aria/scripts/reset-local-sqlite.js",
+    "storage:reset-remote": "npx tsx aria/scripts/reset-remote-d1.ts",
+    "storage:verify-baseline-schema": "tsx aria/scripts/verify-localization-schema.ts",
+    "storage:verify-localization-schema": "tsx aria/scripts/verify-localization-schema.ts",
+    "cms:seed-demo": "tsx aria/scripts/seed-cms-demo-content.ts",
+    "email:drain-local": "tsx aria/scripts/drain-local-email.ts",
+    "email:drain-local:watch": "tsx aria/scripts/drain-local-email.ts --watch",
+    "integrations:worker": "ARIA_RUNTIME=node tsx aria/scripts/run-integration-worker.ts",
+    "storage:slim-local": "tsx aria/scripts/slim-local-storage.ts --apply",
+    "storage:slim-local:dry-run": "tsx aria/scripts/slim-local-storage.ts",
+    "push:remote": "npx tsx aria/scripts/push-remote-content.ts",
+    "push:remote-media": "npx tsx aria/scripts/push-remote-content.ts --with-media",
+    "push:local": "npx tsx aria/scripts/push-remote-content.ts --local --local-wins",
+    "push:local-media": "npx tsx aria/scripts/push-remote-content.ts --local --local-wins --with-media",
+    "deploy:migrate": "npm run db:migrate:remote",
+    "deploy": "npx tsx aria/scripts/deploy-cloudflare.ts",
+    "test": "vitest",
+    "test:ui": "vitest --ui",
+    "test:coverage": "vitest --coverage",
+    "build:cli": "tsx aria/scripts/build-cli.ts",
+    "pack:smoke": "tsx aria/scripts/pack-smoke.ts",
+    "prepack": "npm run build:cli",
+    "aria:types": "tsx aria/cli/main.ts types",
+    "aria:seed": "tsx aria/cli/main.ts seed apply",
+    "aria:schema": "tsx aria/cli/main.ts schema cms",
+    "openapi:cms": "tsx aria/cli/main.ts schema cms"
+  },
+  "bin": {
+    "aria": "./dist/cli/main.js"
+  },
+  "cloudflare": {
+    "bindings": {
+      "aria_db": {
+        "description": "**D1 database for Aria.** `aria-db`"
+      },
+      "aria_cache": {
+        "description": "**KV for render cache.** `aria-cache`"
+      },
+      "aria_r2": {
+        "description": "**R2 bucket for media.** `aria-media`"
+      },
+      "aria_images": {
+        "description": "**Cloudflare Images binding.** `aria-images`"
+      },
+      "session": {
+        "description": "**KV for User sessions.** `aria-session`"
+      },
+      "aria_studio_agent": {
+        "description": "**Durable Object for AI Agent sessions.** `aria-agent`"
+      },
+      "aria_studio_live": {
+        "description": "**Durable Object for user presence.** `aria-live`"
+      },
+      "ai": {
+        "description": "**Workers AI binding.** `ai`"
+      },
+      "aria_email_queue": {
+        "description": "**Cloudflare Queue for transactional emails.** `aria-email-queue`"
+      },
+      "aria_thumbnail_queue": {
+        "description": "**Cloudflare Queue for thumbnail generation.** `aria-thumbnail-queue`"
+      },
+      "aria_integration_queue": {
+        "description": "**Cloudflare Queue for integration webhooks.** `aria-integration-queue`"
+      }
+    }
+  },
+  "dependencies": {
+    "@ai-sdk/anthropic": "^4.0.15",
+    "@ai-sdk/google": "^4.0.17",
+    "@ai-sdk/openai": "^3.0.71",
+    "@astrojs/cloudflare": "^14.1.4",
+    "@astrojs/vue": "^7.0.1",
+    "@cloudflare/ai-chat": "^0.9.3",
+    "@codemirror/commands": "^6.10.3",
+    "@codemirror/lang-css": "^6.3.1",
+    "@codemirror/lang-html": "^6.4.11",
+    "@codemirror/lang-javascript": "^6.2.5",
+    "@codemirror/lang-json": "^6.0.2",
+    "@codemirror/lang-xml": "^6.1.0",
+    "@codemirror/language": "^6.12.3",
+    "@codemirror/state": "^6.6.0",
+    "@codemirror/view": "^6.41.0",
+    "@floating-ui/dom": "^1.7.4",
+    "@internationalized/date": "^3.12.2",
+    "@libsql/client": "^0.14.0",
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "@simplewebauthn/browser": "^13.3.0",
+    "@simplewebauthn/server": "^13.3.2",
+    "@tanstack/vue-table": "^8.21.3",
+    "@tiptap/extension-link": "^3.27.1",
+    "@tiptap/extension-placeholder": "^3.27.1",
+    "@tiptap/extension-underline": "^3.27.1",
+    "@tiptap/starter-kit": "^3.27.1",
+    "@tiptap/vue-3": "^3.27.1",
+    "@unocss/astro": "66.7.2",
+    "@vueuse/core": "^14.1.0",
+    "agents": "^0.17.4",
+    "ai": "^6.0.205",
+    "astro": "^7.1.3",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "codemirror": "^6.0.2",
+    "colord": "^2.9.3",
+    "date-fns": "^4.1.0",
+    "drizzle-orm": "^0.45.2",
+    "fast-xml-parser": "^5.10.1",
+    "html-to-image": "^1.11.13",
+    "idb": "^8.0.3",
+    "isomorphic-dompurify": "^2.11.0",
+    "jszip": "^3.10.1",
+    "marked": "^15.0.12",
+    "nodemailer": "^9.0.3",
+    "otpauth": "^9.3.0",
+    "reka-ui": "^2.7.0",
+    "uuid": "^14.0.1",
+    "vee-validate": "^4.0.0",
+    "vue-input-otp": "^0.3.2",
+    "vue-resizable-panels": "^0.0.1",
+    "vue-router": "^4.6.4",
+    "vue-sonner": "^2.0.9",
+    "vuedraggable": "^4.1.0",
+    "workers-ai-provider": "^3.1.14",
+    "yaml": "^2.9.0",
+    "zod": "^4.3.6"
+  },
+  "overrides": {
+    "@babel/core": "^7.29.7",
+    "body-parser": "^2.3.0",
+    "brace-expansion@2": "2.1.2",
+    "brace-expansion@5": "5.0.7",
+    "dompurify": "^3.4.12",
+    "drizzle-orm": {
+      "better-sqlite3": "npm:@libsql/client@^0.14.0"
+    },
+    "esbuild": "^0.28.1",
+    "fast-uri": "^4.1.1",
+    "form-data": "^4.0.6",
+    "hono": "^4.12.31",
+    "js-cookie": "^3.0.8",
+    "js-yaml": "^4.3.0",
+    "sharp": "^0.35.3",
+    "svgo": "^4.0.2",
+    "ws": "^8.21.0",
+    "yaml": "^2.9.0"
+  },
+  "devDependencies": {
+    "@astrojs/check": "^0.9.9",
+    "@astrojs/node": "^11.0.2",
+    "@iconify-json/cib": "^1.2.3",
+    "@iconify-json/hugeicons": "^1.2.25",
+    "@iconify-json/lucide": "^1.2.114",
+    "@iconify/utils": "^3.1.4",
+    "@types/node": "^22.14.0",
+    "@types/nodemailer": "^7.0.12",
+    "@unocss/preset-icons": "66.7.2",
+    "@unocss/preset-typography": "66.7.2",
+    "@unocss/preset-wind3": "66.7.2",
+    "@unocss/reset": "66.7.2",
+    "@unocss/transformer-directives": "66.7.2",
+    "@unocss/transformer-variant-group": "66.7.2",
+    "@vitejs/plugin-vue": "^6.0.5",
+    "@vitest/ui": "^4.1.10",
+    "@vue/test-utils": "^2.4.0",
+    "esbuild": "^0.28.1",
+    "happy-dom": "^20.0.11",
+    "jsdom": "^23.0.0",
+    "tsx": "^4.22.3",
+    "typescript": "^5.0.0",
+    "unocss": "66.7.2",
+    "vite": "^8.1.4",
+    "vitest": "^4.1.10",
+    "wrangler": "4.113.0"
+  }
+}

@@ -1,0 +1,119 @@
+/* Aria Navigation — minimal structural styles; visual design stays in the builder */
+
+.aria-nav-submenu-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  background: transparent;
+  padding: 0.25rem;
+  cursor: pointer;
+  color: inherit;
+}
+
+.aria-nav-submenu-toggle-icon {
+  display: inline-block;
+  width: 0.45rem;
+  height: 0.45rem;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  transform: rotate(45deg) translateY(-1px);
+  transition: transform 150ms ease;
+}
+
+.aria-nav-submenu-open > .aria-nav-submenu-toggle .aria-nav-submenu-toggle-icon,
+.aria-nav-submenu-open
+  > button[data-aria-submenu-toggle][aria-expanded="true"]
+  .aria-nav-submenu-toggle-icon {
+  transform: rotate(-135deg) translateY(1px);
+}
+
+[data-aria-nav="item"] > [data-aria-nav="items"] {
+  display: none;
+}
+
+[data-aria-nav="item"].aria-nav-submenu-open > [data-aria-nav="items"],
+[data-aria-nav="root"][data-builder-keep-open="true"]
+  [data-aria-nav="item"]
+  > [data-aria-nav="items"] {
+  display: block;
+}
+
+[data-aria-nav="mega"] {
+  min-width: 12rem;
+}
+
+.aria-nav-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgb(0 0 0 / 0.35);
+  z-index: 40;
+}
+
+html.aria-nav-body-lock {
+  overflow: hidden;
+}
+
+[data-aria-nav="toggle"][data-nav-toggle-variant="close"] {
+  display: none;
+}
+
+[data-aria-nav="root"].aria-nav-open
+  [data-aria-nav="toggle"][data-nav-toggle-variant="open"] {
+  display: none;
+}
+
+[data-aria-nav="root"].aria-nav-open
+  [data-aria-nav="toggle"][data-nav-toggle-variant="close"] {
+  display: inline-flex;
+}
+
+@media (min-width: 768px) {
+  [data-aria-nav="toggle"][data-nav-toggle-variant="open"] {
+    display: none;
+  }
+}
+
+@media (max-width: 767px) {
+  [data-aria-nav="root"][data-mobile-enabled="true"] {
+    position: relative;
+  }
+
+  [data-aria-nav="root"][data-mobile-enabled="true"] > [data-aria-nav="items"] {
+    display: none;
+  }
+
+  [data-aria-nav="root"][data-mobile-enabled="true"].aria-nav-open
+    > [data-aria-nav="items"] {
+    display: block;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    z-index: 50;
+    background: var(--color-background, #fff);
+    border: 1px solid rgb(0 0 0 / 0.08);
+    padding: 0.75rem;
+  }
+
+  [data-aria-nav="root"][data-mobile-enabled="true"][data-mobile-drawer-side="right"].aria-nav-open
+    > [data-aria-nav="items"] {
+    left: auto;
+    width: min(18rem, 100vw);
+  }
+
+  [data-aria-nav="root"][data-mobile-enabled="true"][data-mobile-drawer-side="left"].aria-nav-open
+    > [data-aria-nav="items"] {
+    right: auto;
+    width: min(18rem, 100vw);
+  }
+}
+
+a.aria-nav-active,
+[data-aria-nav="item"].aria-nav-active > a {
+  font-weight: 600;
+}
+
+a[aria-current="page"] {
+  text-decoration-thickness: 2px;
+}

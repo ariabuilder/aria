@@ -1,0 +1,131 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Aria Site API",
+    "version": "1.0.0",
+    "description": "Site-local, policy-aware CMS API. API credentials act as an existing Aria principal and never bypass canonical action authorization."
+  },
+  "servers": [{ "url": "/api/v1" }],
+  "security": [{ "bearerAuth": [] }],
+  "paths": {
+    "/openapi.json": {
+      "get": {
+        "security": [],
+        "operationId": "getSiteApiOpenApi",
+        "responses": { "200": { "description": "OpenAPI document" } }
+      }
+    },
+    "/collections": {
+      "get": {
+        "operationId": "listCollections",
+        "x-aria-scopes": ["collections:read"],
+        "responses": { "200": { "$ref": "#/components/responses/Success" }, "401": { "$ref": "#/components/responses/Error" }, "403": { "$ref": "#/components/responses/Error" } }
+      }
+    },
+    "/collections/{collectionId}": {
+      "parameters": [{ "$ref": "#/components/parameters/CollectionId" }],
+      "get": {
+        "operationId": "getCollection",
+        "x-aria-scopes": ["collections:read"],
+        "responses": { "200": { "$ref": "#/components/responses/Success" }, "404": { "$ref": "#/components/responses/Error" } }
+      }
+    },
+    "/collections/{collectionId}/entries": {
+      "parameters": [{ "$ref": "#/components/parameters/CollectionId" }],
+      "get": {
+        "operationId": "listEntries",
+        "x-aria-scopes": ["entries:read"],
+        "parameters": [
+          { "name": "cursor", "in": "query", "schema": { "type": "string" } },
+          { "name": "pageSize", "in": "query", "schema": { "type": "integer", "minimum": 1, "maximum": 100, "default": 50 } },
+          { "name": "status", "in": "query", "schema": { "type": "array", "items": { "type": "string", "enum": ["draft", "published", "scheduled", "archived"] } }, "explode": true },
+          { "name": "query", "in": "query", "schema": { "type": "string" } },
+          { "name": "locale", "in": "query", "schema": { "type": "string" } }
+        ],
+        "responses": { "200": { "$ref": "#/components/responses/Success" }, "400": { "$ref": "#/components/responses/Error" } }
+      },
+      "post": {
+        "operationId": "createEntry",
+        "x-aria-scopes": ["entries:write"],
+        "parameters": [{ "$ref": "#/components/parameters/IdempotencyKey" }],
+        "requestBody": { "$ref": "#/components/requestBodies/JsonBody" },
+        "responses": { "201": { "$ref": "#/components/responses/Success" }, "409": { "$ref": "#/components/responses/Error" }, "422": { "$ref": "#/components/responses/Error" } }
+      }
+    },
+    "/collections/{collectionId}/entries/{entryId}": {
+      "parameters": [{ "$ref": "#/components/parameters/CollectionId" }, { "$ref": "#/components/parameters/EntryId" }],
+      "get": {
+        "operationId": "getEntry",
+        "x-aria-scopes": ["entries:read"],
+        "responses": { "200": { "$ref": "#/components/responses/Success" }, "404": { "$ref": "#/components/responses/Error" } }
+      },
+      "patch": {
+        "operationId": "updateEntry",
+        "x-aria-scopes": ["entries:write"],
+        "parameters": [{ "$ref": "#/components/parameters/IdempotencyKey" }, { "$ref": "#/components/parameters/IfMatch" }],
+        "requestBody": { "$ref": "#/components/requestBodies/JsonBody" },
+        "responses": { "200": { "$ref": "#/components/responses/Success" }, "412": { "$ref": "#/components/responses/Error" }, "428": { "$ref": "#/components/responses/Error" } }
+      }
+    },
+    "/collections/{collectionId}/entries/{entryId}/publish": {
+      "parameters": [{ "$ref": "#/components/parameters/CollectionId" }, { "$ref": "#/components/parameters/EntryId" }],
+      "post": {
+        "operationId": "publishEntry",
+        "x-aria-scopes": ["entries:publish"],
+        "parameters": [{ "$ref": "#/components/parameters/IdempotencyKey" }, { "$ref": "#/components/parameters/IfMatch" }],
+        "requestBody": { "$ref": "#/components/requestBodies/JsonBody" },
+        "responses": { "200": { "$ref": "#/components/responses/Success" }, "412": { "$ref": "#/components/responses/Error" } }
+      }
+    },
+    "/collections/{collectionId}/entries/{entryId}/unpublish": {
+      "parameters": [{ "$ref": "#/components/parameters/CollectionId" }, { "$ref": "#/components/parameters/EntryId" }],
+      "post": {
+        "operationId": "unpublishEntry",
+        "x-aria-scopes": ["entries:publish"],
+        "parameters": [{ "$ref": "#/components/parameters/IdempotencyKey" }, { "$ref": "#/components/parameters/IfMatch" }],
+        "requestBody": { "$ref": "#/components/requestBodies/JsonBody" },
+        "responses": { "200": { "$ref": "#/components/responses/Success" }, "412": { "$ref": "#/components/responses/Error" } }
+      }
+    },
+    "/collections/{collectionId}/entries/{entryId}/revisions/{revisionId}/restore": {
+      "parameters": [{ "$ref": "#/components/parameters/CollectionId" }, { "$ref": "#/components/parameters/EntryId" }, { "name": "revisionId", "in": "path", "required": true, "schema": { "type": "string" } }],
+      "post": {
+        "operationId": "restoreEntryRevision",
+        "x-aria-scopes": ["entries:write", "entries:publish"],
+        "parameters": [{ "$ref": "#/components/parameters/IdempotencyKey" }, { "$ref": "#/components/parameters/IfMatch" }],
+        "requestBody": { "$ref": "#/components/requestBodies/JsonBody" },
+        "responses": { "200": { "$ref": "#/components/responses/Success" }, "412": { "$ref": "#/components/responses/Error" } }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": { "type": "http", "scheme": "bearer", "bearerFormat": "Aria API credential" }
+    },
+    "parameters": {
+      "CollectionId": { "name": "collectionId", "in": "path", "required": true, "schema": { "type": "string" } },
+      "EntryId": { "name": "entryId", "in": "path", "required": true, "schema": { "type": "string" } },
+      "IdempotencyKey": { "name": "Idempotency-Key", "in": "header", "required": true, "schema": { "type": "string", "minLength": 16, "maxLength": 200 } },
+      "IfMatch": { "name": "If-Match", "in": "header", "required": true, "schema": { "type": "string", "example": "\"aria-entry-2026-07-18T18:00:00.000Z\"" } }
+    },
+    "requestBodies": {
+      "JsonBody": { "required": true, "content": { "application/json": { "schema": { "type": "object" } } } }
+    },
+    "responses": {
+      "Success": {
+        "description": "Successful response",
+        "headers": { "X-Aria-Request-Id": { "schema": { "type": "string", "format": "uuid" } } },
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/SuccessEnvelope" } } }
+      },
+      "Error": {
+        "description": "Error response",
+        "headers": { "X-Aria-Request-Id": { "schema": { "type": "string", "format": "uuid" } } },
+        "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelope" } } }
+      }
+    },
+    "schemas": {
+      "SuccessEnvelope": { "type": "object", "required": ["success", "data"], "properties": { "success": { "const": true }, "data": {} } },
+      "ErrorEnvelope": { "type": "object", "required": ["success", "error"], "properties": { "success": { "const": false }, "error": { "type": "object", "required": ["code", "message"], "properties": { "code": { "type": "string" }, "message": { "type": "string" }, "details": {} } } } }
+    }
+  }
+}

@@ -1,0 +1,5814 @@
+{
+  "icons": [
+    {
+      "id": "coreui-brands:500px",
+      "name": "500px",
+      "label": "500px",
+      "search": "500px",
+      "shard": "000-50-ap"
+    },
+    {
+      "id": "coreui-brands:500px-5",
+      "name": "500px-5",
+      "label": "500px 5",
+      "search": "500px 5",
+      "shard": "000-50-ap"
+    },
+    {
+      "id": "coreui-brands:about-me",
+      "name": "about-me",
+      "label": "About Me",
+      "search": "about me",
+      "shard": "000-50-ap"
+    },
+    {
+      "id": "coreui-brands:abstract",
+      "name": "abstract",
+      "label": "Abstract",
+      "search": "abstract",
+      "shard": "000-50-ap"
+    },
+    {
+      "id": "coreui-brands:acm",
+      "name": "acm",
+      "label": "Acm",
+      "search": "acm",
+      "shard": "000-50-ap"
+    },
+    {
+      "id": "coreui-brands:addthis",
+      "name": "addthis",
+      "label": "Addthis",
+      "search": "addthis",
+      "shard": "000-50-ap"
+    },
+    {
+      "id": "coreui-brands:adguard",
+      "name": "adguard",
+      "label": "Adguard",
+      "search": "adguard",
+      "shard": "000-50-ap"
+    },
+    {
+      "id": "coreui-brands:adobe",
+      "name": "adobe",
+      "label": "Adobe",
+      "search": "adobe",
+      "shard": "000-50-ap"
+    },
+    {
+      "id": "coreui-brands:adobe-acrobat-reader",
+      "name": "adobe-acrobat-reader",
+      "label": "Adobe Acrobat Reader",
+      "search": "adobe acrobat reader",
+      "shard": "000-50-ap"
+    },
+    {
+      "id": "coreui-brands:adobe-after-effects",
+      "name": "adobe-after-effects",
+      "label": "Adobe After Effects",
+      "search": "adobe after effects",
+      "shard": "000-50-ap"
+    },
+    {
+      "id": "coreui-brands:adobe-audition",
+      "name": "adobe-audition",
+      "label": "Adobe Audition",
+      "search": "adobe audition",
+      "shard": "000-50-ap"
+    },
+    {
+      "id": "coreui-brands:adobe-creative-cloud",
+      "name": "adobe-creative-cloud",
+      "label": "Adobe Creative Cloud",
+      "search": "adobe creative cloud",
+      "shard": "000-50-ap"
+    },
+    {
+      "id": "coreui-brands:adobe-dreamweaver",
+      "name": "adobe-dreamweaver",
+      "label": "Adobe Dreamweaver",
+      "search": "adobe dreamweaver",
+      "shard": "000-50-ap"
+    },
+    {
+      "id": "coreui-brands:adobe-illustrator",
+      "name": "adobe-illustrator",
+      "label": "Adobe Illustrator",
+      "search": "adobe illustrator",
+      "shard": "000-50-ap"
+    },
+    {
+      "id": "coreui-brands:adobe-indesign",
+      "name": "adobe-indesign",
+      "label": "Adobe Indesign",
+      "search": "adobe indesign",
+      "shard": "000-50-ap"
+    },
+    {
+      "id": "coreui-brands:adobe-lightroom",
+      "name": "adobe-lightroom",
+      "label": "Adobe Lightroom",
+      "search": "adobe lightroom",
+      "shard": "000-50-ap"
+    },
+    {
+      "id": "coreui-brands:adobe-lightroom-classic",
+      "name": "adobe-lightroom-classic",
+      "label": "Adobe Lightroom Classic",
+      "search": "adobe lightroom classic",
+      "shard": "000-50-ap"
+    },
+    {
+      "id": "coreui-brands:adobe-photoshop",
+      "name": "adobe-photoshop",
+      "label": "Adobe Photoshop",
+      "search": "adobe photoshop",
+      "shard": "000-50-ap"
+    },
+    {
+      "id": "coreui-brands:adobe-premiere",
+      "name": "adobe-premiere",
+      "label": "Adobe Premiere",
+      "search": "adobe premiere",
+      "shard": "000-50-ap"
+    },
+    {
+      "id": "coreui-brands:adobe-typekit",
+      "name": "adobe-typekit",
+      "label": "Adobe Typekit",
+      "search": "adobe typekit",
+      "shard": "000-50-ap"
+    },
+    {
+      "id": "coreui-brands:adobe-xd",
+      "name": "adobe-xd",
+      "label": "Adobe Xd",
+      "search": "adobe xd",
+      "shard": "000-50-ap"
+    },
+    {
+      "id": "coreui-brands:airbnb",
+      "name": "airbnb",
+      "label": "Airbnb",
+      "search": "airbnb",
+      "shard": "000-50-ap"
+    },
+    {
+      "id": "coreui-brands:algolia",
+      "name": "algolia",
+      "label": "Algolia",
+      "search": "algolia",
+      "shard": "000-50-ap"
+    },
+    {
+      "id": "coreui-brands:alipay",
+      "name": "alipay",
+      "label": "Alipay",
+      "search": "alipay",
+      "shard": "000-50-ap"
+    },
+    {
+      "id": "coreui-brands:allocine",
+      "name": "allocine",
+      "label": "Allocine",
+      "search": "allocine",
+      "shard": "000-50-ap"
+    },
+    {
+      "id": "coreui-brands:amazon",
+      "name": "amazon",
+      "label": "Amazon",
+      "search": "amazon",
+      "shard": "000-50-ap"
+    },
+    {
+      "id": "coreui-brands:amazon-aws",
+      "name": "amazon-aws",
+      "label": "Amazon Aws",
+      "search": "amazon aws",
+      "shard": "000-50-ap"
+    },
+    {
+      "id": "coreui-brands:amazon-pay",
+      "name": "amazon-pay",
+      "label": "Amazon Pay",
+      "search": "amazon pay",
+      "shard": "000-50-ap"
+    },
+    {
+      "id": "coreui-brands:amd",
+      "name": "amd",
+      "label": "Amd",
+      "search": "amd",
+      "shard": "000-50-ap"
+    },
+    {
+      "id": "coreui-brands:american-express",
+      "name": "american-express",
+      "label": "American Express",
+      "search": "american express",
+      "shard": "000-50-ap"
+    },
+    {
+      "id": "coreui-brands:anaconda",
+      "name": "anaconda",
+      "label": "Anaconda",
+      "search": "anaconda",
+      "shard": "000-50-ap"
+    },
+    {
+      "id": "coreui-brands:analogue",
+      "name": "analogue",
+      "label": "Analogue",
+      "search": "analogue",
+      "shard": "000-50-ap"
+    },
+    {
+      "id": "coreui-brands:android",
+      "name": "android",
+      "label": "Android",
+      "search": "android",
+      "shard": "000-50-ap"
+    },
+    {
+      "id": "coreui-brands:android-alt",
+      "name": "android-alt",
+      "label": "Android Alt",
+      "search": "android alt",
+      "shard": "000-50-ap"
+    },
+    {
+      "id": "coreui-brands:angellist",
+      "name": "angellist",
+      "label": "Angellist",
+      "search": "angellist",
+      "shard": "000-50-ap"
+    },
+    {
+      "id": "coreui-brands:angular",
+      "name": "angular",
+      "label": "Angular",
+      "search": "angular",
+      "shard": "000-50-ap"
+    },
+    {
+      "id": "coreui-brands:angular-universal",
+      "name": "angular-universal",
+      "label": "Angular Universal",
+      "search": "angular universal",
+      "shard": "000-50-ap"
+    },
+    {
+      "id": "coreui-brands:ansible",
+      "name": "ansible",
+      "label": "Ansible",
+      "search": "ansible",
+      "shard": "000-50-ap"
+    },
+    {
+      "id": "coreui-brands:apache",
+      "name": "apache",
+      "label": "Apache",
+      "search": "apache",
+      "shard": "000-50-ap"
+    },
+    {
+      "id": "coreui-brands:apache-airflow",
+      "name": "apache-airflow",
+      "label": "Apache Airflow",
+      "search": "apache airflow",
+      "shard": "001-ap-az"
+    },
+    {
+      "id": "coreui-brands:apache-flink",
+      "name": "apache-flink",
+      "label": "Apache Flink",
+      "search": "apache flink",
+      "shard": "001-ap-az"
+    },
+    {
+      "id": "coreui-brands:apache-spark",
+      "name": "apache-spark",
+      "label": "Apache Spark",
+      "search": "apache spark",
+      "shard": "001-ap-az"
+    },
+    {
+      "id": "coreui-brands:app-store",
+      "name": "app-store",
+      "label": "App Store",
+      "search": "app store",
+      "shard": "001-ap-az"
+    },
+    {
+      "id": "coreui-brands:app-store-ios",
+      "name": "app-store-ios",
+      "label": "App Store Ios",
+      "search": "app store ios",
+      "shard": "001-ap-az"
+    },
+    {
+      "id": "coreui-brands:apple",
+      "name": "apple",
+      "label": "Apple",
+      "search": "apple",
+      "shard": "001-ap-az"
+    },
+    {
+      "id": "coreui-brands:apple-music",
+      "name": "apple-music",
+      "label": "Apple Music",
+      "search": "apple music",
+      "shard": "001-ap-az"
+    },
+    {
+      "id": "coreui-brands:apple-pay",
+      "name": "apple-pay",
+      "label": "Apple Pay",
+      "search": "apple pay",
+      "shard": "001-ap-az"
+    },
+    {
+      "id": "coreui-brands:apple-podcasts",
+      "name": "apple-podcasts",
+      "label": "Apple Podcasts",
+      "search": "apple podcasts",
+      "shard": "001-ap-az"
+    },
+    {
+      "id": "coreui-brands:appveyor",
+      "name": "appveyor",
+      "label": "Appveyor",
+      "search": "appveyor",
+      "shard": "001-ap-az"
+    },
+    {
+      "id": "coreui-brands:aral",
+      "name": "aral",
+      "label": "Aral",
+      "search": "aral",
+      "shard": "001-ap-az"
+    },
+    {
+      "id": "coreui-brands:arch-linux",
+      "name": "arch-linux",
+      "label": "Arch Linux",
+      "search": "arch linux",
+      "shard": "001-ap-az"
+    },
+    {
+      "id": "coreui-brands:archive-of-our-own",
+      "name": "archive-of-our-own",
+      "label": "Archive Of Our Own",
+      "search": "archive of our own",
+      "shard": "001-ap-az"
+    },
+    {
+      "id": "coreui-brands:arduino",
+      "name": "arduino",
+      "label": "Arduino",
+      "search": "arduino",
+      "shard": "001-ap-az"
+    },
+    {
+      "id": "coreui-brands:artstation",
+      "name": "artstation",
+      "label": "Artstation",
+      "search": "artstation",
+      "shard": "001-ap-az"
+    },
+    {
+      "id": "coreui-brands:arxiv",
+      "name": "arxiv",
+      "label": "Arxiv",
+      "search": "arxiv",
+      "shard": "001-ap-az"
+    },
+    {
+      "id": "coreui-brands:asana",
+      "name": "asana",
+      "label": "Asana",
+      "search": "asana",
+      "shard": "001-ap-az"
+    },
+    {
+      "id": "coreui-brands:at-and-t",
+      "name": "at-and-t",
+      "label": "At And T",
+      "search": "at and t",
+      "shard": "001-ap-az"
+    },
+    {
+      "id": "coreui-brands:atlassian",
+      "name": "atlassian",
+      "label": "Atlassian",
+      "search": "atlassian",
+      "shard": "001-ap-az"
+    },
+    {
+      "id": "coreui-brands:atom",
+      "name": "atom",
+      "label": "Atom",
+      "search": "atom",
+      "shard": "001-ap-az"
+    },
+    {
+      "id": "coreui-brands:audible",
+      "name": "audible",
+      "label": "Audible",
+      "search": "audible",
+      "shard": "001-ap-az"
+    },
+    {
+      "id": "coreui-brands:aurelia",
+      "name": "aurelia",
+      "label": "Aurelia",
+      "search": "aurelia",
+      "shard": "001-ap-az"
+    },
+    {
+      "id": "coreui-brands:auth0",
+      "name": "auth0",
+      "label": "Auth0",
+      "search": "auth0",
+      "shard": "001-ap-az"
+    },
+    {
+      "id": "coreui-brands:automatic",
+      "name": "automatic",
+      "label": "Automatic",
+      "search": "automatic",
+      "shard": "001-ap-az"
+    },
+    {
+      "id": "coreui-brands:autotask",
+      "name": "autotask",
+      "label": "Autotask",
+      "search": "autotask",
+      "shard": "001-ap-az"
+    },
+    {
+      "id": "coreui-brands:aventrix",
+      "name": "aventrix",
+      "label": "Aventrix",
+      "search": "aventrix",
+      "shard": "001-ap-az"
+    },
+    {
+      "id": "coreui-brands:azure-artifacts",
+      "name": "azure-artifacts",
+      "label": "Azure Artifacts",
+      "search": "azure artifacts",
+      "shard": "001-ap-az"
+    },
+    {
+      "id": "coreui-brands:azure-devops",
+      "name": "azure-devops",
+      "label": "Azure Devops",
+      "search": "azure devops",
+      "shard": "001-ap-az"
+    },
+    {
+      "id": "coreui-brands:azure-pipelines",
+      "name": "azure-pipelines",
+      "label": "Azure Pipelines",
+      "search": "azure pipelines",
+      "shard": "001-ap-az"
+    },
+    {
+      "id": "coreui-brands:babel",
+      "name": "babel",
+      "label": "Babel",
+      "search": "babel",
+      "shard": "002-ba-ca"
+    },
+    {
+      "id": "coreui-brands:baidu",
+      "name": "baidu",
+      "label": "Baidu",
+      "search": "baidu",
+      "shard": "002-ba-ca"
+    },
+    {
+      "id": "coreui-brands:bamboo",
+      "name": "bamboo",
+      "label": "Bamboo",
+      "search": "bamboo",
+      "shard": "002-ba-ca"
+    },
+    {
+      "id": "coreui-brands:bancontact",
+      "name": "bancontact",
+      "label": "Bancontact",
+      "search": "bancontact",
+      "shard": "002-ba-ca"
+    },
+    {
+      "id": "coreui-brands:bandcamp",
+      "name": "bandcamp",
+      "label": "Bandcamp",
+      "search": "bandcamp",
+      "shard": "002-ba-ca"
+    },
+    {
+      "id": "coreui-brands:basecamp",
+      "name": "basecamp",
+      "label": "Basecamp",
+      "search": "basecamp",
+      "shard": "002-ba-ca"
+    },
+    {
+      "id": "coreui-brands:bathasu",
+      "name": "bathasu",
+      "label": "Bathasu",
+      "search": "bathasu",
+      "shard": "002-ba-ca"
+    },
+    {
+      "id": "coreui-brands:behance",
+      "name": "behance",
+      "label": "Behance",
+      "search": "behance",
+      "shard": "002-ba-ca"
+    },
+    {
+      "id": "coreui-brands:big-cartel",
+      "name": "big-cartel",
+      "label": "Big Cartel",
+      "search": "big cartel",
+      "shard": "002-ba-ca"
+    },
+    {
+      "id": "coreui-brands:bing",
+      "name": "bing",
+      "label": "Bing",
+      "search": "bing",
+      "shard": "002-ba-ca"
+    },
+    {
+      "id": "coreui-brands:bit",
+      "name": "bit",
+      "label": "Bit",
+      "search": "bit",
+      "shard": "002-ba-ca"
+    },
+    {
+      "id": "coreui-brands:bitbucket",
+      "name": "bitbucket",
+      "label": "Bitbucket",
+      "search": "bitbucket",
+      "shard": "002-ba-ca"
+    },
+    {
+      "id": "coreui-brands:bitcoin",
+      "name": "bitcoin",
+      "label": "Bitcoin",
+      "search": "bitcoin",
+      "shard": "002-ba-ca"
+    },
+    {
+      "id": "coreui-brands:bitdefender",
+      "name": "bitdefender",
+      "label": "Bitdefender",
+      "search": "bitdefender",
+      "shard": "002-ba-ca"
+    },
+    {
+      "id": "coreui-brands:bitly",
+      "name": "bitly",
+      "label": "Bitly",
+      "search": "bitly",
+      "shard": "002-ba-ca"
+    },
+    {
+      "id": "coreui-brands:blackberry",
+      "name": "blackberry",
+      "label": "Blackberry",
+      "search": "blackberry",
+      "shard": "002-ba-ca"
+    },
+    {
+      "id": "coreui-brands:blender",
+      "name": "blender",
+      "label": "Blender",
+      "search": "blender",
+      "shard": "002-ba-ca"
+    },
+    {
+      "id": "coreui-brands:blogger",
+      "name": "blogger",
+      "label": "Blogger",
+      "search": "blogger",
+      "shard": "002-ba-ca"
+    },
+    {
+      "id": "coreui-brands:blogger-b",
+      "name": "blogger-b",
+      "label": "Blogger B",
+      "search": "blogger b",
+      "shard": "002-ba-ca"
+    },
+    {
+      "id": "coreui-brands:bluetooth",
+      "name": "bluetooth",
+      "label": "Bluetooth",
+      "search": "bluetooth",
+      "shard": "002-ba-ca"
+    },
+    {
+      "id": "coreui-brands:bluetooth-b",
+      "name": "bluetooth-b",
+      "label": "Bluetooth B",
+      "search": "bluetooth b",
+      "shard": "002-ba-ca"
+    },
+    {
+      "id": "coreui-brands:boeing",
+      "name": "boeing",
+      "label": "Boeing",
+      "search": "boeing",
+      "shard": "002-ba-ca"
+    },
+    {
+      "id": "coreui-brands:boost",
+      "name": "boost",
+      "label": "Boost",
+      "search": "boost",
+      "shard": "002-ba-ca"
+    },
+    {
+      "id": "coreui-brands:bootstrap",
+      "name": "bootstrap",
+      "label": "Bootstrap",
+      "search": "bootstrap",
+      "shard": "002-ba-ca"
+    },
+    {
+      "id": "coreui-brands:bower",
+      "name": "bower",
+      "label": "Bower",
+      "search": "bower",
+      "shard": "002-ba-ca"
+    },
+    {
+      "id": "coreui-brands:brand-ai",
+      "name": "brand-ai",
+      "label": "Brand Ai",
+      "search": "brand ai",
+      "shard": "002-ba-ca"
+    },
+    {
+      "id": "coreui-brands:brave",
+      "name": "brave",
+      "label": "Brave",
+      "search": "brave",
+      "shard": "002-ba-ca"
+    },
+    {
+      "id": "coreui-brands:btc",
+      "name": "btc",
+      "label": "Btc",
+      "search": "btc",
+      "shard": "002-ba-ca"
+    },
+    {
+      "id": "coreui-brands:buddy",
+      "name": "buddy",
+      "label": "Buddy",
+      "search": "buddy",
+      "shard": "002-ba-ca"
+    },
+    {
+      "id": "coreui-brands:buffer",
+      "name": "buffer",
+      "label": "Buffer",
+      "search": "buffer",
+      "shard": "002-ba-ca"
+    },
+    {
+      "id": "coreui-brands:buy-me-a-coffee",
+      "name": "buy-me-a-coffee",
+      "label": "Buy Me A Coffee",
+      "search": "buy me a coffee",
+      "shard": "002-ba-ca"
+    },
+    {
+      "id": "coreui-brands:buysellads",
+      "name": "buysellads",
+      "label": "Buysellads",
+      "search": "buysellads",
+      "shard": "002-ba-ca"
+    },
+    {
+      "id": "coreui-brands:buzzfeed",
+      "name": "buzzfeed",
+      "label": "Buzzfeed",
+      "search": "buzzfeed",
+      "shard": "002-ba-ca"
+    },
+    {
+      "id": "coreui-brands:c",
+      "name": "c",
+      "label": "C",
+      "search": "c",
+      "shard": "002-ba-ca"
+    },
+    {
+      "id": "coreui-brands:cakephp",
+      "name": "cakephp",
+      "label": "Cakephp",
+      "search": "cakephp",
+      "shard": "002-ba-ca"
+    },
+    {
+      "id": "coreui-brands:campaign-monitor",
+      "name": "campaign-monitor",
+      "label": "Campaign Monitor",
+      "search": "campaign monitor",
+      "shard": "002-ba-ca"
+    },
+    {
+      "id": "coreui-brands:canva",
+      "name": "canva",
+      "label": "Canva",
+      "search": "canva",
+      "shard": "002-ba-ca"
+    },
+    {
+      "id": "coreui-brands:cashapp",
+      "name": "cashapp",
+      "label": "Cashapp",
+      "search": "cashapp",
+      "shard": "002-ba-ca"
+    },
+    {
+      "id": "coreui-brands:cassandra",
+      "name": "cassandra",
+      "label": "Cassandra",
+      "search": "cassandra",
+      "shard": "003-ca-co"
+    },
+    {
+      "id": "coreui-brands:castro",
+      "name": "castro",
+      "label": "Castro",
+      "search": "castro",
+      "shard": "003-ca-co"
+    },
+    {
+      "id": "coreui-brands:cc-amazon-pay",
+      "name": "cc-amazon-pay",
+      "label": "Cc Amazon Pay",
+      "search": "cc amazon pay",
+      "shard": "003-ca-co"
+    },
+    {
+      "id": "coreui-brands:cc-amex",
+      "name": "cc-amex",
+      "label": "Cc Amex",
+      "search": "cc amex",
+      "shard": "003-ca-co"
+    },
+    {
+      "id": "coreui-brands:cc-apple-pay",
+      "name": "cc-apple-pay",
+      "label": "Cc Apple Pay",
+      "search": "cc apple pay",
+      "shard": "003-ca-co"
+    },
+    {
+      "id": "coreui-brands:cc-diners-club",
+      "name": "cc-diners-club",
+      "label": "Cc Diners Club",
+      "search": "cc diners club",
+      "shard": "003-ca-co"
+    },
+    {
+      "id": "coreui-brands:cc-discover",
+      "name": "cc-discover",
+      "label": "Cc Discover",
+      "search": "cc discover",
+      "shard": "003-ca-co"
+    },
+    {
+      "id": "coreui-brands:cc-jcb",
+      "name": "cc-jcb",
+      "label": "Cc Jcb",
+      "search": "cc jcb",
+      "shard": "003-ca-co"
+    },
+    {
+      "id": "coreui-brands:cc-mastercard",
+      "name": "cc-mastercard",
+      "label": "Cc Mastercard",
+      "search": "cc mastercard",
+      "shard": "003-ca-co"
+    },
+    {
+      "id": "coreui-brands:cc-paypal",
+      "name": "cc-paypal",
+      "label": "Cc Paypal",
+      "search": "cc paypal",
+      "shard": "003-ca-co"
+    },
+    {
+      "id": "coreui-brands:cc-stripe",
+      "name": "cc-stripe",
+      "label": "Cc Stripe",
+      "search": "cc stripe",
+      "shard": "003-ca-co"
+    },
+    {
+      "id": "coreui-brands:cc-visa",
+      "name": "cc-visa",
+      "label": "Cc Visa",
+      "search": "cc visa",
+      "shard": "003-ca-co"
+    },
+    {
+      "id": "coreui-brands:centos",
+      "name": "centos",
+      "label": "Centos",
+      "search": "centos",
+      "shard": "003-ca-co"
+    },
+    {
+      "id": "coreui-brands:cevo",
+      "name": "cevo",
+      "label": "Cevo",
+      "search": "cevo",
+      "shard": "003-ca-co"
+    },
+    {
+      "id": "coreui-brands:chase",
+      "name": "chase",
+      "label": "Chase",
+      "search": "chase",
+      "shard": "003-ca-co"
+    },
+    {
+      "id": "coreui-brands:chef",
+      "name": "chef",
+      "label": "Chef",
+      "search": "chef",
+      "shard": "003-ca-co"
+    },
+    {
+      "id": "coreui-brands:chromecast",
+      "name": "chromecast",
+      "label": "Chromecast",
+      "search": "chromecast",
+      "shard": "003-ca-co"
+    },
+    {
+      "id": "coreui-brands:circle",
+      "name": "circle",
+      "label": "Circle",
+      "search": "circle",
+      "shard": "003-ca-co"
+    },
+    {
+      "id": "coreui-brands:circleci",
+      "name": "circleci",
+      "label": "Circleci",
+      "search": "circleci",
+      "shard": "003-ca-co"
+    },
+    {
+      "id": "coreui-brands:cirrusci",
+      "name": "cirrusci",
+      "label": "Cirrusci",
+      "search": "cirrusci",
+      "shard": "003-ca-co"
+    },
+    {
+      "id": "coreui-brands:cisco",
+      "name": "cisco",
+      "label": "Cisco",
+      "search": "cisco",
+      "shard": "003-ca-co"
+    },
+    {
+      "id": "coreui-brands:civicrm",
+      "name": "civicrm",
+      "label": "Civicrm",
+      "search": "civicrm",
+      "shard": "003-ca-co"
+    },
+    {
+      "id": "coreui-brands:clockify",
+      "name": "clockify",
+      "label": "Clockify",
+      "search": "clockify",
+      "shard": "003-ca-co"
+    },
+    {
+      "id": "coreui-brands:clojure",
+      "name": "clojure",
+      "label": "Clojure",
+      "search": "clojure",
+      "shard": "003-ca-co"
+    },
+    {
+      "id": "coreui-brands:cloudbees",
+      "name": "cloudbees",
+      "label": "Cloudbees",
+      "search": "cloudbees",
+      "shard": "003-ca-co"
+    },
+    {
+      "id": "coreui-brands:cloudflare",
+      "name": "cloudflare",
+      "label": "Cloudflare",
+      "search": "cloudflare",
+      "shard": "003-ca-co"
+    },
+    {
+      "id": "coreui-brands:cmake",
+      "name": "cmake",
+      "label": "Cmake",
+      "search": "cmake",
+      "shard": "003-ca-co"
+    },
+    {
+      "id": "coreui-brands:co-op",
+      "name": "co-op",
+      "label": "Co Op",
+      "search": "co op",
+      "shard": "003-ca-co"
+    },
+    {
+      "id": "coreui-brands:codacy",
+      "name": "codacy",
+      "label": "Codacy",
+      "search": "codacy",
+      "shard": "003-ca-co"
+    },
+    {
+      "id": "coreui-brands:code-climate",
+      "name": "code-climate",
+      "label": "Code Climate",
+      "search": "code climate",
+      "shard": "003-ca-co"
+    },
+    {
+      "id": "coreui-brands:codecademy",
+      "name": "codecademy",
+      "label": "Codecademy",
+      "search": "codecademy",
+      "shard": "003-ca-co"
+    },
+    {
+      "id": "coreui-brands:codecov",
+      "name": "codecov",
+      "label": "Codecov",
+      "search": "codecov",
+      "shard": "003-ca-co"
+    },
+    {
+      "id": "coreui-brands:codeigniter",
+      "name": "codeigniter",
+      "label": "Codeigniter",
+      "search": "codeigniter",
+      "shard": "003-ca-co"
+    },
+    {
+      "id": "coreui-brands:codepen",
+      "name": "codepen",
+      "label": "Codepen",
+      "search": "codepen",
+      "shard": "003-ca-co"
+    },
+    {
+      "id": "coreui-brands:coderwall",
+      "name": "coderwall",
+      "label": "Coderwall",
+      "search": "coderwall",
+      "shard": "003-ca-co"
+    },
+    {
+      "id": "coreui-brands:codesandbox",
+      "name": "codesandbox",
+      "label": "Codesandbox",
+      "search": "codesandbox",
+      "shard": "003-ca-co"
+    },
+    {
+      "id": "coreui-brands:codeship",
+      "name": "codeship",
+      "label": "Codeship",
+      "search": "codeship",
+      "shard": "004-co-co"
+    },
+    {
+      "id": "coreui-brands:codewars",
+      "name": "codewars",
+      "label": "Codewars",
+      "search": "codewars",
+      "shard": "004-co-co"
+    },
+    {
+      "id": "coreui-brands:codio",
+      "name": "codio",
+      "label": "Codio",
+      "search": "codio",
+      "shard": "004-co-co"
+    },
+    {
+      "id": "coreui-brands:coffeescript",
+      "name": "coffeescript",
+      "label": "Coffeescript",
+      "search": "coffeescript",
+      "shard": "004-co-co"
+    },
+    {
+      "id": "coreui-brands:common-workflow-language",
+      "name": "common-workflow-language",
+      "label": "Common Workflow Language",
+      "search": "common workflow language",
+      "shard": "004-co-co"
+    },
+    {
+      "id": "coreui-brands:composer",
+      "name": "composer",
+      "label": "Composer",
+      "search": "composer",
+      "shard": "005-co-cr"
+    },
+    {
+      "id": "coreui-brands:conda-forge",
+      "name": "conda-forge",
+      "label": "Conda Forge",
+      "search": "conda forge",
+      "shard": "005-co-cr"
+    },
+    {
+      "id": "coreui-brands:conekta",
+      "name": "conekta",
+      "label": "Conekta",
+      "search": "conekta",
+      "shard": "005-co-cr"
+    },
+    {
+      "id": "coreui-brands:confluence",
+      "name": "confluence",
+      "label": "Confluence",
+      "search": "confluence",
+      "shard": "005-co-cr"
+    },
+    {
+      "id": "coreui-brands:coreui",
+      "name": "coreui",
+      "label": "Coreui",
+      "search": "coreui",
+      "shard": "005-co-cr"
+    },
+    {
+      "id": "coreui-brands:coreui-c",
+      "name": "coreui-c",
+      "label": "Coreui C",
+      "search": "coreui c",
+      "shard": "005-co-cr"
+    },
+    {
+      "id": "coreui-brands:coursera",
+      "name": "coursera",
+      "label": "Coursera",
+      "search": "coursera",
+      "shard": "005-co-cr"
+    },
+    {
+      "id": "coreui-brands:coveralls",
+      "name": "coveralls",
+      "label": "Coveralls",
+      "search": "coveralls",
+      "shard": "005-co-cr"
+    },
+    {
+      "id": "coreui-brands:cpanel",
+      "name": "cpanel",
+      "label": "Cpanel",
+      "search": "cpanel",
+      "shard": "005-co-cr"
+    },
+    {
+      "id": "coreui-brands:cplusplus",
+      "name": "cplusplus",
+      "label": "Cplusplus",
+      "search": "cplusplus",
+      "shard": "005-co-cr"
+    },
+    {
+      "id": "coreui-brands:creative-commons",
+      "name": "creative-commons",
+      "label": "Creative Commons",
+      "search": "creative commons",
+      "shard": "005-co-cr"
+    },
+    {
+      "id": "coreui-brands:creative-commons-by",
+      "name": "creative-commons-by",
+      "label": "Creative Commons By",
+      "search": "creative commons by",
+      "shard": "005-co-cr"
+    },
+    {
+      "id": "coreui-brands:creative-commons-nc",
+      "name": "creative-commons-nc",
+      "label": "Creative Commons Nc",
+      "search": "creative commons nc",
+      "shard": "005-co-cr"
+    },
+    {
+      "id": "coreui-brands:creative-commons-nc-eu",
+      "name": "creative-commons-nc-eu",
+      "label": "Creative Commons Nc Eu",
+      "search": "creative commons nc eu",
+      "shard": "005-co-cr"
+    },
+    {
+      "id": "coreui-brands:creative-commons-nc-jp",
+      "name": "creative-commons-nc-jp",
+      "label": "Creative Commons Nc Jp",
+      "search": "creative commons nc jp",
+      "shard": "005-co-cr"
+    },
+    {
+      "id": "coreui-brands:creative-commons-nd",
+      "name": "creative-commons-nd",
+      "label": "Creative Commons Nd",
+      "search": "creative commons nd",
+      "shard": "005-co-cr"
+    },
+    {
+      "id": "coreui-brands:creative-commons-pd",
+      "name": "creative-commons-pd",
+      "label": "Creative Commons Pd",
+      "search": "creative commons pd",
+      "shard": "006-cr-dr"
+    },
+    {
+      "id": "coreui-brands:creative-commons-pd-alt",
+      "name": "creative-commons-pd-alt",
+      "label": "Creative Commons Pd Alt",
+      "search": "creative commons pd alt",
+      "shard": "006-cr-dr"
+    },
+    {
+      "id": "coreui-brands:creative-commons-remix",
+      "name": "creative-commons-remix",
+      "label": "Creative Commons Remix",
+      "search": "creative commons remix",
+      "shard": "006-cr-dr"
+    },
+    {
+      "id": "coreui-brands:creative-commons-sa",
+      "name": "creative-commons-sa",
+      "label": "Creative Commons Sa",
+      "search": "creative commons sa",
+      "shard": "006-cr-dr"
+    },
+    {
+      "id": "coreui-brands:creative-commons-sampling",
+      "name": "creative-commons-sampling",
+      "label": "Creative Commons Sampling",
+      "search": "creative commons sampling",
+      "shard": "006-cr-dr"
+    },
+    {
+      "id": "coreui-brands:creative-commons-sampling-plus",
+      "name": "creative-commons-sampling-plus",
+      "label": "Creative Commons Sampling Plus",
+      "search": "creative commons sampling plus",
+      "shard": "006-cr-dr"
+    },
+    {
+      "id": "coreui-brands:creative-commons-share",
+      "name": "creative-commons-share",
+      "label": "Creative Commons Share",
+      "search": "creative commons share",
+      "shard": "006-cr-dr"
+    },
+    {
+      "id": "coreui-brands:creative-commons-zero",
+      "name": "creative-commons-zero",
+      "label": "Creative Commons Zero",
+      "search": "creative commons zero",
+      "shard": "006-cr-dr"
+    },
+    {
+      "id": "coreui-brands:crunchbase",
+      "name": "crunchbase",
+      "label": "Crunchbase",
+      "search": "crunchbase",
+      "shard": "006-cr-dr"
+    },
+    {
+      "id": "coreui-brands:crunchyroll",
+      "name": "crunchyroll",
+      "label": "Crunchyroll",
+      "search": "crunchyroll",
+      "shard": "006-cr-dr"
+    },
+    {
+      "id": "coreui-brands:css3",
+      "name": "css3",
+      "label": "Css3",
+      "search": "css3",
+      "shard": "006-cr-dr"
+    },
+    {
+      "id": "coreui-brands:css3-shiled",
+      "name": "css3-shiled",
+      "label": "Css3 Shiled",
+      "search": "css3 shiled",
+      "shard": "006-cr-dr"
+    },
+    {
+      "id": "coreui-brands:csswizardry",
+      "name": "csswizardry",
+      "label": "Csswizardry",
+      "search": "csswizardry",
+      "shard": "006-cr-dr"
+    },
+    {
+      "id": "coreui-brands:d3-js",
+      "name": "d3-js",
+      "label": "D3 Js",
+      "search": "d3 js",
+      "shard": "006-cr-dr"
+    },
+    {
+      "id": "coreui-brands:dailymotion",
+      "name": "dailymotion",
+      "label": "Dailymotion",
+      "search": "dailymotion",
+      "shard": "006-cr-dr"
+    },
+    {
+      "id": "coreui-brands:dashlane",
+      "name": "dashlane",
+      "label": "Dashlane",
+      "search": "dashlane",
+      "shard": "006-cr-dr"
+    },
+    {
+      "id": "coreui-brands:dazn",
+      "name": "dazn",
+      "label": "Dazn",
+      "search": "dazn",
+      "shard": "006-cr-dr"
+    },
+    {
+      "id": "coreui-brands:dblp",
+      "name": "dblp",
+      "label": "Dblp",
+      "search": "dblp",
+      "shard": "006-cr-dr"
+    },
+    {
+      "id": "coreui-brands:debian",
+      "name": "debian",
+      "label": "Debian",
+      "search": "debian",
+      "shard": "006-cr-dr"
+    },
+    {
+      "id": "coreui-brands:deepin",
+      "name": "deepin",
+      "label": "Deepin",
+      "search": "deepin",
+      "shard": "006-cr-dr"
+    },
+    {
+      "id": "coreui-brands:deezer",
+      "name": "deezer",
+      "label": "Deezer",
+      "search": "deezer",
+      "shard": "006-cr-dr"
+    },
+    {
+      "id": "coreui-brands:delicious",
+      "name": "delicious",
+      "label": "Delicious",
+      "search": "delicious",
+      "shard": "006-cr-dr"
+    },
+    {
+      "id": "coreui-brands:dell",
+      "name": "dell",
+      "label": "Dell",
+      "search": "dell",
+      "shard": "006-cr-dr"
+    },
+    {
+      "id": "coreui-brands:deno",
+      "name": "deno",
+      "label": "Deno",
+      "search": "deno",
+      "shard": "006-cr-dr"
+    },
+    {
+      "id": "coreui-brands:dependabot",
+      "name": "dependabot",
+      "label": "Dependabot",
+      "search": "dependabot",
+      "shard": "006-cr-dr"
+    },
+    {
+      "id": "coreui-brands:designer-news",
+      "name": "designer-news",
+      "label": "Designer News",
+      "search": "designer news",
+      "shard": "006-cr-dr"
+    },
+    {
+      "id": "coreui-brands:dev-to",
+      "name": "dev-to",
+      "label": "Dev To",
+      "search": "dev to",
+      "shard": "006-cr-dr"
+    },
+    {
+      "id": "coreui-brands:deviantart",
+      "name": "deviantart",
+      "label": "Deviantart",
+      "search": "deviantart",
+      "shard": "006-cr-dr"
+    },
+    {
+      "id": "coreui-brands:devrant",
+      "name": "devrant",
+      "label": "Devrant",
+      "search": "devrant",
+      "shard": "006-cr-dr"
+    },
+    {
+      "id": "coreui-brands:diaspora",
+      "name": "diaspora",
+      "label": "Diaspora",
+      "search": "diaspora",
+      "shard": "006-cr-dr"
+    },
+    {
+      "id": "coreui-brands:digg",
+      "name": "digg",
+      "label": "Digg",
+      "search": "digg",
+      "shard": "006-cr-dr"
+    },
+    {
+      "id": "coreui-brands:digital-ocean",
+      "name": "digital-ocean",
+      "label": "Digital Ocean",
+      "search": "digital ocean",
+      "shard": "006-cr-dr"
+    },
+    {
+      "id": "coreui-brands:discord",
+      "name": "discord",
+      "label": "Discord",
+      "search": "discord",
+      "shard": "006-cr-dr"
+    },
+    {
+      "id": "coreui-brands:discourse",
+      "name": "discourse",
+      "label": "Discourse",
+      "search": "discourse",
+      "shard": "006-cr-dr"
+    },
+    {
+      "id": "coreui-brands:discover",
+      "name": "discover",
+      "label": "Discover",
+      "search": "discover",
+      "shard": "006-cr-dr"
+    },
+    {
+      "id": "coreui-brands:disqus",
+      "name": "disqus",
+      "label": "Disqus",
+      "search": "disqus",
+      "shard": "006-cr-dr"
+    },
+    {
+      "id": "coreui-brands:disroot",
+      "name": "disroot",
+      "label": "Disroot",
+      "search": "disroot",
+      "shard": "006-cr-dr"
+    },
+    {
+      "id": "coreui-brands:django",
+      "name": "django",
+      "label": "Django",
+      "search": "django",
+      "shard": "006-cr-dr"
+    },
+    {
+      "id": "coreui-brands:docker",
+      "name": "docker",
+      "label": "Docker",
+      "search": "docker",
+      "shard": "006-cr-dr"
+    },
+    {
+      "id": "coreui-brands:docusign",
+      "name": "docusign",
+      "label": "Docusign",
+      "search": "docusign",
+      "shard": "006-cr-dr"
+    },
+    {
+      "id": "coreui-brands:dot-net",
+      "name": "dot-net",
+      "label": "Dot Net",
+      "search": "dot net",
+      "shard": "006-cr-dr"
+    },
+    {
+      "id": "coreui-brands:draugiem-lv",
+      "name": "draugiem-lv",
+      "label": "Draugiem Lv",
+      "search": "draugiem lv",
+      "shard": "006-cr-dr"
+    },
+    {
+      "id": "coreui-brands:dribbble",
+      "name": "dribbble",
+      "label": "Dribbble",
+      "search": "dribbble",
+      "shard": "007-dr-fe"
+    },
+    {
+      "id": "coreui-brands:drone",
+      "name": "drone",
+      "label": "Drone",
+      "search": "drone",
+      "shard": "007-dr-fe"
+    },
+    {
+      "id": "coreui-brands:dropbox",
+      "name": "dropbox",
+      "label": "Dropbox",
+      "search": "dropbox",
+      "shard": "007-dr-fe"
+    },
+    {
+      "id": "coreui-brands:drupal",
+      "name": "drupal",
+      "label": "Drupal",
+      "search": "drupal",
+      "shard": "007-dr-fe"
+    },
+    {
+      "id": "coreui-brands:dtube",
+      "name": "dtube",
+      "label": "Dtube",
+      "search": "dtube",
+      "shard": "007-dr-fe"
+    },
+    {
+      "id": "coreui-brands:duckduckgo",
+      "name": "duckduckgo",
+      "label": "Duckduckgo",
+      "search": "duckduckgo",
+      "shard": "007-dr-fe"
+    },
+    {
+      "id": "coreui-brands:dynatrace",
+      "name": "dynatrace",
+      "label": "Dynatrace",
+      "search": "dynatrace",
+      "shard": "007-dr-fe"
+    },
+    {
+      "id": "coreui-brands:ebay",
+      "name": "ebay",
+      "label": "Ebay",
+      "search": "ebay",
+      "shard": "007-dr-fe"
+    },
+    {
+      "id": "coreui-brands:eclipseide",
+      "name": "eclipseide",
+      "label": "Eclipseide",
+      "search": "eclipseide",
+      "shard": "007-dr-fe"
+    },
+    {
+      "id": "coreui-brands:elastic",
+      "name": "elastic",
+      "label": "Elastic",
+      "search": "elastic",
+      "shard": "007-dr-fe"
+    },
+    {
+      "id": "coreui-brands:elastic-cloud",
+      "name": "elastic-cloud",
+      "label": "Elastic Cloud",
+      "search": "elastic cloud",
+      "shard": "007-dr-fe"
+    },
+    {
+      "id": "coreui-brands:elastic-search",
+      "name": "elastic-search",
+      "label": "Elastic Search",
+      "search": "elastic search",
+      "shard": "007-dr-fe"
+    },
+    {
+      "id": "coreui-brands:elastic-stack",
+      "name": "elastic-stack",
+      "label": "Elastic Stack",
+      "search": "elastic stack",
+      "shard": "007-dr-fe"
+    },
+    {
+      "id": "coreui-brands:electron",
+      "name": "electron",
+      "label": "Electron",
+      "search": "electron",
+      "shard": "007-dr-fe"
+    },
+    {
+      "id": "coreui-brands:elementary",
+      "name": "elementary",
+      "label": "Elementary",
+      "search": "elementary",
+      "shard": "007-dr-fe"
+    },
+    {
+      "id": "coreui-brands:eleventy",
+      "name": "eleventy",
+      "label": "Eleventy",
+      "search": "eleventy",
+      "shard": "007-dr-fe"
+    },
+    {
+      "id": "coreui-brands:ello",
+      "name": "ello",
+      "label": "Ello",
+      "search": "ello",
+      "shard": "007-dr-fe"
+    },
+    {
+      "id": "coreui-brands:emlakjet",
+      "name": "emlakjet",
+      "label": "Emlakjet",
+      "search": "emlakjet",
+      "shard": "007-dr-fe"
+    },
+    {
+      "id": "coreui-brands:empirekred",
+      "name": "empirekred",
+      "label": "Empirekred",
+      "search": "empirekred",
+      "shard": "007-dr-fe"
+    },
+    {
+      "id": "coreui-brands:envato",
+      "name": "envato",
+      "label": "Envato",
+      "search": "envato",
+      "shard": "007-dr-fe"
+    },
+    {
+      "id": "coreui-brands:epic-games",
+      "name": "epic-games",
+      "label": "Epic Games",
+      "search": "epic games",
+      "shard": "007-dr-fe"
+    },
+    {
+      "id": "coreui-brands:epson",
+      "name": "epson",
+      "label": "Epson",
+      "search": "epson",
+      "shard": "007-dr-fe"
+    },
+    {
+      "id": "coreui-brands:esea",
+      "name": "esea",
+      "label": "Esea",
+      "search": "esea",
+      "shard": "007-dr-fe"
+    },
+    {
+      "id": "coreui-brands:eslint",
+      "name": "eslint",
+      "label": "Eslint",
+      "search": "eslint",
+      "shard": "007-dr-fe"
+    },
+    {
+      "id": "coreui-brands:ethereum",
+      "name": "ethereum",
+      "label": "Ethereum",
+      "search": "ethereum",
+      "shard": "007-dr-fe"
+    },
+    {
+      "id": "coreui-brands:etsy",
+      "name": "etsy",
+      "label": "Etsy",
+      "search": "etsy",
+      "shard": "007-dr-fe"
+    },
+    {
+      "id": "coreui-brands:event-store",
+      "name": "event-store",
+      "label": "Event Store",
+      "search": "event store",
+      "shard": "007-dr-fe"
+    },
+    {
+      "id": "coreui-brands:eventbrite",
+      "name": "eventbrite",
+      "label": "Eventbrite",
+      "search": "eventbrite",
+      "shard": "007-dr-fe"
+    },
+    {
+      "id": "coreui-brands:evernote",
+      "name": "evernote",
+      "label": "Evernote",
+      "search": "evernote",
+      "shard": "007-dr-fe"
+    },
+    {
+      "id": "coreui-brands:everplaces",
+      "name": "everplaces",
+      "label": "Everplaces",
+      "search": "everplaces",
+      "shard": "007-dr-fe"
+    },
+    {
+      "id": "coreui-brands:evry",
+      "name": "evry",
+      "label": "Evry",
+      "search": "evry",
+      "shard": "007-dr-fe"
+    },
+    {
+      "id": "coreui-brands:exercism",
+      "name": "exercism",
+      "label": "Exercism",
+      "search": "exercism",
+      "shard": "007-dr-fe"
+    },
+    {
+      "id": "coreui-brands:experts-exchange",
+      "name": "experts-exchange",
+      "label": "Experts Exchange",
+      "search": "experts exchange",
+      "shard": "007-dr-fe"
+    },
+    {
+      "id": "coreui-brands:expo",
+      "name": "expo",
+      "label": "Expo",
+      "search": "expo",
+      "shard": "007-dr-fe"
+    },
+    {
+      "id": "coreui-brands:eyeem",
+      "name": "eyeem",
+      "label": "Eyeem",
+      "search": "eyeem",
+      "shard": "007-dr-fe"
+    },
+    {
+      "id": "coreui-brands:f-secure",
+      "name": "f-secure",
+      "label": "F Secure",
+      "search": "f secure",
+      "shard": "007-dr-fe"
+    },
+    {
+      "id": "coreui-brands:facebook",
+      "name": "facebook",
+      "label": "Facebook",
+      "search": "facebook",
+      "shard": "007-dr-fe"
+    },
+    {
+      "id": "coreui-brands:facebook-f",
+      "name": "facebook-f",
+      "label": "Facebook F",
+      "search": "facebook f",
+      "shard": "007-dr-fe"
+    },
+    {
+      "id": "coreui-brands:faceit",
+      "name": "faceit",
+      "label": "Faceit",
+      "search": "faceit",
+      "shard": "007-dr-fe"
+    },
+    {
+      "id": "coreui-brands:fandango",
+      "name": "fandango",
+      "label": "Fandango",
+      "search": "fandango",
+      "shard": "007-dr-fe"
+    },
+    {
+      "id": "coreui-brands:favro",
+      "name": "favro",
+      "label": "Favro",
+      "search": "favro",
+      "shard": "007-dr-fe"
+    },
+    {
+      "id": "coreui-brands:feathub",
+      "name": "feathub",
+      "label": "Feathub",
+      "search": "feathub",
+      "shard": "007-dr-fe"
+    },
+    {
+      "id": "coreui-brands:fedex",
+      "name": "fedex",
+      "label": "Fedex",
+      "search": "fedex",
+      "shard": "007-dr-fe"
+    },
+    {
+      "id": "coreui-brands:fedora",
+      "name": "fedora",
+      "label": "Fedora",
+      "search": "fedora",
+      "shard": "007-dr-fe"
+    },
+    {
+      "id": "coreui-brands:feedly",
+      "name": "feedly",
+      "label": "Feedly",
+      "search": "feedly",
+      "shard": "007-dr-fe"
+    },
+    {
+      "id": "coreui-brands:fido-alliance",
+      "name": "fido-alliance",
+      "label": "Fido Alliance",
+      "search": "fido alliance",
+      "shard": "008-fi-gl"
+    },
+    {
+      "id": "coreui-brands:figma",
+      "name": "figma",
+      "label": "Figma",
+      "search": "figma",
+      "shard": "008-fi-gl"
+    },
+    {
+      "id": "coreui-brands:filezilla",
+      "name": "filezilla",
+      "label": "Filezilla",
+      "search": "filezilla",
+      "shard": "008-fi-gl"
+    },
+    {
+      "id": "coreui-brands:firebase",
+      "name": "firebase",
+      "label": "Firebase",
+      "search": "firebase",
+      "shard": "008-fi-gl"
+    },
+    {
+      "id": "coreui-brands:fitbit",
+      "name": "fitbit",
+      "label": "Fitbit",
+      "search": "fitbit",
+      "shard": "008-fi-gl"
+    },
+    {
+      "id": "coreui-brands:flask",
+      "name": "flask",
+      "label": "Flask",
+      "search": "flask",
+      "shard": "008-fi-gl"
+    },
+    {
+      "id": "coreui-brands:flattr",
+      "name": "flattr",
+      "label": "Flattr",
+      "search": "flattr",
+      "shard": "008-fi-gl"
+    },
+    {
+      "id": "coreui-brands:flickr",
+      "name": "flickr",
+      "label": "Flickr",
+      "search": "flickr",
+      "shard": "008-fi-gl"
+    },
+    {
+      "id": "coreui-brands:flipboard",
+      "name": "flipboard",
+      "label": "Flipboard",
+      "search": "flipboard",
+      "shard": "008-fi-gl"
+    },
+    {
+      "id": "coreui-brands:flutter",
+      "name": "flutter",
+      "label": "Flutter",
+      "search": "flutter",
+      "shard": "008-fi-gl"
+    },
+    {
+      "id": "coreui-brands:fnac",
+      "name": "fnac",
+      "label": "Fnac",
+      "search": "fnac",
+      "shard": "008-fi-gl"
+    },
+    {
+      "id": "coreui-brands:foursquare",
+      "name": "foursquare",
+      "label": "Foursquare",
+      "search": "foursquare",
+      "shard": "008-fi-gl"
+    },
+    {
+      "id": "coreui-brands:framer",
+      "name": "framer",
+      "label": "Framer",
+      "search": "framer",
+      "shard": "008-fi-gl"
+    },
+    {
+      "id": "coreui-brands:freebsd",
+      "name": "freebsd",
+      "label": "Freebsd",
+      "search": "freebsd",
+      "shard": "008-fi-gl"
+    },
+    {
+      "id": "coreui-brands:freecodecamp",
+      "name": "freecodecamp",
+      "label": "Freecodecamp",
+      "search": "freecodecamp",
+      "shard": "008-fi-gl"
+    },
+    {
+      "id": "coreui-brands:fur-affinity",
+      "name": "fur-affinity",
+      "label": "Fur Affinity",
+      "search": "fur affinity",
+      "shard": "008-fi-gl"
+    },
+    {
+      "id": "coreui-brands:furry-network",
+      "name": "furry-network",
+      "label": "Furry Network",
+      "search": "furry network",
+      "shard": "008-fi-gl"
+    },
+    {
+      "id": "coreui-brands:garmin",
+      "name": "garmin",
+      "label": "Garmin",
+      "search": "garmin",
+      "shard": "008-fi-gl"
+    },
+    {
+      "id": "coreui-brands:gatsby",
+      "name": "gatsby",
+      "label": "Gatsby",
+      "search": "gatsby",
+      "shard": "008-fi-gl"
+    },
+    {
+      "id": "coreui-brands:gauges",
+      "name": "gauges",
+      "label": "Gauges",
+      "search": "gauges",
+      "shard": "008-fi-gl"
+    },
+    {
+      "id": "coreui-brands:genius",
+      "name": "genius",
+      "label": "Genius",
+      "search": "genius",
+      "shard": "008-fi-gl"
+    },
+    {
+      "id": "coreui-brands:gentoo",
+      "name": "gentoo",
+      "label": "Gentoo",
+      "search": "gentoo",
+      "shard": "008-fi-gl"
+    },
+    {
+      "id": "coreui-brands:geocaching",
+      "name": "geocaching",
+      "label": "Geocaching",
+      "search": "geocaching",
+      "shard": "008-fi-gl"
+    },
+    {
+      "id": "coreui-brands:gerrit",
+      "name": "gerrit",
+      "label": "Gerrit",
+      "search": "gerrit",
+      "shard": "008-fi-gl"
+    },
+    {
+      "id": "coreui-brands:gg",
+      "name": "gg",
+      "label": "Gg",
+      "search": "gg",
+      "shard": "008-fi-gl"
+    },
+    {
+      "id": "coreui-brands:ghost",
+      "name": "ghost",
+      "label": "Ghost",
+      "search": "ghost",
+      "shard": "008-fi-gl"
+    },
+    {
+      "id": "coreui-brands:gimp",
+      "name": "gimp",
+      "label": "Gimp",
+      "search": "gimp",
+      "shard": "008-fi-gl"
+    },
+    {
+      "id": "coreui-brands:git",
+      "name": "git",
+      "label": "Git",
+      "search": "git",
+      "shard": "008-fi-gl"
+    },
+    {
+      "id": "coreui-brands:gitea",
+      "name": "gitea",
+      "label": "Gitea",
+      "search": "gitea",
+      "shard": "008-fi-gl"
+    },
+    {
+      "id": "coreui-brands:github",
+      "name": "github",
+      "label": "Github",
+      "search": "github",
+      "shard": "008-fi-gl"
+    },
+    {
+      "id": "coreui-brands:gitkraken",
+      "name": "gitkraken",
+      "label": "Gitkraken",
+      "search": "gitkraken",
+      "shard": "008-fi-gl"
+    },
+    {
+      "id": "coreui-brands:gitlab",
+      "name": "gitlab",
+      "label": "Gitlab",
+      "search": "gitlab",
+      "shard": "008-fi-gl"
+    },
+    {
+      "id": "coreui-brands:gitpod",
+      "name": "gitpod",
+      "label": "Gitpod",
+      "search": "gitpod",
+      "shard": "008-fi-gl"
+    },
+    {
+      "id": "coreui-brands:gitter",
+      "name": "gitter",
+      "label": "Gitter",
+      "search": "gitter",
+      "shard": "008-fi-gl"
+    },
+    {
+      "id": "coreui-brands:glassdoor",
+      "name": "glassdoor",
+      "label": "Glassdoor",
+      "search": "glassdoor",
+      "shard": "008-fi-gl"
+    },
+    {
+      "id": "coreui-brands:glitch",
+      "name": "glitch",
+      "label": "Glitch",
+      "search": "glitch",
+      "shard": "009-gl-gr"
+    },
+    {
+      "id": "coreui-brands:gmail",
+      "name": "gmail",
+      "label": "Gmail",
+      "search": "gmail",
+      "shard": "009-gl-gr"
+    },
+    {
+      "id": "coreui-brands:gnu",
+      "name": "gnu",
+      "label": "Gnu",
+      "search": "gnu",
+      "shard": "009-gl-gr"
+    },
+    {
+      "id": "coreui-brands:gnu-privacy-guard",
+      "name": "gnu-privacy-guard",
+      "label": "Gnu Privacy Guard",
+      "search": "gnu privacy guard",
+      "shard": "009-gl-gr"
+    },
+    {
+      "id": "coreui-brands:gnu-social",
+      "name": "gnu-social",
+      "label": "Gnu Social",
+      "search": "gnu social",
+      "shard": "009-gl-gr"
+    },
+    {
+      "id": "coreui-brands:go",
+      "name": "go",
+      "label": "Go",
+      "search": "go",
+      "shard": "009-gl-gr"
+    },
+    {
+      "id": "coreui-brands:godot-engine",
+      "name": "godot-engine",
+      "label": "Godot Engine",
+      "search": "godot engine",
+      "shard": "009-gl-gr"
+    },
+    {
+      "id": "coreui-brands:gog-com",
+      "name": "gog-com",
+      "label": "Gog Com",
+      "search": "gog com",
+      "shard": "009-gl-gr"
+    },
+    {
+      "id": "coreui-brands:goldenline",
+      "name": "goldenline",
+      "label": "Goldenline",
+      "search": "goldenline",
+      "shard": "009-gl-gr"
+    },
+    {
+      "id": "coreui-brands:goodreads",
+      "name": "goodreads",
+      "label": "Goodreads",
+      "search": "goodreads",
+      "shard": "009-gl-gr"
+    },
+    {
+      "id": "coreui-brands:google",
+      "name": "google",
+      "label": "Google",
+      "search": "google",
+      "shard": "009-gl-gr"
+    },
+    {
+      "id": "coreui-brands:google-ads",
+      "name": "google-ads",
+      "label": "Google Ads",
+      "search": "google ads",
+      "shard": "009-gl-gr"
+    },
+    {
+      "id": "coreui-brands:google-allo",
+      "name": "google-allo",
+      "label": "Google Allo",
+      "search": "google allo",
+      "shard": "009-gl-gr"
+    },
+    {
+      "id": "coreui-brands:google-analytics",
+      "name": "google-analytics",
+      "label": "Google Analytics",
+      "search": "google analytics",
+      "shard": "009-gl-gr"
+    },
+    {
+      "id": "coreui-brands:google-chrome",
+      "name": "google-chrome",
+      "label": "Google Chrome",
+      "search": "google chrome",
+      "shard": "009-gl-gr"
+    },
+    {
+      "id": "coreui-brands:google-cloud",
+      "name": "google-cloud",
+      "label": "Google Cloud",
+      "search": "google cloud",
+      "shard": "009-gl-gr"
+    },
+    {
+      "id": "coreui-brands:google-keep",
+      "name": "google-keep",
+      "label": "Google Keep",
+      "search": "google keep",
+      "shard": "009-gl-gr"
+    },
+    {
+      "id": "coreui-brands:google-pay",
+      "name": "google-pay",
+      "label": "Google Pay",
+      "search": "google pay",
+      "shard": "009-gl-gr"
+    },
+    {
+      "id": "coreui-brands:google-play",
+      "name": "google-play",
+      "label": "Google Play",
+      "search": "google play",
+      "shard": "009-gl-gr"
+    },
+    {
+      "id": "coreui-brands:google-podcasts",
+      "name": "google-podcasts",
+      "label": "Google Podcasts",
+      "search": "google podcasts",
+      "shard": "009-gl-gr"
+    },
+    {
+      "id": "coreui-brands:googles-cholar",
+      "name": "googles-cholar",
+      "label": "Googles Cholar",
+      "search": "googles cholar",
+      "shard": "009-gl-gr"
+    },
+    {
+      "id": "coreui-brands:gov-uk",
+      "name": "gov-uk",
+      "label": "Gov Uk",
+      "search": "gov uk",
+      "shard": "009-gl-gr"
+    },
+    {
+      "id": "coreui-brands:gradle",
+      "name": "gradle",
+      "label": "Gradle",
+      "search": "gradle",
+      "shard": "009-gl-gr"
+    },
+    {
+      "id": "coreui-brands:grafana",
+      "name": "grafana",
+      "label": "Grafana",
+      "search": "grafana",
+      "shard": "009-gl-gr"
+    },
+    {
+      "id": "coreui-brands:graphcool",
+      "name": "graphcool",
+      "label": "Graphcool",
+      "search": "graphcool",
+      "shard": "009-gl-gr"
+    },
+    {
+      "id": "coreui-brands:graphql",
+      "name": "graphql",
+      "label": "Graphql",
+      "search": "graphql",
+      "shard": "009-gl-gr"
+    },
+    {
+      "id": "coreui-brands:grav",
+      "name": "grav",
+      "label": "Grav",
+      "search": "grav",
+      "shard": "009-gl-gr"
+    },
+    {
+      "id": "coreui-brands:gravatar",
+      "name": "gravatar",
+      "label": "Gravatar",
+      "search": "gravatar",
+      "shard": "009-gl-gr"
+    },
+    {
+      "id": "coreui-brands:greenkeeper",
+      "name": "greenkeeper",
+      "label": "Greenkeeper",
+      "search": "greenkeeper",
+      "shard": "009-gl-gr"
+    },
+    {
+      "id": "coreui-brands:greensock",
+      "name": "greensock",
+      "label": "Greensock",
+      "search": "greensock",
+      "shard": "010-gr-ht"
+    },
+    {
+      "id": "coreui-brands:groovy",
+      "name": "groovy",
+      "label": "Groovy",
+      "search": "groovy",
+      "shard": "010-gr-ht"
+    },
+    {
+      "id": "coreui-brands:groupon",
+      "name": "groupon",
+      "label": "Groupon",
+      "search": "groupon",
+      "shard": "010-gr-ht"
+    },
+    {
+      "id": "coreui-brands:grunt",
+      "name": "grunt",
+      "label": "Grunt",
+      "search": "grunt",
+      "shard": "010-gr-ht"
+    },
+    {
+      "id": "coreui-brands:gulp",
+      "name": "gulp",
+      "label": "Gulp",
+      "search": "gulp",
+      "shard": "010-gr-ht"
+    },
+    {
+      "id": "coreui-brands:gumroad",
+      "name": "gumroad",
+      "label": "Gumroad",
+      "search": "gumroad",
+      "shard": "010-gr-ht"
+    },
+    {
+      "id": "coreui-brands:gumtree",
+      "name": "gumtree",
+      "label": "Gumtree",
+      "search": "gumtree",
+      "shard": "010-gr-ht"
+    },
+    {
+      "id": "coreui-brands:habr",
+      "name": "habr",
+      "label": "Habr",
+      "search": "habr",
+      "shard": "010-gr-ht"
+    },
+    {
+      "id": "coreui-brands:hackaday",
+      "name": "hackaday",
+      "label": "Hackaday",
+      "search": "hackaday",
+      "shard": "010-gr-ht"
+    },
+    {
+      "id": "coreui-brands:hackerearth",
+      "name": "hackerearth",
+      "label": "Hackerearth",
+      "search": "hackerearth",
+      "shard": "010-gr-ht"
+    },
+    {
+      "id": "coreui-brands:hackerone",
+      "name": "hackerone",
+      "label": "Hackerone",
+      "search": "hackerone",
+      "shard": "010-gr-ht"
+    },
+    {
+      "id": "coreui-brands:hackerrank",
+      "name": "hackerrank",
+      "label": "Hackerrank",
+      "search": "hackerrank",
+      "shard": "010-gr-ht"
+    },
+    {
+      "id": "coreui-brands:hackhands",
+      "name": "hackhands",
+      "label": "Hackhands",
+      "search": "hackhands",
+      "shard": "010-gr-ht"
+    },
+    {
+      "id": "coreui-brands:hackster",
+      "name": "hackster",
+      "label": "Hackster",
+      "search": "hackster",
+      "shard": "010-gr-ht"
+    },
+    {
+      "id": "coreui-brands:happycow",
+      "name": "happycow",
+      "label": "Happycow",
+      "search": "happycow",
+      "shard": "010-gr-ht"
+    },
+    {
+      "id": "coreui-brands:hashnode",
+      "name": "hashnode",
+      "label": "Hashnode",
+      "search": "hashnode",
+      "shard": "010-gr-ht"
+    },
+    {
+      "id": "coreui-brands:haskell",
+      "name": "haskell",
+      "label": "Haskell",
+      "search": "haskell",
+      "shard": "010-gr-ht"
+    },
+    {
+      "id": "coreui-brands:hatena-bookmark",
+      "name": "hatena-bookmark",
+      "label": "Hatena Bookmark",
+      "search": "hatena bookmark",
+      "shard": "010-gr-ht"
+    },
+    {
+      "id": "coreui-brands:haxe",
+      "name": "haxe",
+      "label": "Haxe",
+      "search": "haxe",
+      "shard": "010-gr-ht"
+    },
+    {
+      "id": "coreui-brands:helm",
+      "name": "helm",
+      "label": "Helm",
+      "search": "helm",
+      "shard": "010-gr-ht"
+    },
+    {
+      "id": "coreui-brands:here",
+      "name": "here",
+      "label": "Here",
+      "search": "here",
+      "shard": "010-gr-ht"
+    },
+    {
+      "id": "coreui-brands:heroku",
+      "name": "heroku",
+      "label": "Heroku",
+      "search": "heroku",
+      "shard": "010-gr-ht"
+    },
+    {
+      "id": "coreui-brands:hexo",
+      "name": "hexo",
+      "label": "Hexo",
+      "search": "hexo",
+      "shard": "010-gr-ht"
+    },
+    {
+      "id": "coreui-brands:highly",
+      "name": "highly",
+      "label": "Highly",
+      "search": "highly",
+      "shard": "010-gr-ht"
+    },
+    {
+      "id": "coreui-brands:hipchat",
+      "name": "hipchat",
+      "label": "Hipchat",
+      "search": "hipchat",
+      "shard": "010-gr-ht"
+    },
+    {
+      "id": "coreui-brands:hitachi",
+      "name": "hitachi",
+      "label": "Hitachi",
+      "search": "hitachi",
+      "shard": "010-gr-ht"
+    },
+    {
+      "id": "coreui-brands:hockeyapp",
+      "name": "hockeyapp",
+      "label": "Hockeyapp",
+      "search": "hockeyapp",
+      "shard": "010-gr-ht"
+    },
+    {
+      "id": "coreui-brands:homify",
+      "name": "homify",
+      "label": "Homify",
+      "search": "homify",
+      "shard": "010-gr-ht"
+    },
+    {
+      "id": "coreui-brands:hootsuite",
+      "name": "hootsuite",
+      "label": "Hootsuite",
+      "search": "hootsuite",
+      "shard": "010-gr-ht"
+    },
+    {
+      "id": "coreui-brands:hotjar",
+      "name": "hotjar",
+      "label": "Hotjar",
+      "search": "hotjar",
+      "shard": "010-gr-ht"
+    },
+    {
+      "id": "coreui-brands:houzz",
+      "name": "houzz",
+      "label": "Houzz",
+      "search": "houzz",
+      "shard": "010-gr-ht"
+    },
+    {
+      "id": "coreui-brands:hp",
+      "name": "hp",
+      "label": "Hp",
+      "search": "hp",
+      "shard": "010-gr-ht"
+    },
+    {
+      "id": "coreui-brands:html5",
+      "name": "html5",
+      "label": "Html5",
+      "search": "html5",
+      "shard": "010-gr-ht"
+    },
+    {
+      "id": "coreui-brands:html5-shield",
+      "name": "html5-shield",
+      "label": "Html5 Shield",
+      "search": "html5 shield",
+      "shard": "010-gr-ht"
+    },
+    {
+      "id": "coreui-brands:htmlacademy",
+      "name": "htmlacademy",
+      "label": "Htmlacademy",
+      "search": "htmlacademy",
+      "shard": "011-ht-jo"
+    },
+    {
+      "id": "coreui-brands:huawei",
+      "name": "huawei",
+      "label": "Huawei",
+      "search": "huawei",
+      "shard": "011-ht-jo"
+    },
+    {
+      "id": "coreui-brands:hubspot",
+      "name": "hubspot",
+      "label": "Hubspot",
+      "search": "hubspot",
+      "shard": "011-ht-jo"
+    },
+    {
+      "id": "coreui-brands:hulu",
+      "name": "hulu",
+      "label": "Hulu",
+      "search": "hulu",
+      "shard": "011-ht-jo"
+    },
+    {
+      "id": "coreui-brands:humble-bundle",
+      "name": "humble-bundle",
+      "label": "Humble Bundle",
+      "search": "humble bundle",
+      "shard": "011-ht-jo"
+    },
+    {
+      "id": "coreui-brands:iata",
+      "name": "iata",
+      "label": "Iata",
+      "search": "iata",
+      "shard": "011-ht-jo"
+    },
+    {
+      "id": "coreui-brands:ibm",
+      "name": "ibm",
+      "label": "Ibm",
+      "search": "ibm",
+      "shard": "011-ht-jo"
+    },
+    {
+      "id": "coreui-brands:icloud",
+      "name": "icloud",
+      "label": "Icloud",
+      "search": "icloud",
+      "shard": "011-ht-jo"
+    },
+    {
+      "id": "coreui-brands:iconjar",
+      "name": "iconjar",
+      "label": "Iconjar",
+      "search": "iconjar",
+      "shard": "011-ht-jo"
+    },
+    {
+      "id": "coreui-brands:icq",
+      "name": "icq",
+      "label": "Icq",
+      "search": "icq",
+      "shard": "011-ht-jo"
+    },
+    {
+      "id": "coreui-brands:ideal",
+      "name": "ideal",
+      "label": "Ideal",
+      "search": "ideal",
+      "shard": "011-ht-jo"
+    },
+    {
+      "id": "coreui-brands:ifixit",
+      "name": "ifixit",
+      "label": "Ifixit",
+      "search": "ifixit",
+      "shard": "011-ht-jo"
+    },
+    {
+      "id": "coreui-brands:imdb",
+      "name": "imdb",
+      "label": "Imdb",
+      "search": "imdb",
+      "shard": "011-ht-jo"
+    },
+    {
+      "id": "coreui-brands:indeed",
+      "name": "indeed",
+      "label": "Indeed",
+      "search": "indeed",
+      "shard": "011-ht-jo"
+    },
+    {
+      "id": "coreui-brands:inkscape",
+      "name": "inkscape",
+      "label": "Inkscape",
+      "search": "inkscape",
+      "shard": "011-ht-jo"
+    },
+    {
+      "id": "coreui-brands:instacart",
+      "name": "instacart",
+      "label": "Instacart",
+      "search": "instacart",
+      "shard": "011-ht-jo"
+    },
+    {
+      "id": "coreui-brands:instagram",
+      "name": "instagram",
+      "label": "Instagram",
+      "search": "instagram",
+      "shard": "011-ht-jo"
+    },
+    {
+      "id": "coreui-brands:instapaper",
+      "name": "instapaper",
+      "label": "Instapaper",
+      "search": "instapaper",
+      "shard": "011-ht-jo"
+    },
+    {
+      "id": "coreui-brands:intel",
+      "name": "intel",
+      "label": "Intel",
+      "search": "intel",
+      "shard": "011-ht-jo"
+    },
+    {
+      "id": "coreui-brands:intellijidea",
+      "name": "intellijidea",
+      "label": "Intellijidea",
+      "search": "intellijidea",
+      "shard": "011-ht-jo"
+    },
+    {
+      "id": "coreui-brands:intercom",
+      "name": "intercom",
+      "label": "Intercom",
+      "search": "intercom",
+      "shard": "011-ht-jo"
+    },
+    {
+      "id": "coreui-brands:internet-explorer",
+      "name": "internet-explorer",
+      "label": "Internet Explorer",
+      "search": "internet explorer",
+      "shard": "011-ht-jo"
+    },
+    {
+      "id": "coreui-brands:invision",
+      "name": "invision",
+      "label": "Invision",
+      "search": "invision",
+      "shard": "011-ht-jo"
+    },
+    {
+      "id": "coreui-brands:ionic",
+      "name": "ionic",
+      "label": "Ionic",
+      "search": "ionic",
+      "shard": "011-ht-jo"
+    },
+    {
+      "id": "coreui-brands:issuu",
+      "name": "issuu",
+      "label": "Issuu",
+      "search": "issuu",
+      "shard": "011-ht-jo"
+    },
+    {
+      "id": "coreui-brands:itch-io",
+      "name": "itch-io",
+      "label": "Itch Io",
+      "search": "itch io",
+      "shard": "011-ht-jo"
+    },
+    {
+      "id": "coreui-brands:jabber",
+      "name": "jabber",
+      "label": "Jabber",
+      "search": "jabber",
+      "shard": "011-ht-jo"
+    },
+    {
+      "id": "coreui-brands:java",
+      "name": "java",
+      "label": "Java",
+      "search": "java",
+      "shard": "011-ht-jo"
+    },
+    {
+      "id": "coreui-brands:javascript",
+      "name": "javascript",
+      "label": "Javascript",
+      "search": "javascript",
+      "shard": "011-ht-jo"
+    },
+    {
+      "id": "coreui-brands:jekyll",
+      "name": "jekyll",
+      "label": "Jekyll",
+      "search": "jekyll",
+      "shard": "011-ht-jo"
+    },
+    {
+      "id": "coreui-brands:jenkins",
+      "name": "jenkins",
+      "label": "Jenkins",
+      "search": "jenkins",
+      "shard": "011-ht-jo"
+    },
+    {
+      "id": "coreui-brands:jest",
+      "name": "jest",
+      "label": "Jest",
+      "search": "jest",
+      "shard": "011-ht-jo"
+    },
+    {
+      "id": "coreui-brands:jet",
+      "name": "jet",
+      "label": "Jet",
+      "search": "jet",
+      "shard": "011-ht-jo"
+    },
+    {
+      "id": "coreui-brands:jetbrains",
+      "name": "jetbrains",
+      "label": "Jetbrains",
+      "search": "jetbrains",
+      "shard": "011-ht-jo"
+    },
+    {
+      "id": "coreui-brands:jira",
+      "name": "jira",
+      "label": "Jira",
+      "search": "jira",
+      "shard": "011-ht-jo"
+    },
+    {
+      "id": "coreui-brands:joomla",
+      "name": "joomla",
+      "label": "Joomla",
+      "search": "joomla",
+      "shard": "011-ht-jo"
+    },
+    {
+      "id": "coreui-brands:jquery",
+      "name": "jquery",
+      "label": "Jquery",
+      "search": "jquery",
+      "shard": "012-jq-lg"
+    },
+    {
+      "id": "coreui-brands:js",
+      "name": "js",
+      "label": "Js",
+      "search": "js",
+      "shard": "012-jq-lg"
+    },
+    {
+      "id": "coreui-brands:jsdelivr",
+      "name": "jsdelivr",
+      "label": "Jsdelivr",
+      "search": "jsdelivr",
+      "shard": "012-jq-lg"
+    },
+    {
+      "id": "coreui-brands:jsfiddle",
+      "name": "jsfiddle",
+      "label": "Jsfiddle",
+      "search": "jsfiddle",
+      "shard": "012-jq-lg"
+    },
+    {
+      "id": "coreui-brands:json",
+      "name": "json",
+      "label": "Json",
+      "search": "json",
+      "shard": "012-jq-lg"
+    },
+    {
+      "id": "coreui-brands:jupyter",
+      "name": "jupyter",
+      "label": "Jupyter",
+      "search": "jupyter",
+      "shard": "012-jq-lg"
+    },
+    {
+      "id": "coreui-brands:justgiving",
+      "name": "justgiving",
+      "label": "Justgiving",
+      "search": "justgiving",
+      "shard": "012-jq-lg"
+    },
+    {
+      "id": "coreui-brands:kaggle",
+      "name": "kaggle",
+      "label": "Kaggle",
+      "search": "kaggle",
+      "shard": "012-jq-lg"
+    },
+    {
+      "id": "coreui-brands:kaios",
+      "name": "kaios",
+      "label": "Kaios",
+      "search": "kaios",
+      "shard": "012-jq-lg"
+    },
+    {
+      "id": "coreui-brands:kaspersky",
+      "name": "kaspersky",
+      "label": "Kaspersky",
+      "search": "kaspersky",
+      "shard": "012-jq-lg"
+    },
+    {
+      "id": "coreui-brands:kentico",
+      "name": "kentico",
+      "label": "Kentico",
+      "search": "kentico",
+      "shard": "012-jq-lg"
+    },
+    {
+      "id": "coreui-brands:keras",
+      "name": "keras",
+      "label": "Keras",
+      "search": "keras",
+      "shard": "012-jq-lg"
+    },
+    {
+      "id": "coreui-brands:keybase",
+      "name": "keybase",
+      "label": "Keybase",
+      "search": "keybase",
+      "shard": "012-jq-lg"
+    },
+    {
+      "id": "coreui-brands:keycdn",
+      "name": "keycdn",
+      "label": "Keycdn",
+      "search": "keycdn",
+      "shard": "012-jq-lg"
+    },
+    {
+      "id": "coreui-brands:khan-academy",
+      "name": "khan-academy",
+      "label": "Khan Academy",
+      "search": "khan academy",
+      "shard": "012-jq-lg"
+    },
+    {
+      "id": "coreui-brands:kibana",
+      "name": "kibana",
+      "label": "Kibana",
+      "search": "kibana",
+      "shard": "012-jq-lg"
+    },
+    {
+      "id": "coreui-brands:kickstarter",
+      "name": "kickstarter",
+      "label": "Kickstarter",
+      "search": "kickstarter",
+      "shard": "012-jq-lg"
+    },
+    {
+      "id": "coreui-brands:kik",
+      "name": "kik",
+      "label": "Kik",
+      "search": "kik",
+      "shard": "012-jq-lg"
+    },
+    {
+      "id": "coreui-brands:kirby",
+      "name": "kirby",
+      "label": "Kirby",
+      "search": "kirby",
+      "shard": "012-jq-lg"
+    },
+    {
+      "id": "coreui-brands:klout",
+      "name": "klout",
+      "label": "Klout",
+      "search": "klout",
+      "shard": "012-jq-lg"
+    },
+    {
+      "id": "coreui-brands:known",
+      "name": "known",
+      "label": "Known",
+      "search": "known",
+      "shard": "012-jq-lg"
+    },
+    {
+      "id": "coreui-brands:ko-fi",
+      "name": "ko-fi",
+      "label": "Ko Fi",
+      "search": "ko fi",
+      "shard": "012-jq-lg"
+    },
+    {
+      "id": "coreui-brands:kodi",
+      "name": "kodi",
+      "label": "Kodi",
+      "search": "kodi",
+      "shard": "012-jq-lg"
+    },
+    {
+      "id": "coreui-brands:koding",
+      "name": "koding",
+      "label": "Koding",
+      "search": "koding",
+      "shard": "012-jq-lg"
+    },
+    {
+      "id": "coreui-brands:kotlin",
+      "name": "kotlin",
+      "label": "Kotlin",
+      "search": "kotlin",
+      "shard": "012-jq-lg"
+    },
+    {
+      "id": "coreui-brands:krita",
+      "name": "krita",
+      "label": "Krita",
+      "search": "krita",
+      "shard": "012-jq-lg"
+    },
+    {
+      "id": "coreui-brands:kubernetes",
+      "name": "kubernetes",
+      "label": "Kubernetes",
+      "search": "kubernetes",
+      "shard": "012-jq-lg"
+    },
+    {
+      "id": "coreui-brands:lanyrd",
+      "name": "lanyrd",
+      "label": "Lanyrd",
+      "search": "lanyrd",
+      "shard": "012-jq-lg"
+    },
+    {
+      "id": "coreui-brands:laravel",
+      "name": "laravel",
+      "label": "Laravel",
+      "search": "laravel",
+      "shard": "012-jq-lg"
+    },
+    {
+      "id": "coreui-brands:laravel-horizon",
+      "name": "laravel-horizon",
+      "label": "Laravel Horizon",
+      "search": "laravel horizon",
+      "shard": "012-jq-lg"
+    },
+    {
+      "id": "coreui-brands:laravel-nova",
+      "name": "laravel-nova",
+      "label": "Laravel Nova",
+      "search": "laravel nova",
+      "shard": "012-jq-lg"
+    },
+    {
+      "id": "coreui-brands:last-fm",
+      "name": "last-fm",
+      "label": "Last Fm",
+      "search": "last fm",
+      "shard": "012-jq-lg"
+    },
+    {
+      "id": "coreui-brands:latex",
+      "name": "latex",
+      "label": "Latex",
+      "search": "latex",
+      "shard": "012-jq-lg"
+    },
+    {
+      "id": "coreui-brands:launchpad",
+      "name": "launchpad",
+      "label": "Launchpad",
+      "search": "launchpad",
+      "shard": "012-jq-lg"
+    },
+    {
+      "id": "coreui-brands:leetcode",
+      "name": "leetcode",
+      "label": "Leetcode",
+      "search": "leetcode",
+      "shard": "012-jq-lg"
+    },
+    {
+      "id": "coreui-brands:lenovo",
+      "name": "lenovo",
+      "label": "Lenovo",
+      "search": "lenovo",
+      "shard": "012-jq-lg"
+    },
+    {
+      "id": "coreui-brands:less",
+      "name": "less",
+      "label": "Less",
+      "search": "less",
+      "shard": "012-jq-lg"
+    },
+    {
+      "id": "coreui-brands:lets-encrypt",
+      "name": "lets-encrypt",
+      "label": "Lets Encrypt",
+      "search": "lets encrypt",
+      "shard": "012-jq-lg"
+    },
+    {
+      "id": "coreui-brands:letterboxd",
+      "name": "letterboxd",
+      "label": "Letterboxd",
+      "search": "letterboxd",
+      "shard": "012-jq-lg"
+    },
+    {
+      "id": "coreui-brands:lgtm",
+      "name": "lgtm",
+      "label": "Lgtm",
+      "search": "lgtm",
+      "shard": "012-jq-lg"
+    },
+    {
+      "id": "coreui-brands:liberapay",
+      "name": "liberapay",
+      "label": "Liberapay",
+      "search": "liberapay",
+      "shard": "013-li-mi"
+    },
+    {
+      "id": "coreui-brands:librarything",
+      "name": "librarything",
+      "label": "Librarything",
+      "search": "librarything",
+      "shard": "013-li-mi"
+    },
+    {
+      "id": "coreui-brands:libreoffice",
+      "name": "libreoffice",
+      "label": "Libreoffice",
+      "search": "libreoffice",
+      "shard": "013-li-mi"
+    },
+    {
+      "id": "coreui-brands:line",
+      "name": "line",
+      "label": "Line",
+      "search": "line",
+      "shard": "013-li-mi"
+    },
+    {
+      "id": "coreui-brands:linkedin",
+      "name": "linkedin",
+      "label": "Linkedin",
+      "search": "linkedin",
+      "shard": "013-li-mi"
+    },
+    {
+      "id": "coreui-brands:linkedin-in",
+      "name": "linkedin-in",
+      "label": "Linkedin In",
+      "search": "linkedin in",
+      "shard": "013-li-mi"
+    },
+    {
+      "id": "coreui-brands:linux",
+      "name": "linux",
+      "label": "Linux",
+      "search": "linux",
+      "shard": "013-li-mi"
+    },
+    {
+      "id": "coreui-brands:linux-foundation",
+      "name": "linux-foundation",
+      "label": "Linux Foundation",
+      "search": "linux foundation",
+      "shard": "013-li-mi"
+    },
+    {
+      "id": "coreui-brands:linux-mint",
+      "name": "linux-mint",
+      "label": "Linux Mint",
+      "search": "linux mint",
+      "shard": "013-li-mi"
+    },
+    {
+      "id": "coreui-brands:livejournal",
+      "name": "livejournal",
+      "label": "Livejournal",
+      "search": "livejournal",
+      "shard": "013-li-mi"
+    },
+    {
+      "id": "coreui-brands:livestream",
+      "name": "livestream",
+      "label": "Livestream",
+      "search": "livestream",
+      "shard": "013-li-mi"
+    },
+    {
+      "id": "coreui-brands:logstash",
+      "name": "logstash",
+      "label": "Logstash",
+      "search": "logstash",
+      "shard": "013-li-mi"
+    },
+    {
+      "id": "coreui-brands:lua",
+      "name": "lua",
+      "label": "Lua",
+      "search": "lua",
+      "shard": "013-li-mi"
+    },
+    {
+      "id": "coreui-brands:lumen",
+      "name": "lumen",
+      "label": "Lumen",
+      "search": "lumen",
+      "shard": "013-li-mi"
+    },
+    {
+      "id": "coreui-brands:lyft",
+      "name": "lyft",
+      "label": "Lyft",
+      "search": "lyft",
+      "shard": "013-li-mi"
+    },
+    {
+      "id": "coreui-brands:macys",
+      "name": "macys",
+      "label": "Macys",
+      "search": "macys",
+      "shard": "013-li-mi"
+    },
+    {
+      "id": "coreui-brands:magento",
+      "name": "magento",
+      "label": "Magento",
+      "search": "magento",
+      "shard": "013-li-mi"
+    },
+    {
+      "id": "coreui-brands:magisk",
+      "name": "magisk",
+      "label": "Magisk",
+      "search": "magisk",
+      "shard": "013-li-mi"
+    },
+    {
+      "id": "coreui-brands:mail-ru",
+      "name": "mail-ru",
+      "label": "Mail Ru",
+      "search": "mail ru",
+      "shard": "013-li-mi"
+    },
+    {
+      "id": "coreui-brands:mailchimp",
+      "name": "mailchimp",
+      "label": "Mailchimp",
+      "search": "mailchimp",
+      "shard": "013-li-mi"
+    },
+    {
+      "id": "coreui-brands:makerbot",
+      "name": "makerbot",
+      "label": "Makerbot",
+      "search": "makerbot",
+      "shard": "013-li-mi"
+    },
+    {
+      "id": "coreui-brands:manjaro",
+      "name": "manjaro",
+      "label": "Manjaro",
+      "search": "manjaro",
+      "shard": "013-li-mi"
+    },
+    {
+      "id": "coreui-brands:markdown",
+      "name": "markdown",
+      "label": "Markdown",
+      "search": "markdown",
+      "shard": "013-li-mi"
+    },
+    {
+      "id": "coreui-brands:marketo",
+      "name": "marketo",
+      "label": "Marketo",
+      "search": "marketo",
+      "shard": "013-li-mi"
+    },
+    {
+      "id": "coreui-brands:mastercard",
+      "name": "mastercard",
+      "label": "Mastercard",
+      "search": "mastercard",
+      "shard": "013-li-mi"
+    },
+    {
+      "id": "coreui-brands:mastodon",
+      "name": "mastodon",
+      "label": "Mastodon",
+      "search": "mastodon",
+      "shard": "013-li-mi"
+    },
+    {
+      "id": "coreui-brands:material-design",
+      "name": "material-design",
+      "label": "Material Design",
+      "search": "material design",
+      "shard": "013-li-mi"
+    },
+    {
+      "id": "coreui-brands:mathworks",
+      "name": "mathworks",
+      "label": "Mathworks",
+      "search": "mathworks",
+      "shard": "013-li-mi"
+    },
+    {
+      "id": "coreui-brands:matrix",
+      "name": "matrix",
+      "label": "Matrix",
+      "search": "matrix",
+      "shard": "013-li-mi"
+    },
+    {
+      "id": "coreui-brands:mattermost",
+      "name": "mattermost",
+      "label": "Mattermost",
+      "search": "mattermost",
+      "shard": "013-li-mi"
+    },
+    {
+      "id": "coreui-brands:matternet",
+      "name": "matternet",
+      "label": "Matternet",
+      "search": "matternet",
+      "shard": "013-li-mi"
+    },
+    {
+      "id": "coreui-brands:maxcdn",
+      "name": "maxcdn",
+      "label": "Maxcdn",
+      "search": "maxcdn",
+      "shard": "013-li-mi"
+    },
+    {
+      "id": "coreui-brands:mcafee",
+      "name": "mcafee",
+      "label": "Mcafee",
+      "search": "mcafee",
+      "shard": "013-li-mi"
+    },
+    {
+      "id": "coreui-brands:media-temple",
+      "name": "media-temple",
+      "label": "Media Temple",
+      "search": "media temple",
+      "shard": "013-li-mi"
+    },
+    {
+      "id": "coreui-brands:mediafire",
+      "name": "mediafire",
+      "label": "Mediafire",
+      "search": "mediafire",
+      "shard": "013-li-mi"
+    },
+    {
+      "id": "coreui-brands:medium",
+      "name": "medium",
+      "label": "Medium",
+      "search": "medium",
+      "shard": "013-li-mi"
+    },
+    {
+      "id": "coreui-brands:medium-m",
+      "name": "medium-m",
+      "label": "Medium M",
+      "search": "medium m",
+      "shard": "013-li-mi"
+    },
+    {
+      "id": "coreui-brands:meetup",
+      "name": "meetup",
+      "label": "Meetup",
+      "search": "meetup",
+      "shard": "013-li-mi"
+    },
+    {
+      "id": "coreui-brands:mega",
+      "name": "mega",
+      "label": "Mega",
+      "search": "mega",
+      "shard": "013-li-mi"
+    },
+    {
+      "id": "coreui-brands:mendeley",
+      "name": "mendeley",
+      "label": "Mendeley",
+      "search": "mendeley",
+      "shard": "013-li-mi"
+    },
+    {
+      "id": "coreui-brands:messenger",
+      "name": "messenger",
+      "label": "Messenger",
+      "search": "messenger",
+      "shard": "013-li-mi"
+    },
+    {
+      "id": "coreui-brands:meteor",
+      "name": "meteor",
+      "label": "Meteor",
+      "search": "meteor",
+      "shard": "013-li-mi"
+    },
+    {
+      "id": "coreui-brands:micro-blog",
+      "name": "micro-blog",
+      "label": "Micro Blog",
+      "search": "micro blog",
+      "shard": "013-li-mi"
+    },
+    {
+      "id": "coreui-brands:microgenetics",
+      "name": "microgenetics",
+      "label": "Microgenetics",
+      "search": "microgenetics",
+      "shard": "013-li-mi"
+    },
+    {
+      "id": "coreui-brands:microsoft",
+      "name": "microsoft",
+      "label": "Microsoft",
+      "search": "microsoft",
+      "shard": "013-li-mi"
+    },
+    {
+      "id": "coreui-brands:microsoft-edge",
+      "name": "microsoft-edge",
+      "label": "Microsoft Edge",
+      "search": "microsoft edge",
+      "shard": "014-mi-oc"
+    },
+    {
+      "id": "coreui-brands:minetest",
+      "name": "minetest",
+      "label": "Minetest",
+      "search": "minetest",
+      "shard": "014-mi-oc"
+    },
+    {
+      "id": "coreui-brands:minutemailer",
+      "name": "minutemailer",
+      "label": "Minutemailer",
+      "search": "minutemailer",
+      "shard": "014-mi-oc"
+    },
+    {
+      "id": "coreui-brands:mix",
+      "name": "mix",
+      "label": "Mix",
+      "search": "mix",
+      "shard": "014-mi-oc"
+    },
+    {
+      "id": "coreui-brands:mixcloud",
+      "name": "mixcloud",
+      "label": "Mixcloud",
+      "search": "mixcloud",
+      "shard": "014-mi-oc"
+    },
+    {
+      "id": "coreui-brands:mixer",
+      "name": "mixer",
+      "label": "Mixer",
+      "search": "mixer",
+      "shard": "014-mi-oc"
+    },
+    {
+      "id": "coreui-brands:mojang",
+      "name": "mojang",
+      "label": "Mojang",
+      "search": "mojang",
+      "shard": "014-mi-oc"
+    },
+    {
+      "id": "coreui-brands:monero",
+      "name": "monero",
+      "label": "Monero",
+      "search": "monero",
+      "shard": "014-mi-oc"
+    },
+    {
+      "id": "coreui-brands:mongodb",
+      "name": "mongodb",
+      "label": "Mongodb",
+      "search": "mongodb",
+      "shard": "014-mi-oc"
+    },
+    {
+      "id": "coreui-brands:monkeytie",
+      "name": "monkeytie",
+      "label": "Monkeytie",
+      "search": "monkeytie",
+      "shard": "014-mi-oc"
+    },
+    {
+      "id": "coreui-brands:monogram",
+      "name": "monogram",
+      "label": "Monogram",
+      "search": "monogram",
+      "shard": "014-mi-oc"
+    },
+    {
+      "id": "coreui-brands:monzo",
+      "name": "monzo",
+      "label": "Monzo",
+      "search": "monzo",
+      "shard": "014-mi-oc"
+    },
+    {
+      "id": "coreui-brands:moo",
+      "name": "moo",
+      "label": "Moo",
+      "search": "moo",
+      "shard": "014-mi-oc"
+    },
+    {
+      "id": "coreui-brands:mozilla",
+      "name": "mozilla",
+      "label": "Mozilla",
+      "search": "mozilla",
+      "shard": "014-mi-oc"
+    },
+    {
+      "id": "coreui-brands:mozilla-firefox",
+      "name": "mozilla-firefox",
+      "label": "Mozilla Firefox",
+      "search": "mozilla firefox",
+      "shard": "014-mi-oc"
+    },
+    {
+      "id": "coreui-brands:musescore",
+      "name": "musescore",
+      "label": "Musescore",
+      "search": "musescore",
+      "shard": "014-mi-oc"
+    },
+    {
+      "id": "coreui-brands:mxlinux",
+      "name": "mxlinux",
+      "label": "Mxlinux",
+      "search": "mxlinux",
+      "shard": "014-mi-oc"
+    },
+    {
+      "id": "coreui-brands:myspace",
+      "name": "myspace",
+      "label": "Myspace",
+      "search": "myspace",
+      "shard": "014-mi-oc"
+    },
+    {
+      "id": "coreui-brands:mysql",
+      "name": "mysql",
+      "label": "Mysql",
+      "search": "mysql",
+      "shard": "014-mi-oc"
+    },
+    {
+      "id": "coreui-brands:nativescript",
+      "name": "nativescript",
+      "label": "Nativescript",
+      "search": "nativescript",
+      "shard": "014-mi-oc"
+    },
+    {
+      "id": "coreui-brands:nec",
+      "name": "nec",
+      "label": "Nec",
+      "search": "nec",
+      "shard": "014-mi-oc"
+    },
+    {
+      "id": "coreui-brands:neo4j",
+      "name": "neo4j",
+      "label": "Neo4j",
+      "search": "neo4j",
+      "shard": "014-mi-oc"
+    },
+    {
+      "id": "coreui-brands:netflix",
+      "name": "netflix",
+      "label": "Netflix",
+      "search": "netflix",
+      "shard": "014-mi-oc"
+    },
+    {
+      "id": "coreui-brands:netlify",
+      "name": "netlify",
+      "label": "Netlify",
+      "search": "netlify",
+      "shard": "014-mi-oc"
+    },
+    {
+      "id": "coreui-brands:next-js",
+      "name": "next-js",
+      "label": "Next Js",
+      "search": "next js",
+      "shard": "014-mi-oc"
+    },
+    {
+      "id": "coreui-brands:nextcloud",
+      "name": "nextcloud",
+      "label": "Nextcloud",
+      "search": "nextcloud",
+      "shard": "014-mi-oc"
+    },
+    {
+      "id": "coreui-brands:nextdoor",
+      "name": "nextdoor",
+      "label": "Nextdoor",
+      "search": "nextdoor",
+      "shard": "014-mi-oc"
+    },
+    {
+      "id": "coreui-brands:nginx",
+      "name": "nginx",
+      "label": "Nginx",
+      "search": "nginx",
+      "shard": "014-mi-oc"
+    },
+    {
+      "id": "coreui-brands:nim",
+      "name": "nim",
+      "label": "Nim",
+      "search": "nim",
+      "shard": "014-mi-oc"
+    },
+    {
+      "id": "coreui-brands:nintendo",
+      "name": "nintendo",
+      "label": "Nintendo",
+      "search": "nintendo",
+      "shard": "014-mi-oc"
+    },
+    {
+      "id": "coreui-brands:nintendo-3ds",
+      "name": "nintendo-3ds",
+      "label": "Nintendo 3ds",
+      "search": "nintendo 3ds",
+      "shard": "014-mi-oc"
+    },
+    {
+      "id": "coreui-brands:nintendo-gamecube",
+      "name": "nintendo-gamecube",
+      "label": "Nintendo Gamecube",
+      "search": "nintendo gamecube",
+      "shard": "014-mi-oc"
+    },
+    {
+      "id": "coreui-brands:nintendo-switch",
+      "name": "nintendo-switch",
+      "label": "Nintendo Switch",
+      "search": "nintendo switch",
+      "shard": "014-mi-oc"
+    },
+    {
+      "id": "coreui-brands:node-js",
+      "name": "node-js",
+      "label": "Node Js",
+      "search": "node js",
+      "shard": "014-mi-oc"
+    },
+    {
+      "id": "coreui-brands:node-red",
+      "name": "node-red",
+      "label": "Node Red",
+      "search": "node red",
+      "shard": "014-mi-oc"
+    },
+    {
+      "id": "coreui-brands:nodemon",
+      "name": "nodemon",
+      "label": "Nodemon",
+      "search": "nodemon",
+      "shard": "014-mi-oc"
+    },
+    {
+      "id": "coreui-brands:nokia",
+      "name": "nokia",
+      "label": "Nokia",
+      "search": "nokia",
+      "shard": "014-mi-oc"
+    },
+    {
+      "id": "coreui-brands:notion",
+      "name": "notion",
+      "label": "Notion",
+      "search": "notion",
+      "shard": "014-mi-oc"
+    },
+    {
+      "id": "coreui-brands:npm",
+      "name": "npm",
+      "label": "Npm",
+      "search": "npm",
+      "shard": "014-mi-oc"
+    },
+    {
+      "id": "coreui-brands:nucleo",
+      "name": "nucleo",
+      "label": "Nucleo",
+      "search": "nucleo",
+      "shard": "014-mi-oc"
+    },
+    {
+      "id": "coreui-brands:nuget",
+      "name": "nuget",
+      "label": "Nuget",
+      "search": "nuget",
+      "shard": "014-mi-oc"
+    },
+    {
+      "id": "coreui-brands:nuxt-js",
+      "name": "nuxt-js",
+      "label": "Nuxt Js",
+      "search": "nuxt js",
+      "shard": "014-mi-oc"
+    },
+    {
+      "id": "coreui-brands:nvidia",
+      "name": "nvidia",
+      "label": "Nvidia",
+      "search": "nvidia",
+      "shard": "014-mi-oc"
+    },
+    {
+      "id": "coreui-brands:ocaml",
+      "name": "ocaml",
+      "label": "Ocaml",
+      "search": "ocaml",
+      "shard": "014-mi-oc"
+    },
+    {
+      "id": "coreui-brands:octave",
+      "name": "octave",
+      "label": "Octave",
+      "search": "octave",
+      "shard": "014-mi-oc"
+    },
+    {
+      "id": "coreui-brands:octopus-deploy",
+      "name": "octopus-deploy",
+      "label": "Octopus Deploy",
+      "search": "octopus deploy",
+      "shard": "015-oc-po"
+    },
+    {
+      "id": "coreui-brands:oculus",
+      "name": "oculus",
+      "label": "Oculus",
+      "search": "oculus",
+      "shard": "015-oc-po"
+    },
+    {
+      "id": "coreui-brands:odnoklassniki",
+      "name": "odnoklassniki",
+      "label": "Odnoklassniki",
+      "search": "odnoklassniki",
+      "shard": "015-oc-po"
+    },
+    {
+      "id": "coreui-brands:open-access",
+      "name": "open-access",
+      "label": "Open Access",
+      "search": "open access",
+      "shard": "015-oc-po"
+    },
+    {
+      "id": "coreui-brands:open-collective",
+      "name": "open-collective",
+      "label": "Open Collective",
+      "search": "open collective",
+      "shard": "015-oc-po"
+    },
+    {
+      "id": "coreui-brands:open-id",
+      "name": "open-id",
+      "label": "Open Id",
+      "search": "open id",
+      "shard": "015-oc-po"
+    },
+    {
+      "id": "coreui-brands:open-source-initiative",
+      "name": "open-source-initiative",
+      "label": "Open Source Initiative",
+      "search": "open source initiative",
+      "shard": "015-oc-po"
+    },
+    {
+      "id": "coreui-brands:openstreetmap",
+      "name": "openstreetmap",
+      "label": "Openstreetmap",
+      "search": "openstreetmap",
+      "shard": "015-oc-po"
+    },
+    {
+      "id": "coreui-brands:opensuse",
+      "name": "opensuse",
+      "label": "Opensuse",
+      "search": "opensuse",
+      "shard": "015-oc-po"
+    },
+    {
+      "id": "coreui-brands:openvpn",
+      "name": "openvpn",
+      "label": "Openvpn",
+      "search": "openvpn",
+      "shard": "015-oc-po"
+    },
+    {
+      "id": "coreui-brands:opera",
+      "name": "opera",
+      "label": "Opera",
+      "search": "opera",
+      "shard": "015-oc-po"
+    },
+    {
+      "id": "coreui-brands:opsgenie",
+      "name": "opsgenie",
+      "label": "Opsgenie",
+      "search": "opsgenie",
+      "shard": "015-oc-po"
+    },
+    {
+      "id": "coreui-brands:oracle",
+      "name": "oracle",
+      "label": "Oracle",
+      "search": "oracle",
+      "shard": "015-oc-po"
+    },
+    {
+      "id": "coreui-brands:oracle-netsuite",
+      "name": "oracle-netsuite",
+      "label": "Oracle Netsuite",
+      "search": "oracle netsuite",
+      "shard": "015-oc-po"
+    },
+    {
+      "id": "coreui-brands:orcid",
+      "name": "orcid",
+      "label": "Orcid",
+      "search": "orcid",
+      "shard": "015-oc-po"
+    },
+    {
+      "id": "coreui-brands:origin",
+      "name": "origin",
+      "label": "Origin",
+      "search": "origin",
+      "shard": "015-oc-po"
+    },
+    {
+      "id": "coreui-brands:osi",
+      "name": "osi",
+      "label": "Osi",
+      "search": "osi",
+      "shard": "015-oc-po"
+    },
+    {
+      "id": "coreui-brands:osmc",
+      "name": "osmc",
+      "label": "Osmc",
+      "search": "osmc",
+      "shard": "015-oc-po"
+    },
+    {
+      "id": "coreui-brands:overcast",
+      "name": "overcast",
+      "label": "Overcast",
+      "search": "overcast",
+      "shard": "015-oc-po"
+    },
+    {
+      "id": "coreui-brands:overleaf",
+      "name": "overleaf",
+      "label": "Overleaf",
+      "search": "overleaf",
+      "shard": "015-oc-po"
+    },
+    {
+      "id": "coreui-brands:ovh",
+      "name": "ovh",
+      "label": "Ovh",
+      "search": "ovh",
+      "shard": "015-oc-po"
+    },
+    {
+      "id": "coreui-brands:pagekit",
+      "name": "pagekit",
+      "label": "Pagekit",
+      "search": "pagekit",
+      "shard": "015-oc-po"
+    },
+    {
+      "id": "coreui-brands:palantir",
+      "name": "palantir",
+      "label": "Palantir",
+      "search": "palantir",
+      "shard": "015-oc-po"
+    },
+    {
+      "id": "coreui-brands:pandora",
+      "name": "pandora",
+      "label": "Pandora",
+      "search": "pandora",
+      "shard": "015-oc-po"
+    },
+    {
+      "id": "coreui-brands:pantheon",
+      "name": "pantheon",
+      "label": "Pantheon",
+      "search": "pantheon",
+      "shard": "015-oc-po"
+    },
+    {
+      "id": "coreui-brands:patreon",
+      "name": "patreon",
+      "label": "Patreon",
+      "search": "patreon",
+      "shard": "015-oc-po"
+    },
+    {
+      "id": "coreui-brands:paypal",
+      "name": "paypal",
+      "label": "Paypal",
+      "search": "paypal",
+      "shard": "015-oc-po"
+    },
+    {
+      "id": "coreui-brands:periscope",
+      "name": "periscope",
+      "label": "Periscope",
+      "search": "periscope",
+      "shard": "015-oc-po"
+    },
+    {
+      "id": "coreui-brands:php",
+      "name": "php",
+      "label": "Php",
+      "search": "php",
+      "shard": "015-oc-po"
+    },
+    {
+      "id": "coreui-brands:picarto-tv",
+      "name": "picarto-tv",
+      "label": "Picarto Tv",
+      "search": "picarto tv",
+      "shard": "015-oc-po"
+    },
+    {
+      "id": "coreui-brands:pinboard",
+      "name": "pinboard",
+      "label": "Pinboard",
+      "search": "pinboard",
+      "shard": "015-oc-po"
+    },
+    {
+      "id": "coreui-brands:pingdom",
+      "name": "pingdom",
+      "label": "Pingdom",
+      "search": "pingdom",
+      "shard": "015-oc-po"
+    },
+    {
+      "id": "coreui-brands:pingup",
+      "name": "pingup",
+      "label": "Pingup",
+      "search": "pingup",
+      "shard": "015-oc-po"
+    },
+    {
+      "id": "coreui-brands:pinterest",
+      "name": "pinterest",
+      "label": "Pinterest",
+      "search": "pinterest",
+      "shard": "015-oc-po"
+    },
+    {
+      "id": "coreui-brands:pinterest-p",
+      "name": "pinterest-p",
+      "label": "Pinterest P",
+      "search": "pinterest p",
+      "shard": "015-oc-po"
+    },
+    {
+      "id": "coreui-brands:pivotaltracker",
+      "name": "pivotaltracker",
+      "label": "Pivotaltracker",
+      "search": "pivotaltracker",
+      "shard": "015-oc-po"
+    },
+    {
+      "id": "coreui-brands:plangrid",
+      "name": "plangrid",
+      "label": "Plangrid",
+      "search": "plangrid",
+      "shard": "015-oc-po"
+    },
+    {
+      "id": "coreui-brands:player-me",
+      "name": "player-me",
+      "label": "Player Me",
+      "search": "player me",
+      "shard": "015-oc-po"
+    },
+    {
+      "id": "coreui-brands:playerfm",
+      "name": "playerfm",
+      "label": "Playerfm",
+      "search": "playerfm",
+      "shard": "015-oc-po"
+    },
+    {
+      "id": "coreui-brands:playstation",
+      "name": "playstation",
+      "label": "Playstation",
+      "search": "playstation",
+      "shard": "015-oc-po"
+    },
+    {
+      "id": "coreui-brands:playstation3",
+      "name": "playstation3",
+      "label": "Playstation3",
+      "search": "playstation3",
+      "shard": "015-oc-po"
+    },
+    {
+      "id": "coreui-brands:playstation4",
+      "name": "playstation4",
+      "label": "Playstation4",
+      "search": "playstation4",
+      "shard": "015-oc-po"
+    },
+    {
+      "id": "coreui-brands:plesk",
+      "name": "plesk",
+      "label": "Plesk",
+      "search": "plesk",
+      "shard": "015-oc-po"
+    },
+    {
+      "id": "coreui-brands:plex",
+      "name": "plex",
+      "label": "Plex",
+      "search": "plex",
+      "shard": "015-oc-po"
+    },
+    {
+      "id": "coreui-brands:pluralsight",
+      "name": "pluralsight",
+      "label": "Pluralsight",
+      "search": "pluralsight",
+      "shard": "015-oc-po"
+    },
+    {
+      "id": "coreui-brands:plurk",
+      "name": "plurk",
+      "label": "Plurk",
+      "search": "plurk",
+      "shard": "015-oc-po"
+    },
+    {
+      "id": "coreui-brands:pocket",
+      "name": "pocket",
+      "label": "Pocket",
+      "search": "pocket",
+      "shard": "015-oc-po"
+    },
+    {
+      "id": "coreui-brands:postgresql",
+      "name": "postgresql",
+      "label": "Postgresql",
+      "search": "postgresql",
+      "shard": "015-oc-po"
+    },
+    {
+      "id": "coreui-brands:postman",
+      "name": "postman",
+      "label": "Postman",
+      "search": "postman",
+      "shard": "016-po-re"
+    },
+    {
+      "id": "coreui-brands:postwoman",
+      "name": "postwoman",
+      "label": "Postwoman",
+      "search": "postwoman",
+      "shard": "016-po-re"
+    },
+    {
+      "id": "coreui-brands:powershell",
+      "name": "powershell",
+      "label": "Powershell",
+      "search": "powershell",
+      "shard": "016-po-re"
+    },
+    {
+      "id": "coreui-brands:prettier",
+      "name": "prettier",
+      "label": "Prettier",
+      "search": "prettier",
+      "shard": "016-po-re"
+    },
+    {
+      "id": "coreui-brands:prismic",
+      "name": "prismic",
+      "label": "Prismic",
+      "search": "prismic",
+      "shard": "016-po-re"
+    },
+    {
+      "id": "coreui-brands:probot",
+      "name": "probot",
+      "label": "Probot",
+      "search": "probot",
+      "shard": "016-po-re"
+    },
+    {
+      "id": "coreui-brands:processwire",
+      "name": "processwire",
+      "label": "Processwire",
+      "search": "processwire",
+      "shard": "016-po-re"
+    },
+    {
+      "id": "coreui-brands:product-hunt",
+      "name": "product-hunt",
+      "label": "Product Hunt",
+      "search": "product hunt",
+      "shard": "016-po-re"
+    },
+    {
+      "id": "coreui-brands:proto-io",
+      "name": "proto-io",
+      "label": "Proto Io",
+      "search": "proto io",
+      "shard": "016-po-re"
+    },
+    {
+      "id": "coreui-brands:protonmail",
+      "name": "protonmail",
+      "label": "Protonmail",
+      "search": "protonmail",
+      "shard": "016-po-re"
+    },
+    {
+      "id": "coreui-brands:proxmox",
+      "name": "proxmox",
+      "label": "Proxmox",
+      "search": "proxmox",
+      "shard": "016-po-re"
+    },
+    {
+      "id": "coreui-brands:pypi",
+      "name": "pypi",
+      "label": "Pypi",
+      "search": "pypi",
+      "shard": "016-po-re"
+    },
+    {
+      "id": "coreui-brands:python",
+      "name": "python",
+      "label": "Python",
+      "search": "python",
+      "shard": "016-po-re"
+    },
+    {
+      "id": "coreui-brands:pytorch",
+      "name": "pytorch",
+      "label": "Pytorch",
+      "search": "pytorch",
+      "shard": "016-po-re"
+    },
+    {
+      "id": "coreui-brands:qgis",
+      "name": "qgis",
+      "label": "Qgis",
+      "search": "qgis",
+      "shard": "016-po-re"
+    },
+    {
+      "id": "coreui-brands:qiita",
+      "name": "qiita",
+      "label": "Qiita",
+      "search": "qiita",
+      "shard": "016-po-re"
+    },
+    {
+      "id": "coreui-brands:qq",
+      "name": "qq",
+      "label": "Qq",
+      "search": "qq",
+      "shard": "016-po-re"
+    },
+    {
+      "id": "coreui-brands:qualcomm",
+      "name": "qualcomm",
+      "label": "Qualcomm",
+      "search": "qualcomm",
+      "shard": "016-po-re"
+    },
+    {
+      "id": "coreui-brands:quantcast",
+      "name": "quantcast",
+      "label": "Quantcast",
+      "search": "quantcast",
+      "shard": "016-po-re"
+    },
+    {
+      "id": "coreui-brands:quantopian",
+      "name": "quantopian",
+      "label": "Quantopian",
+      "search": "quantopian",
+      "shard": "016-po-re"
+    },
+    {
+      "id": "coreui-brands:quarkus",
+      "name": "quarkus",
+      "label": "Quarkus",
+      "search": "quarkus",
+      "shard": "016-po-re"
+    },
+    {
+      "id": "coreui-brands:quora",
+      "name": "quora",
+      "label": "Quora",
+      "search": "quora",
+      "shard": "016-po-re"
+    },
+    {
+      "id": "coreui-brands:qwiklabs",
+      "name": "qwiklabs",
+      "label": "Qwiklabs",
+      "search": "qwiklabs",
+      "shard": "016-po-re"
+    },
+    {
+      "id": "coreui-brands:qzone",
+      "name": "qzone",
+      "label": "Qzone",
+      "search": "qzone",
+      "shard": "016-po-re"
+    },
+    {
+      "id": "coreui-brands:r",
+      "name": "r",
+      "label": "R",
+      "search": "r",
+      "shard": "016-po-re"
+    },
+    {
+      "id": "coreui-brands:radiopublic",
+      "name": "radiopublic",
+      "label": "Radiopublic",
+      "search": "radiopublic",
+      "shard": "016-po-re"
+    },
+    {
+      "id": "coreui-brands:rails",
+      "name": "rails",
+      "label": "Rails",
+      "search": "rails",
+      "shard": "016-po-re"
+    },
+    {
+      "id": "coreui-brands:raspberry-pi",
+      "name": "raspberry-pi",
+      "label": "Raspberry Pi",
+      "search": "raspberry pi",
+      "shard": "016-po-re"
+    },
+    {
+      "id": "coreui-brands:react",
+      "name": "react",
+      "label": "React",
+      "search": "react",
+      "shard": "016-po-re"
+    },
+    {
+      "id": "coreui-brands:read-the-docs",
+      "name": "read-the-docs",
+      "label": "Read The Docs",
+      "search": "read the docs",
+      "shard": "016-po-re"
+    },
+    {
+      "id": "coreui-brands:readme",
+      "name": "readme",
+      "label": "Readme",
+      "search": "readme",
+      "shard": "016-po-re"
+    },
+    {
+      "id": "coreui-brands:realm",
+      "name": "realm",
+      "label": "Realm",
+      "search": "realm",
+      "shard": "016-po-re"
+    },
+    {
+      "id": "coreui-brands:reason",
+      "name": "reason",
+      "label": "Reason",
+      "search": "reason",
+      "shard": "016-po-re"
+    },
+    {
+      "id": "coreui-brands:redbubble",
+      "name": "redbubble",
+      "label": "Redbubble",
+      "search": "redbubble",
+      "shard": "016-po-re"
+    },
+    {
+      "id": "coreui-brands:reddit",
+      "name": "reddit",
+      "label": "Reddit",
+      "search": "reddit",
+      "shard": "016-po-re"
+    },
+    {
+      "id": "coreui-brands:reddit-alt",
+      "name": "reddit-alt",
+      "label": "Reddit Alt",
+      "search": "reddit alt",
+      "shard": "016-po-re"
+    },
+    {
+      "id": "coreui-brands:redhat",
+      "name": "redhat",
+      "label": "Redhat",
+      "search": "redhat",
+      "shard": "016-po-re"
+    },
+    {
+      "id": "coreui-brands:redis",
+      "name": "redis",
+      "label": "Redis",
+      "search": "redis",
+      "shard": "016-po-re"
+    },
+    {
+      "id": "coreui-brands:redux",
+      "name": "redux",
+      "label": "Redux",
+      "search": "redux",
+      "shard": "016-po-re"
+    },
+    {
+      "id": "coreui-brands:renren",
+      "name": "renren",
+      "label": "Renren",
+      "search": "renren",
+      "shard": "017-re-sk"
+    },
+    {
+      "id": "coreui-brands:reverbnation",
+      "name": "reverbnation",
+      "label": "Reverbnation",
+      "search": "reverbnation",
+      "shard": "017-re-sk"
+    },
+    {
+      "id": "coreui-brands:riot",
+      "name": "riot",
+      "label": "Riot",
+      "search": "riot",
+      "shard": "017-re-sk"
+    },
+    {
+      "id": "coreui-brands:ripple",
+      "name": "ripple",
+      "label": "Ripple",
+      "search": "ripple",
+      "shard": "017-re-sk"
+    },
+    {
+      "id": "coreui-brands:riseup",
+      "name": "riseup",
+      "label": "Riseup",
+      "search": "riseup",
+      "shard": "017-re-sk"
+    },
+    {
+      "id": "coreui-brands:rollup-js",
+      "name": "rollup-js",
+      "label": "Rollup Js",
+      "search": "rollup js",
+      "shard": "017-re-sk"
+    },
+    {
+      "id": "coreui-brands:roots",
+      "name": "roots",
+      "label": "Roots",
+      "search": "roots",
+      "shard": "017-re-sk"
+    },
+    {
+      "id": "coreui-brands:roundcube",
+      "name": "roundcube",
+      "label": "Roundcube",
+      "search": "roundcube",
+      "shard": "017-re-sk"
+    },
+    {
+      "id": "coreui-brands:rss",
+      "name": "rss",
+      "label": "Rss",
+      "search": "rss",
+      "shard": "017-re-sk"
+    },
+    {
+      "id": "coreui-brands:rstudio",
+      "name": "rstudio",
+      "label": "Rstudio",
+      "search": "rstudio",
+      "shard": "017-re-sk"
+    },
+    {
+      "id": "coreui-brands:ruby",
+      "name": "ruby",
+      "label": "Ruby",
+      "search": "ruby",
+      "shard": "017-re-sk"
+    },
+    {
+      "id": "coreui-brands:rubygems",
+      "name": "rubygems",
+      "label": "Rubygems",
+      "search": "rubygems",
+      "shard": "017-re-sk"
+    },
+    {
+      "id": "coreui-brands:runkeeper",
+      "name": "runkeeper",
+      "label": "Runkeeper",
+      "search": "runkeeper",
+      "shard": "017-re-sk"
+    },
+    {
+      "id": "coreui-brands:rust",
+      "name": "rust",
+      "label": "Rust",
+      "search": "rust",
+      "shard": "017-re-sk"
+    },
+    {
+      "id": "coreui-brands:safari",
+      "name": "safari",
+      "label": "Safari",
+      "search": "safari",
+      "shard": "017-re-sk"
+    },
+    {
+      "id": "coreui-brands:sahibinden",
+      "name": "sahibinden",
+      "label": "Sahibinden",
+      "search": "sahibinden",
+      "shard": "017-re-sk"
+    },
+    {
+      "id": "coreui-brands:salesforce",
+      "name": "salesforce",
+      "label": "Salesforce",
+      "search": "salesforce",
+      "shard": "017-re-sk"
+    },
+    {
+      "id": "coreui-brands:saltstack",
+      "name": "saltstack",
+      "label": "Saltstack",
+      "search": "saltstack",
+      "shard": "017-re-sk"
+    },
+    {
+      "id": "coreui-brands:samsung",
+      "name": "samsung",
+      "label": "Samsung",
+      "search": "samsung",
+      "shard": "017-re-sk"
+    },
+    {
+      "id": "coreui-brands:samsung-pay",
+      "name": "samsung-pay",
+      "label": "Samsung Pay",
+      "search": "samsung pay",
+      "shard": "017-re-sk"
+    },
+    {
+      "id": "coreui-brands:sap",
+      "name": "sap",
+      "label": "Sap",
+      "search": "sap",
+      "shard": "017-re-sk"
+    },
+    {
+      "id": "coreui-brands:sass",
+      "name": "sass",
+      "label": "Sass",
+      "search": "sass",
+      "shard": "017-re-sk"
+    },
+    {
+      "id": "coreui-brands:sass-alt",
+      "name": "sass-alt",
+      "label": "Sass Alt",
+      "search": "sass alt",
+      "shard": "017-re-sk"
+    },
+    {
+      "id": "coreui-brands:saucelabs",
+      "name": "saucelabs",
+      "label": "Saucelabs",
+      "search": "saucelabs",
+      "shard": "017-re-sk"
+    },
+    {
+      "id": "coreui-brands:scala",
+      "name": "scala",
+      "label": "Scala",
+      "search": "scala",
+      "shard": "017-re-sk"
+    },
+    {
+      "id": "coreui-brands:scaleway",
+      "name": "scaleway",
+      "label": "Scaleway",
+      "search": "scaleway",
+      "shard": "017-re-sk"
+    },
+    {
+      "id": "coreui-brands:scribd",
+      "name": "scribd",
+      "label": "Scribd",
+      "search": "scribd",
+      "shard": "017-re-sk"
+    },
+    {
+      "id": "coreui-brands:scrutinizerci",
+      "name": "scrutinizerci",
+      "label": "Scrutinizerci",
+      "search": "scrutinizerci",
+      "shard": "017-re-sk"
+    },
+    {
+      "id": "coreui-brands:seagate",
+      "name": "seagate",
+      "label": "Seagate",
+      "search": "seagate",
+      "shard": "017-re-sk"
+    },
+    {
+      "id": "coreui-brands:sega",
+      "name": "sega",
+      "label": "Sega",
+      "search": "sega",
+      "shard": "017-re-sk"
+    },
+    {
+      "id": "coreui-brands:sellfy",
+      "name": "sellfy",
+      "label": "Sellfy",
+      "search": "sellfy",
+      "shard": "017-re-sk"
+    },
+    {
+      "id": "coreui-brands:semaphoreci",
+      "name": "semaphoreci",
+      "label": "Semaphoreci",
+      "search": "semaphoreci",
+      "shard": "017-re-sk"
+    },
+    {
+      "id": "coreui-brands:sensu",
+      "name": "sensu",
+      "label": "Sensu",
+      "search": "sensu",
+      "shard": "017-re-sk"
+    },
+    {
+      "id": "coreui-brands:sentry",
+      "name": "sentry",
+      "label": "Sentry",
+      "search": "sentry",
+      "shard": "017-re-sk"
+    },
+    {
+      "id": "coreui-brands:server-fault",
+      "name": "server-fault",
+      "label": "Server Fault",
+      "search": "server fault",
+      "shard": "017-re-sk"
+    },
+    {
+      "id": "coreui-brands:shazam",
+      "name": "shazam",
+      "label": "Shazam",
+      "search": "shazam",
+      "shard": "017-re-sk"
+    },
+    {
+      "id": "coreui-brands:shell",
+      "name": "shell",
+      "label": "Shell",
+      "search": "shell",
+      "shard": "017-re-sk"
+    },
+    {
+      "id": "coreui-brands:shopify",
+      "name": "shopify",
+      "label": "Shopify",
+      "search": "shopify",
+      "shard": "017-re-sk"
+    },
+    {
+      "id": "coreui-brands:showpad",
+      "name": "showpad",
+      "label": "Showpad",
+      "search": "showpad",
+      "shard": "017-re-sk"
+    },
+    {
+      "id": "coreui-brands:siemens",
+      "name": "siemens",
+      "label": "Siemens",
+      "search": "siemens",
+      "shard": "017-re-sk"
+    },
+    {
+      "id": "coreui-brands:signal",
+      "name": "signal",
+      "label": "Signal",
+      "search": "signal",
+      "shard": "017-re-sk"
+    },
+    {
+      "id": "coreui-brands:sina-weibo",
+      "name": "sina-weibo",
+      "label": "Sina Weibo",
+      "search": "sina weibo",
+      "shard": "017-re-sk"
+    },
+    {
+      "id": "coreui-brands:sitepoint",
+      "name": "sitepoint",
+      "label": "Sitepoint",
+      "search": "sitepoint",
+      "shard": "017-re-sk"
+    },
+    {
+      "id": "coreui-brands:sketch",
+      "name": "sketch",
+      "label": "Sketch",
+      "search": "sketch",
+      "shard": "017-re-sk"
+    },
+    {
+      "id": "coreui-brands:skillshare",
+      "name": "skillshare",
+      "label": "Skillshare",
+      "search": "skillshare",
+      "shard": "018-sk-st"
+    },
+    {
+      "id": "coreui-brands:skyliner",
+      "name": "skyliner",
+      "label": "Skyliner",
+      "search": "skyliner",
+      "shard": "018-sk-st"
+    },
+    {
+      "id": "coreui-brands:skype",
+      "name": "skype",
+      "label": "Skype",
+      "search": "skype",
+      "shard": "018-sk-st"
+    },
+    {
+      "id": "coreui-brands:slack",
+      "name": "slack",
+      "label": "Slack",
+      "search": "slack",
+      "shard": "018-sk-st"
+    },
+    {
+      "id": "coreui-brands:slashdot",
+      "name": "slashdot",
+      "label": "Slashdot",
+      "search": "slashdot",
+      "shard": "018-sk-st"
+    },
+    {
+      "id": "coreui-brands:slickpic",
+      "name": "slickpic",
+      "label": "Slickpic",
+      "search": "slickpic",
+      "shard": "018-sk-st"
+    },
+    {
+      "id": "coreui-brands:slides",
+      "name": "slides",
+      "label": "Slides",
+      "search": "slides",
+      "shard": "018-sk-st"
+    },
+    {
+      "id": "coreui-brands:slideshare",
+      "name": "slideshare",
+      "label": "Slideshare",
+      "search": "slideshare",
+      "shard": "018-sk-st"
+    },
+    {
+      "id": "coreui-brands:smashingmagazine",
+      "name": "smashingmagazine",
+      "label": "Smashingmagazine",
+      "search": "smashingmagazine",
+      "shard": "018-sk-st"
+    },
+    {
+      "id": "coreui-brands:snapchat",
+      "name": "snapchat",
+      "label": "Snapchat",
+      "search": "snapchat",
+      "shard": "018-sk-st"
+    },
+    {
+      "id": "coreui-brands:snapcraft",
+      "name": "snapcraft",
+      "label": "Snapcraft",
+      "search": "snapcraft",
+      "shard": "018-sk-st"
+    },
+    {
+      "id": "coreui-brands:snyk",
+      "name": "snyk",
+      "label": "Snyk",
+      "search": "snyk",
+      "shard": "018-sk-st"
+    },
+    {
+      "id": "coreui-brands:society6",
+      "name": "society6",
+      "label": "Society6",
+      "search": "society6",
+      "shard": "018-sk-st"
+    },
+    {
+      "id": "coreui-brands:socket-io",
+      "name": "socket-io",
+      "label": "Socket Io",
+      "search": "socket io",
+      "shard": "018-sk-st"
+    },
+    {
+      "id": "coreui-brands:sogou",
+      "name": "sogou",
+      "label": "Sogou",
+      "search": "sogou",
+      "shard": "018-sk-st"
+    },
+    {
+      "id": "coreui-brands:solus",
+      "name": "solus",
+      "label": "Solus",
+      "search": "solus",
+      "shard": "018-sk-st"
+    },
+    {
+      "id": "coreui-brands:songkick",
+      "name": "songkick",
+      "label": "Songkick",
+      "search": "songkick",
+      "shard": "018-sk-st"
+    },
+    {
+      "id": "coreui-brands:sonos",
+      "name": "sonos",
+      "label": "Sonos",
+      "search": "sonos",
+      "shard": "018-sk-st"
+    },
+    {
+      "id": "coreui-brands:soundcloud",
+      "name": "soundcloud",
+      "label": "Soundcloud",
+      "search": "soundcloud",
+      "shard": "018-sk-st"
+    },
+    {
+      "id": "coreui-brands:sourceforge",
+      "name": "sourceforge",
+      "label": "Sourceforge",
+      "search": "sourceforge",
+      "shard": "018-sk-st"
+    },
+    {
+      "id": "coreui-brands:sourcegraph",
+      "name": "sourcegraph",
+      "label": "Sourcegraph",
+      "search": "sourcegraph",
+      "shard": "018-sk-st"
+    },
+    {
+      "id": "coreui-brands:spacemacs",
+      "name": "spacemacs",
+      "label": "Spacemacs",
+      "search": "spacemacs",
+      "shard": "018-sk-st"
+    },
+    {
+      "id": "coreui-brands:spacex",
+      "name": "spacex",
+      "label": "Spacex",
+      "search": "spacex",
+      "shard": "018-sk-st"
+    },
+    {
+      "id": "coreui-brands:sparkfun",
+      "name": "sparkfun",
+      "label": "Sparkfun",
+      "search": "sparkfun",
+      "shard": "018-sk-st"
+    },
+    {
+      "id": "coreui-brands:sparkpost",
+      "name": "sparkpost",
+      "label": "Sparkpost",
+      "search": "sparkpost",
+      "shard": "018-sk-st"
+    },
+    {
+      "id": "coreui-brands:spdx",
+      "name": "spdx",
+      "label": "Spdx",
+      "search": "spdx",
+      "shard": "018-sk-st"
+    },
+    {
+      "id": "coreui-brands:speaker-deck",
+      "name": "speaker-deck",
+      "label": "Speaker Deck",
+      "search": "speaker deck",
+      "shard": "018-sk-st"
+    },
+    {
+      "id": "coreui-brands:spectrum",
+      "name": "spectrum",
+      "label": "Spectrum",
+      "search": "spectrum",
+      "shard": "018-sk-st"
+    },
+    {
+      "id": "coreui-brands:spotify",
+      "name": "spotify",
+      "label": "Spotify",
+      "search": "spotify",
+      "shard": "018-sk-st"
+    },
+    {
+      "id": "coreui-brands:spotlight",
+      "name": "spotlight",
+      "label": "Spotlight",
+      "search": "spotlight",
+      "shard": "018-sk-st"
+    },
+    {
+      "id": "coreui-brands:spreaker",
+      "name": "spreaker",
+      "label": "Spreaker",
+      "search": "spreaker",
+      "shard": "018-sk-st"
+    },
+    {
+      "id": "coreui-brands:spring",
+      "name": "spring",
+      "label": "Spring",
+      "search": "spring",
+      "shard": "018-sk-st"
+    },
+    {
+      "id": "coreui-brands:sprint",
+      "name": "sprint",
+      "label": "Sprint",
+      "search": "sprint",
+      "shard": "018-sk-st"
+    },
+    {
+      "id": "coreui-brands:squarespace",
+      "name": "squarespace",
+      "label": "Squarespace",
+      "search": "squarespace",
+      "shard": "018-sk-st"
+    },
+    {
+      "id": "coreui-brands:stack-overflow",
+      "name": "stack-overflow",
+      "label": "Stack Overflow",
+      "search": "stack overflow",
+      "shard": "018-sk-st"
+    },
+    {
+      "id": "coreui-brands:stackbit",
+      "name": "stackbit",
+      "label": "Stackbit",
+      "search": "stackbit",
+      "shard": "018-sk-st"
+    },
+    {
+      "id": "coreui-brands:stackexchange",
+      "name": "stackexchange",
+      "label": "Stackexchange",
+      "search": "stackexchange",
+      "shard": "018-sk-st"
+    },
+    {
+      "id": "coreui-brands:stackoverflow",
+      "name": "stackoverflow",
+      "label": "Stackoverflow",
+      "search": "stackoverflow",
+      "shard": "018-sk-st"
+    },
+    {
+      "id": "coreui-brands:stackpath",
+      "name": "stackpath",
+      "label": "Stackpath",
+      "search": "stackpath",
+      "shard": "018-sk-st"
+    },
+    {
+      "id": "coreui-brands:stackshare",
+      "name": "stackshare",
+      "label": "Stackshare",
+      "search": "stackshare",
+      "shard": "018-sk-st"
+    },
+    {
+      "id": "coreui-brands:stadia",
+      "name": "stadia",
+      "label": "Stadia",
+      "search": "stadia",
+      "shard": "018-sk-st"
+    },
+    {
+      "id": "coreui-brands:statamic",
+      "name": "statamic",
+      "label": "Statamic",
+      "search": "statamic",
+      "shard": "018-sk-st"
+    },
+    {
+      "id": "coreui-brands:staticman",
+      "name": "staticman",
+      "label": "Staticman",
+      "search": "staticman",
+      "shard": "019-st-te"
+    },
+    {
+      "id": "coreui-brands:statuspage",
+      "name": "statuspage",
+      "label": "Statuspage",
+      "search": "statuspage",
+      "shard": "019-st-te"
+    },
+    {
+      "id": "coreui-brands:steam",
+      "name": "steam",
+      "label": "Steam",
+      "search": "steam",
+      "shard": "019-st-te"
+    },
+    {
+      "id": "coreui-brands:steem",
+      "name": "steem",
+      "label": "Steem",
+      "search": "steem",
+      "shard": "019-st-te"
+    },
+    {
+      "id": "coreui-brands:steemit",
+      "name": "steemit",
+      "label": "Steemit",
+      "search": "steemit",
+      "shard": "019-st-te"
+    },
+    {
+      "id": "coreui-brands:stitcher",
+      "name": "stitcher",
+      "label": "Stitcher",
+      "search": "stitcher",
+      "shard": "019-st-te"
+    },
+    {
+      "id": "coreui-brands:storify",
+      "name": "storify",
+      "label": "Storify",
+      "search": "storify",
+      "shard": "019-st-te"
+    },
+    {
+      "id": "coreui-brands:storybook",
+      "name": "storybook",
+      "label": "Storybook",
+      "search": "storybook",
+      "shard": "019-st-te"
+    },
+    {
+      "id": "coreui-brands:strapi",
+      "name": "strapi",
+      "label": "Strapi",
+      "search": "strapi",
+      "shard": "019-st-te"
+    },
+    {
+      "id": "coreui-brands:strava",
+      "name": "strava",
+      "label": "Strava",
+      "search": "strava",
+      "shard": "019-st-te"
+    },
+    {
+      "id": "coreui-brands:stripe",
+      "name": "stripe",
+      "label": "Stripe",
+      "search": "stripe",
+      "shard": "019-st-te"
+    },
+    {
+      "id": "coreui-brands:stripe-s",
+      "name": "stripe-s",
+      "label": "Stripe S",
+      "search": "stripe s",
+      "shard": "019-st-te"
+    },
+    {
+      "id": "coreui-brands:stubhub",
+      "name": "stubhub",
+      "label": "Stubhub",
+      "search": "stubhub",
+      "shard": "019-st-te"
+    },
+    {
+      "id": "coreui-brands:stumbleupon",
+      "name": "stumbleupon",
+      "label": "Stumbleupon",
+      "search": "stumbleupon",
+      "shard": "019-st-te"
+    },
+    {
+      "id": "coreui-brands:styleshare",
+      "name": "styleshare",
+      "label": "Styleshare",
+      "search": "styleshare",
+      "shard": "019-st-te"
+    },
+    {
+      "id": "coreui-brands:stylus",
+      "name": "stylus",
+      "label": "Stylus",
+      "search": "stylus",
+      "shard": "019-st-te"
+    },
+    {
+      "id": "coreui-brands:sublime-text",
+      "name": "sublime-text",
+      "label": "Sublime Text",
+      "search": "sublime text",
+      "shard": "019-st-te"
+    },
+    {
+      "id": "coreui-brands:subversion",
+      "name": "subversion",
+      "label": "Subversion",
+      "search": "subversion",
+      "shard": "019-st-te"
+    },
+    {
+      "id": "coreui-brands:superuser",
+      "name": "superuser",
+      "label": "Superuser",
+      "search": "superuser",
+      "shard": "019-st-te"
+    },
+    {
+      "id": "coreui-brands:svelte",
+      "name": "svelte",
+      "label": "Svelte",
+      "search": "svelte",
+      "shard": "019-st-te"
+    },
+    {
+      "id": "coreui-brands:svg",
+      "name": "svg",
+      "label": "Svg",
+      "search": "svg",
+      "shard": "019-st-te"
+    },
+    {
+      "id": "coreui-brands:swagger",
+      "name": "swagger",
+      "label": "Swagger",
+      "search": "swagger",
+      "shard": "019-st-te"
+    },
+    {
+      "id": "coreui-brands:swarm",
+      "name": "swarm",
+      "label": "Swarm",
+      "search": "swarm",
+      "shard": "019-st-te"
+    },
+    {
+      "id": "coreui-brands:swift",
+      "name": "swift",
+      "label": "Swift",
+      "search": "swift",
+      "shard": "019-st-te"
+    },
+    {
+      "id": "coreui-brands:symantec",
+      "name": "symantec",
+      "label": "Symantec",
+      "search": "symantec",
+      "shard": "019-st-te"
+    },
+    {
+      "id": "coreui-brands:symfony",
+      "name": "symfony",
+      "label": "Symfony",
+      "search": "symfony",
+      "shard": "019-st-te"
+    },
+    {
+      "id": "coreui-brands:synology",
+      "name": "synology",
+      "label": "Synology",
+      "search": "synology",
+      "shard": "019-st-te"
+    },
+    {
+      "id": "coreui-brands:t-mobile",
+      "name": "t-mobile",
+      "label": "T Mobile",
+      "search": "t mobile",
+      "shard": "019-st-te"
+    },
+    {
+      "id": "coreui-brands:tableau",
+      "name": "tableau",
+      "label": "Tableau",
+      "search": "tableau",
+      "shard": "019-st-te"
+    },
+    {
+      "id": "coreui-brands:tails",
+      "name": "tails",
+      "label": "Tails",
+      "search": "tails",
+      "shard": "019-st-te"
+    },
+    {
+      "id": "coreui-brands:tapas",
+      "name": "tapas",
+      "label": "Tapas",
+      "search": "tapas",
+      "shard": "019-st-te"
+    },
+    {
+      "id": "coreui-brands:teamviewer",
+      "name": "teamviewer",
+      "label": "Teamviewer",
+      "search": "teamviewer",
+      "shard": "019-st-te"
+    },
+    {
+      "id": "coreui-brands:ted",
+      "name": "ted",
+      "label": "Ted",
+      "search": "ted",
+      "shard": "019-st-te"
+    },
+    {
+      "id": "coreui-brands:teespring",
+      "name": "teespring",
+      "label": "Teespring",
+      "search": "teespring",
+      "shard": "019-st-te"
+    },
+    {
+      "id": "coreui-brands:telegram",
+      "name": "telegram",
+      "label": "Telegram",
+      "search": "telegram",
+      "shard": "019-st-te"
+    },
+    {
+      "id": "coreui-brands:telegram-plane",
+      "name": "telegram-plane",
+      "label": "Telegram Plane",
+      "search": "telegram plane",
+      "shard": "020-te-va"
+    },
+    {
+      "id": "coreui-brands:tencent-qq",
+      "name": "tencent-qq",
+      "label": "Tencent Qq",
+      "search": "tencent qq",
+      "shard": "020-te-va"
+    },
+    {
+      "id": "coreui-brands:tencent-weibo",
+      "name": "tencent-weibo",
+      "label": "Tencent Weibo",
+      "search": "tencent weibo",
+      "shard": "020-te-va"
+    },
+    {
+      "id": "coreui-brands:tensorflow",
+      "name": "tensorflow",
+      "label": "Tensorflow",
+      "search": "tensorflow",
+      "shard": "020-te-va"
+    },
+    {
+      "id": "coreui-brands:terraform",
+      "name": "terraform",
+      "label": "Terraform",
+      "search": "terraform",
+      "shard": "020-te-va"
+    },
+    {
+      "id": "coreui-brands:tesla",
+      "name": "tesla",
+      "label": "Tesla",
+      "search": "tesla",
+      "shard": "020-te-va"
+    },
+    {
+      "id": "coreui-brands:the-mighty",
+      "name": "the-mighty",
+      "label": "The Mighty",
+      "search": "the mighty",
+      "shard": "020-te-va"
+    },
+    {
+      "id": "coreui-brands:the-movie-database",
+      "name": "the-movie-database",
+      "label": "The Movie Database",
+      "search": "the movie database",
+      "shard": "020-te-va"
+    },
+    {
+      "id": "coreui-brands:tidal",
+      "name": "tidal",
+      "label": "Tidal",
+      "search": "tidal",
+      "shard": "020-te-va"
+    },
+    {
+      "id": "coreui-brands:tiktok",
+      "name": "tiktok",
+      "label": "Tiktok",
+      "search": "tiktok",
+      "shard": "020-te-va"
+    },
+    {
+      "id": "coreui-brands:tinder",
+      "name": "tinder",
+      "label": "Tinder",
+      "search": "tinder",
+      "shard": "020-te-va"
+    },
+    {
+      "id": "coreui-brands:todoist",
+      "name": "todoist",
+      "label": "Todoist",
+      "search": "todoist",
+      "shard": "020-te-va"
+    },
+    {
+      "id": "coreui-brands:toggl",
+      "name": "toggl",
+      "label": "Toggl",
+      "search": "toggl",
+      "shard": "020-te-va"
+    },
+    {
+      "id": "coreui-brands:topcoder",
+      "name": "topcoder",
+      "label": "Topcoder",
+      "search": "topcoder",
+      "shard": "020-te-va"
+    },
+    {
+      "id": "coreui-brands:toptal",
+      "name": "toptal",
+      "label": "Toptal",
+      "search": "toptal",
+      "shard": "020-te-va"
+    },
+    {
+      "id": "coreui-brands:tor",
+      "name": "tor",
+      "label": "Tor",
+      "search": "tor",
+      "shard": "020-te-va"
+    },
+    {
+      "id": "coreui-brands:toshiba",
+      "name": "toshiba",
+      "label": "Toshiba",
+      "search": "toshiba",
+      "shard": "020-te-va"
+    },
+    {
+      "id": "coreui-brands:trainerroad",
+      "name": "trainerroad",
+      "label": "Trainerroad",
+      "search": "trainerroad",
+      "shard": "020-te-va"
+    },
+    {
+      "id": "coreui-brands:trakt",
+      "name": "trakt",
+      "label": "Trakt",
+      "search": "trakt",
+      "shard": "020-te-va"
+    },
+    {
+      "id": "coreui-brands:travisci",
+      "name": "travisci",
+      "label": "Travisci",
+      "search": "travisci",
+      "shard": "020-te-va"
+    },
+    {
+      "id": "coreui-brands:treehouse",
+      "name": "treehouse",
+      "label": "Treehouse",
+      "search": "treehouse",
+      "shard": "020-te-va"
+    },
+    {
+      "id": "coreui-brands:trello",
+      "name": "trello",
+      "label": "Trello",
+      "search": "trello",
+      "shard": "020-te-va"
+    },
+    {
+      "id": "coreui-brands:tripadvisor",
+      "name": "tripadvisor",
+      "label": "Tripadvisor",
+      "search": "tripadvisor",
+      "shard": "020-te-va"
+    },
+    {
+      "id": "coreui-brands:trulia",
+      "name": "trulia",
+      "label": "Trulia",
+      "search": "trulia",
+      "shard": "020-te-va"
+    },
+    {
+      "id": "coreui-brands:tumblr",
+      "name": "tumblr",
+      "label": "Tumblr",
+      "search": "tumblr",
+      "shard": "020-te-va"
+    },
+    {
+      "id": "coreui-brands:twilio",
+      "name": "twilio",
+      "label": "Twilio",
+      "search": "twilio",
+      "shard": "020-te-va"
+    },
+    {
+      "id": "coreui-brands:twitch",
+      "name": "twitch",
+      "label": "Twitch",
+      "search": "twitch",
+      "shard": "020-te-va"
+    },
+    {
+      "id": "coreui-brands:twitter",
+      "name": "twitter",
+      "label": "Twitter",
+      "search": "twitter",
+      "shard": "020-te-va"
+    },
+    {
+      "id": "coreui-brands:twoo",
+      "name": "twoo",
+      "label": "Twoo",
+      "search": "twoo",
+      "shard": "020-te-va"
+    },
+    {
+      "id": "coreui-brands:typescript",
+      "name": "typescript",
+      "label": "Typescript",
+      "search": "typescript",
+      "shard": "020-te-va"
+    },
+    {
+      "id": "coreui-brands:typo3",
+      "name": "typo3",
+      "label": "Typo3",
+      "search": "typo3",
+      "shard": "020-te-va"
+    },
+    {
+      "id": "coreui-brands:uber",
+      "name": "uber",
+      "label": "Uber",
+      "search": "uber",
+      "shard": "020-te-va"
+    },
+    {
+      "id": "coreui-brands:ubisoft",
+      "name": "ubisoft",
+      "label": "Ubisoft",
+      "search": "ubisoft",
+      "shard": "020-te-va"
+    },
+    {
+      "id": "coreui-brands:ublock-origin",
+      "name": "ublock-origin",
+      "label": "Ublock Origin",
+      "search": "ublock origin",
+      "shard": "020-te-va"
+    },
+    {
+      "id": "coreui-brands:ubuntu",
+      "name": "ubuntu",
+      "label": "Ubuntu",
+      "search": "ubuntu",
+      "shard": "020-te-va"
+    },
+    {
+      "id": "coreui-brands:udacity",
+      "name": "udacity",
+      "label": "Udacity",
+      "search": "udacity",
+      "shard": "020-te-va"
+    },
+    {
+      "id": "coreui-brands:udemy",
+      "name": "udemy",
+      "label": "Udemy",
+      "search": "udemy",
+      "shard": "020-te-va"
+    },
+    {
+      "id": "coreui-brands:uikit",
+      "name": "uikit",
+      "label": "Uikit",
+      "search": "uikit",
+      "shard": "020-te-va"
+    },
+    {
+      "id": "coreui-brands:umbraco",
+      "name": "umbraco",
+      "label": "Umbraco",
+      "search": "umbraco",
+      "shard": "020-te-va"
+    },
+    {
+      "id": "coreui-brands:unity",
+      "name": "unity",
+      "label": "Unity",
+      "search": "unity",
+      "shard": "020-te-va"
+    },
+    {
+      "id": "coreui-brands:unreal-engine",
+      "name": "unreal-engine",
+      "label": "Unreal Engine",
+      "search": "unreal engine",
+      "shard": "020-te-va"
+    },
+    {
+      "id": "coreui-brands:unsplash",
+      "name": "unsplash",
+      "label": "Unsplash",
+      "search": "unsplash",
+      "shard": "020-te-va"
+    },
+    {
+      "id": "coreui-brands:untappd",
+      "name": "untappd",
+      "label": "Untappd",
+      "search": "untappd",
+      "shard": "020-te-va"
+    },
+    {
+      "id": "coreui-brands:upwork",
+      "name": "upwork",
+      "label": "Upwork",
+      "search": "upwork",
+      "shard": "020-te-va"
+    },
+    {
+      "id": "coreui-brands:usb",
+      "name": "usb",
+      "label": "Usb",
+      "search": "usb",
+      "shard": "020-te-va"
+    },
+    {
+      "id": "coreui-brands:v8",
+      "name": "v8",
+      "label": "V8",
+      "search": "v8",
+      "shard": "020-te-va"
+    },
+    {
+      "id": "coreui-brands:vagrant",
+      "name": "vagrant",
+      "label": "Vagrant",
+      "search": "vagrant",
+      "shard": "020-te-va"
+    },
+    {
+      "id": "coreui-brands:venmo",
+      "name": "venmo",
+      "label": "Venmo",
+      "search": "venmo",
+      "shard": "021-ve-yx"
+    },
+    {
+      "id": "coreui-brands:verizon",
+      "name": "verizon",
+      "label": "Verizon",
+      "search": "verizon",
+      "shard": "021-ve-yx"
+    },
+    {
+      "id": "coreui-brands:viadeo",
+      "name": "viadeo",
+      "label": "Viadeo",
+      "search": "viadeo",
+      "shard": "021-ve-yx"
+    },
+    {
+      "id": "coreui-brands:viber",
+      "name": "viber",
+      "label": "Viber",
+      "search": "viber",
+      "shard": "021-ve-yx"
+    },
+    {
+      "id": "coreui-brands:vim",
+      "name": "vim",
+      "label": "Vim",
+      "search": "vim",
+      "shard": "021-ve-yx"
+    },
+    {
+      "id": "coreui-brands:vimeo",
+      "name": "vimeo",
+      "label": "Vimeo",
+      "search": "vimeo",
+      "shard": "021-ve-yx"
+    },
+    {
+      "id": "coreui-brands:vimeo-v",
+      "name": "vimeo-v",
+      "label": "Vimeo V",
+      "search": "vimeo v",
+      "shard": "021-ve-yx"
+    },
+    {
+      "id": "coreui-brands:vine",
+      "name": "vine",
+      "label": "Vine",
+      "search": "vine",
+      "shard": "021-ve-yx"
+    },
+    {
+      "id": "coreui-brands:virb",
+      "name": "virb",
+      "label": "Virb",
+      "search": "virb",
+      "shard": "021-ve-yx"
+    },
+    {
+      "id": "coreui-brands:visa",
+      "name": "visa",
+      "label": "Visa",
+      "search": "visa",
+      "shard": "021-ve-yx"
+    },
+    {
+      "id": "coreui-brands:visual-studio",
+      "name": "visual-studio",
+      "label": "Visual Studio",
+      "search": "visual studio",
+      "shard": "021-ve-yx"
+    },
+    {
+      "id": "coreui-brands:visual-studio-code",
+      "name": "visual-studio-code",
+      "label": "Visual Studio Code",
+      "search": "visual studio code",
+      "shard": "021-ve-yx"
+    },
+    {
+      "id": "coreui-brands:vk",
+      "name": "vk",
+      "label": "Vk",
+      "search": "vk",
+      "shard": "021-ve-yx"
+    },
+    {
+      "id": "coreui-brands:vlc",
+      "name": "vlc",
+      "label": "Vlc",
+      "search": "vlc",
+      "shard": "021-ve-yx"
+    },
+    {
+      "id": "coreui-brands:vsco",
+      "name": "vsco",
+      "label": "Vsco",
+      "search": "vsco",
+      "shard": "021-ve-yx"
+    },
+    {
+      "id": "coreui-brands:vue-js",
+      "name": "vue-js",
+      "label": "Vue Js",
+      "search": "vue js",
+      "shard": "021-ve-yx"
+    },
+    {
+      "id": "coreui-brands:wattpad",
+      "name": "wattpad",
+      "label": "Wattpad",
+      "search": "wattpad",
+      "shard": "021-ve-yx"
+    },
+    {
+      "id": "coreui-brands:weasyl",
+      "name": "weasyl",
+      "label": "Weasyl",
+      "search": "weasyl",
+      "shard": "021-ve-yx"
+    },
+    {
+      "id": "coreui-brands:webcomponents-org",
+      "name": "webcomponents-org",
+      "label": "Webcomponents Org",
+      "search": "webcomponents org",
+      "shard": "021-ve-yx"
+    },
+    {
+      "id": "coreui-brands:webpack",
+      "name": "webpack",
+      "label": "Webpack",
+      "search": "webpack",
+      "shard": "021-ve-yx"
+    },
+    {
+      "id": "coreui-brands:webstorm",
+      "name": "webstorm",
+      "label": "Webstorm",
+      "search": "webstorm",
+      "shard": "021-ve-yx"
+    },
+    {
+      "id": "coreui-brands:wechat",
+      "name": "wechat",
+      "label": "Wechat",
+      "search": "wechat",
+      "shard": "021-ve-yx"
+    },
+    {
+      "id": "coreui-brands:whatsapp",
+      "name": "whatsapp",
+      "label": "Whatsapp",
+      "search": "whatsapp",
+      "shard": "021-ve-yx"
+    },
+    {
+      "id": "coreui-brands:when-i-work",
+      "name": "when-i-work",
+      "label": "When I Work",
+      "search": "when i work",
+      "shard": "021-ve-yx"
+    },
+    {
+      "id": "coreui-brands:wii",
+      "name": "wii",
+      "label": "Wii",
+      "search": "wii",
+      "shard": "021-ve-yx"
+    },
+    {
+      "id": "coreui-brands:wiiu",
+      "name": "wiiu",
+      "label": "Wiiu",
+      "search": "wiiu",
+      "shard": "021-ve-yx"
+    },
+    {
+      "id": "coreui-brands:wikipedia",
+      "name": "wikipedia",
+      "label": "Wikipedia",
+      "search": "wikipedia",
+      "shard": "021-ve-yx"
+    },
+    {
+      "id": "coreui-brands:windows",
+      "name": "windows",
+      "label": "Windows",
+      "search": "windows",
+      "shard": "021-ve-yx"
+    },
+    {
+      "id": "coreui-brands:wire",
+      "name": "wire",
+      "label": "Wire",
+      "search": "wire",
+      "shard": "021-ve-yx"
+    },
+    {
+      "id": "coreui-brands:wireguard",
+      "name": "wireguard",
+      "label": "Wireguard",
+      "search": "wireguard",
+      "shard": "021-ve-yx"
+    },
+    {
+      "id": "coreui-brands:wix",
+      "name": "wix",
+      "label": "Wix",
+      "search": "wix",
+      "shard": "021-ve-yx"
+    },
+    {
+      "id": "coreui-brands:wolfram",
+      "name": "wolfram",
+      "label": "Wolfram",
+      "search": "wolfram",
+      "shard": "021-ve-yx"
+    },
+    {
+      "id": "coreui-brands:wolfram-language",
+      "name": "wolfram-language",
+      "label": "Wolfram Language",
+      "search": "wolfram language",
+      "shard": "021-ve-yx"
+    },
+    {
+      "id": "coreui-brands:wolfram-mathematica",
+      "name": "wolfram-mathematica",
+      "label": "Wolfram Mathematica",
+      "search": "wolfram mathematica",
+      "shard": "021-ve-yx"
+    },
+    {
+      "id": "coreui-brands:wordpress",
+      "name": "wordpress",
+      "label": "Wordpress",
+      "search": "wordpress",
+      "shard": "021-ve-yx"
+    },
+    {
+      "id": "coreui-brands:wpengine",
+      "name": "wpengine",
+      "label": "Wpengine",
+      "search": "wpengine",
+      "shard": "021-ve-yx"
+    },
+    {
+      "id": "coreui-brands:x-pack",
+      "name": "x-pack",
+      "label": "X Pack",
+      "search": "x pack",
+      "shard": "021-ve-yx"
+    },
+    {
+      "id": "coreui-brands:xbox",
+      "name": "xbox",
+      "label": "Xbox",
+      "search": "xbox",
+      "shard": "021-ve-yx"
+    },
+    {
+      "id": "coreui-brands:xcode",
+      "name": "xcode",
+      "label": "Xcode",
+      "search": "xcode",
+      "shard": "021-ve-yx"
+    },
+    {
+      "id": "coreui-brands:xero",
+      "name": "xero",
+      "label": "Xero",
+      "search": "xero",
+      "shard": "021-ve-yx"
+    },
+    {
+      "id": "coreui-brands:xiaomi",
+      "name": "xiaomi",
+      "label": "Xiaomi",
+      "search": "xiaomi",
+      "shard": "021-ve-yx"
+    },
+    {
+      "id": "coreui-brands:xing",
+      "name": "xing",
+      "label": "Xing",
+      "search": "xing",
+      "shard": "021-ve-yx"
+    },
+    {
+      "id": "coreui-brands:xrp",
+      "name": "xrp",
+      "label": "Xrp",
+      "search": "xrp",
+      "shard": "021-ve-yx"
+    },
+    {
+      "id": "coreui-brands:xsplit",
+      "name": "xsplit",
+      "label": "Xsplit",
+      "search": "xsplit",
+      "shard": "021-ve-yx"
+    },
+    {
+      "id": "coreui-brands:y-combinator",
+      "name": "y-combinator",
+      "label": "Y Combinator",
+      "search": "y combinator",
+      "shard": "021-ve-yx"
+    },
+    {
+      "id": "coreui-brands:yahoo",
+      "name": "yahoo",
+      "label": "Yahoo",
+      "search": "yahoo",
+      "shard": "022-ya-zu"
+    },
+    {
+      "id": "coreui-brands:yammer",
+      "name": "yammer",
+      "label": "Yammer",
+      "search": "yammer",
+      "shard": "022-ya-zu"
+    },
+    {
+      "id": "coreui-brands:yandex",
+      "name": "yandex",
+      "label": "Yandex",
+      "search": "yandex",
+      "shard": "022-ya-zu"
+    },
+    {
+      "id": "coreui-brands:yarn",
+      "name": "yarn",
+      "label": "Yarn",
+      "search": "yarn",
+      "shard": "022-ya-zu"
+    },
+    {
+      "id": "coreui-brands:yelp",
+      "name": "yelp",
+      "label": "Yelp",
+      "search": "yelp",
+      "shard": "022-ya-zu"
+    },
+    {
+      "id": "coreui-brands:youtube",
+      "name": "youtube",
+      "label": "Youtube",
+      "search": "youtube",
+      "shard": "022-ya-zu"
+    },
+    {
+      "id": "coreui-brands:zalando",
+      "name": "zalando",
+      "label": "Zalando",
+      "search": "zalando",
+      "shard": "022-ya-zu"
+    },
+    {
+      "id": "coreui-brands:zapier",
+      "name": "zapier",
+      "label": "Zapier",
+      "search": "zapier",
+      "shard": "022-ya-zu"
+    },
+    {
+      "id": "coreui-brands:zeit",
+      "name": "zeit",
+      "label": "Zeit",
+      "search": "zeit",
+      "shard": "022-ya-zu"
+    },
+    {
+      "id": "coreui-brands:zendesk",
+      "name": "zendesk",
+      "label": "Zendesk",
+      "search": "zendesk",
+      "shard": "022-ya-zu"
+    },
+    {
+      "id": "coreui-brands:zerply",
+      "name": "zerply",
+      "label": "Zerply",
+      "search": "zerply",
+      "shard": "022-ya-zu"
+    },
+    {
+      "id": "coreui-brands:zillow",
+      "name": "zillow",
+      "label": "Zillow",
+      "search": "zillow",
+      "shard": "022-ya-zu"
+    },
+    {
+      "id": "coreui-brands:zingat",
+      "name": "zingat",
+      "label": "Zingat",
+      "search": "zingat",
+      "shard": "022-ya-zu"
+    },
+    {
+      "id": "coreui-brands:zoom",
+      "name": "zoom",
+      "label": "Zoom",
+      "search": "zoom",
+      "shard": "022-ya-zu"
+    },
+    {
+      "id": "coreui-brands:zorin",
+      "name": "zorin",
+      "label": "Zorin",
+      "search": "zorin",
+      "shard": "022-ya-zu"
+    },
+    {
+      "id": "coreui-brands:zulip",
+      "name": "zulip",
+      "label": "Zulip",
+      "search": "zulip",
+      "shard": "022-ya-zu"
+    }
+  ]
+}

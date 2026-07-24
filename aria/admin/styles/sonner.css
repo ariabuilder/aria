@@ -1,0 +1,113 @@
+/* Aria toast overrides — imported from @/components/ui/sonner/Sonner.vue */
+
+.sonner-toaster,
+[data-sonner-toaster],
+.sonner-toaster[data-position="bottom-center"],
+.sonner-toaster[data-y-position="bottom"][data-x-position="center"],
+[data-sonner-toaster][data-position="bottom-center"],
+[data-sonner-toaster][data-y-position="bottom"][data-x-position="center"] {
+  position: fixed !important;
+  inset: auto 0 20px 0 !important;
+  left: 50% !important;
+  right: auto !important;
+  bottom: 10px !important;
+  top: auto !important;
+  transform: translateX(-50%) !important;
+  z-index: var(--z-toast);
+  max-width: 250px;
+  pointer-events: none;
+}
+
+[data-sonner-toast][data-mounted="true"] {
+  opacity: 1 !important;
+}
+
+.sonner-toast,
+[data-sonner-toast],
+.sonner-toast[data-type],
+[data-sonner-toast][data-type] {
+  background: var(--background) !important;
+  border: 1px dashed var(--border) !important;
+  box-shadow: none !important;
+  padding: 10px 10px !important;
+  margin: 0 0 4px 0 !important;
+  border-radius: 6px !important;
+  font-family: sans-serif;
+  gap: 10px !important;
+  font-size: 14px !important;
+  line-height: 1.5 !important;
+  color: var(--foreground) !important;
+  font-weight: 400 !important;
+  letter-spacing: 0.01em;
+  pointer-events: auto;
+}
+
+.sonner-content {
+  padding: 0 !important;
+  margin: 0 !important;
+}
+
+.sonner-description {
+  color: var(--foreground) !important;
+  margin-top: 2px;
+}
+
+.sonner-close-button {
+  display: none !important;
+}
+
+.sonner-toast.sonner-success,
+[data-sonner-toast][data-type="success"] {
+  color: var(--foreground) !important;
+}
+
+.sonner-toast.sonner-error,
+[data-sonner-toast][data-type="error"] {
+  color: var(--foreground) !important;
+}
+
+.sonner-toast.sonner-warning,
+[data-sonner-toast][data-type="warning"] {
+  color: var(--foreground) !important;
+}
+
+.sonner-toast.sonner-info,
+[data-sonner-toast][data-type="info"] {
+  color: var(--foreground) !important;
+}
+
+.sonner-toast.sonner-loading,
+[data-sonner-toast][data-type="loading"] {
+  color: var(--foreground) !important;
+}
+
+@keyframes aria-sonner-slide-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes aria-sonner-slide-out {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+.sonner-toast,
+[data-sonner-toast] {
+  animation: aria-sonner-slide-in 0.1s cubic-bezier(0.22, 1, 0.36, 1) !important;
+}
+
+.sonner-toast.sonner-closing {
+  animation: aria-sonner-slide-out 0.1s cubic-bezier(0.55, 0, 0.55, 0.2) forwards !important;
+}

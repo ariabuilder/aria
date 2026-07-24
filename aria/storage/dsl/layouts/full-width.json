@@ -1,0 +1,33 @@
+{
+  "id": "full-width",
+  "name": "Full Width",
+  "title": "Full Width",
+  "description": "Single-column layout",
+  "nodes": [],
+  "slots": [
+    {
+      "name": "header",
+      "label": "Header",
+      "defaultContent": []
+    },
+    {
+      "name": "main",
+      "label": "Main Content",
+      "isDefault": true
+    },
+    {
+      "name": "footer",
+      "label": "Footer",
+      "defaultContent": []
+    }
+  ],
+  "metadata": {
+    "regions": {}
+  },
+  "layoutMetadata": {
+    "regions": {}
+  },
+  "settings": {},
+  "version": "1782252993543",
+  "updatedAt": "2026-06-23T22:16:33.543Z"
+}

@@ -1,0 +1,46 @@
+/* Premium Fade — theme switch crossfade (View Transition API) */
+
+@keyframes premium-fade-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes premium-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+html.the-premium-fade-transition::view-transition-group(root) {
+  animation-duration: 400ms;
+  animation-timing-function: cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+html.the-premium-fade-transition::view-transition-old(root) {
+  animation: premium-fade-out 400ms cubic-bezier(0.32, 0.72, 0, 1) both;
+  mix-blend-mode: normal;
+}
+
+html.the-premium-fade-transition::view-transition-new(root) {
+  animation: premium-fade-in 400ms cubic-bezier(0.32, 0.72, 0, 1) both;
+  mix-blend-mode: normal;
+}
+
+html.the-premium-fade-transition::view-transition-old(aria-settings),
+html.the-premium-fade-transition::view-transition-new(aria-settings) {
+  animation: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html.the-premium-fade-transition::view-transition-old(root),
+  html.the-premium-fade-transition::view-transition-new(root) {
+    animation: none !important;
+  }
+}

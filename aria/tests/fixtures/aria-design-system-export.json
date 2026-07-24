@@ -1,0 +1,1325 @@
+{
+  "name": "Aria Design System",
+  "globalStyles": {
+    "variables": {
+      "custom": {
+        "aria-fixture-custom-0": {
+          "label": "Fixture Custom 0",
+          "value": "#000000",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-1": {
+          "label": "Fixture Custom 1",
+          "value": "#111111",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-2": {
+          "label": "Fixture Custom 2",
+          "value": "#222222",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-3": {
+          "label": "Fixture Custom 3",
+          "value": "#333333",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-4": {
+          "label": "Fixture Custom 4",
+          "value": "#444444",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-5": {
+          "label": "Fixture Custom 5",
+          "value": "#555555",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-6": {
+          "label": "Fixture Custom 6",
+          "value": "#666666",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-7": {
+          "label": "Fixture Custom 7",
+          "value": "#777777",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-8": {
+          "label": "Fixture Custom 8",
+          "value": "#888888",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-9": {
+          "label": "Fixture Custom 9",
+          "value": "#999999",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-10": {
+          "label": "Fixture Custom 10",
+          "value": "#aaaaaa",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-11": {
+          "label": "Fixture Custom 11",
+          "value": "#bbbbbb",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-12": {
+          "label": "Fixture Custom 12",
+          "value": "#cccccc",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-13": {
+          "label": "Fixture Custom 13",
+          "value": "#dddddd",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-14": {
+          "label": "Fixture Custom 14",
+          "value": "#eeeeee",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-15": {
+          "label": "Fixture Custom 15",
+          "value": "#ffffff",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-16": {
+          "label": "Fixture Custom 16",
+          "value": "#000000",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-17": {
+          "label": "Fixture Custom 17",
+          "value": "#111111",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-18": {
+          "label": "Fixture Custom 18",
+          "value": "#222222",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-19": {
+          "label": "Fixture Custom 19",
+          "value": "#333333",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-20": {
+          "label": "Fixture Custom 20",
+          "value": "#444444",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-21": {
+          "label": "Fixture Custom 21",
+          "value": "#555555",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-22": {
+          "label": "Fixture Custom 22",
+          "value": "#666666",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-23": {
+          "label": "Fixture Custom 23",
+          "value": "#777777",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-24": {
+          "label": "Fixture Custom 24",
+          "value": "#888888",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-25": {
+          "label": "Fixture Custom 25",
+          "value": "#999999",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-26": {
+          "label": "Fixture Custom 26",
+          "value": "#aaaaaa",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-27": {
+          "label": "Fixture Custom 27",
+          "value": "#bbbbbb",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-28": {
+          "label": "Fixture Custom 28",
+          "value": "#cccccc",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-29": {
+          "label": "Fixture Custom 29",
+          "value": "#dddddd",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-30": {
+          "label": "Fixture Custom 30",
+          "value": "#eeeeee",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-31": {
+          "label": "Fixture Custom 31",
+          "value": "#ffffff",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-32": {
+          "label": "Fixture Custom 32",
+          "value": "#000000",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-33": {
+          "label": "Fixture Custom 33",
+          "value": "#111111",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-34": {
+          "label": "Fixture Custom 34",
+          "value": "#222222",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-35": {
+          "label": "Fixture Custom 35",
+          "value": "#333333",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-36": {
+          "label": "Fixture Custom 36",
+          "value": "#444444",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-37": {
+          "label": "Fixture Custom 37",
+          "value": "#555555",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-38": {
+          "label": "Fixture Custom 38",
+          "value": "#666666",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-39": {
+          "label": "Fixture Custom 39",
+          "value": "#777777",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-40": {
+          "label": "Fixture Custom 40",
+          "value": "#888888",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-41": {
+          "label": "Fixture Custom 41",
+          "value": "#999999",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-42": {
+          "label": "Fixture Custom 42",
+          "value": "#aaaaaa",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-43": {
+          "label": "Fixture Custom 43",
+          "value": "#bbbbbb",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-44": {
+          "label": "Fixture Custom 44",
+          "value": "#cccccc",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-45": {
+          "label": "Fixture Custom 45",
+          "value": "#dddddd",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-46": {
+          "label": "Fixture Custom 46",
+          "value": "#eeeeee",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-47": {
+          "label": "Fixture Custom 47",
+          "value": "#ffffff",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-48": {
+          "label": "Fixture Custom 48",
+          "value": "#000000",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-49": {
+          "label": "Fixture Custom 49",
+          "value": "#111111",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-50": {
+          "label": "Fixture Custom 50",
+          "value": "#222222",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-51": {
+          "label": "Fixture Custom 51",
+          "value": "#333333",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-52": {
+          "label": "Fixture Custom 52",
+          "value": "#444444",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-53": {
+          "label": "Fixture Custom 53",
+          "value": "#555555",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-54": {
+          "label": "Fixture Custom 54",
+          "value": "#666666",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-55": {
+          "label": "Fixture Custom 55",
+          "value": "#777777",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-56": {
+          "label": "Fixture Custom 56",
+          "value": "#888888",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-57": {
+          "label": "Fixture Custom 57",
+          "value": "#999999",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-58": {
+          "label": "Fixture Custom 58",
+          "value": "#aaaaaa",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-59": {
+          "label": "Fixture Custom 59",
+          "value": "#bbbbbb",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-60": {
+          "label": "Fixture Custom 60",
+          "value": "#cccccc",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-61": {
+          "label": "Fixture Custom 61",
+          "value": "#dddddd",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-62": {
+          "label": "Fixture Custom 62",
+          "value": "#eeeeee",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-63": {
+          "label": "Fixture Custom 63",
+          "value": "#ffffff",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-64": {
+          "label": "Fixture Custom 64",
+          "value": "#000000",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-65": {
+          "label": "Fixture Custom 65",
+          "value": "#111111",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-66": {
+          "label": "Fixture Custom 66",
+          "value": "#222222",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-67": {
+          "label": "Fixture Custom 67",
+          "value": "#333333",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-68": {
+          "label": "Fixture Custom 68",
+          "value": "#444444",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-69": {
+          "label": "Fixture Custom 69",
+          "value": "#555555",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-70": {
+          "label": "Fixture Custom 70",
+          "value": "#666666",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-71": {
+          "label": "Fixture Custom 71",
+          "value": "#777777",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-72": {
+          "label": "Fixture Custom 72",
+          "value": "#888888",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-73": {
+          "label": "Fixture Custom 73",
+          "value": "#999999",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-74": {
+          "label": "Fixture Custom 74",
+          "value": "#aaaaaa",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-75": {
+          "label": "Fixture Custom 75",
+          "value": "#bbbbbb",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-76": {
+          "label": "Fixture Custom 76",
+          "value": "#cccccc",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-77": {
+          "label": "Fixture Custom 77",
+          "value": "#dddddd",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-78": {
+          "label": "Fixture Custom 78",
+          "value": "#eeeeee",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-79": {
+          "label": "Fixture Custom 79",
+          "value": "#ffffff",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-80": {
+          "label": "Fixture Custom 80",
+          "value": "#000000",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-81": {
+          "label": "Fixture Custom 81",
+          "value": "#111111",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-82": {
+          "label": "Fixture Custom 82",
+          "value": "#222222",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-83": {
+          "label": "Fixture Custom 83",
+          "value": "#333333",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-84": {
+          "label": "Fixture Custom 84",
+          "value": "#444444",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-85": {
+          "label": "Fixture Custom 85",
+          "value": "#555555",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-86": {
+          "label": "Fixture Custom 86",
+          "value": "#666666",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-87": {
+          "label": "Fixture Custom 87",
+          "value": "#777777",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-88": {
+          "label": "Fixture Custom 88",
+          "value": "#888888",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-89": {
+          "label": "Fixture Custom 89",
+          "value": "#999999",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-90": {
+          "label": "Fixture Custom 90",
+          "value": "#aaaaaa",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-91": {
+          "label": "Fixture Custom 91",
+          "value": "#bbbbbb",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-92": {
+          "label": "Fixture Custom 92",
+          "value": "#cccccc",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-93": {
+          "label": "Fixture Custom 93",
+          "value": "#dddddd",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-94": {
+          "label": "Fixture Custom 94",
+          "value": "#eeeeee",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-95": {
+          "label": "Fixture Custom 95",
+          "value": "#ffffff",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-96": {
+          "label": "Fixture Custom 96",
+          "value": "#000000",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-97": {
+          "label": "Fixture Custom 97",
+          "value": "#111111",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-98": {
+          "label": "Fixture Custom 98",
+          "value": "#222222",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-99": {
+          "label": "Fixture Custom 99",
+          "value": "#333333",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-100": {
+          "label": "Fixture Custom 100",
+          "value": "#444444",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-101": {
+          "label": "Fixture Custom 101",
+          "value": "#555555",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-102": {
+          "label": "Fixture Custom 102",
+          "value": "#666666",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-103": {
+          "label": "Fixture Custom 103",
+          "value": "#777777",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-104": {
+          "label": "Fixture Custom 104",
+          "value": "#888888",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-105": {
+          "label": "Fixture Custom 105",
+          "value": "#999999",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-106": {
+          "label": "Fixture Custom 106",
+          "value": "#aaaaaa",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-107": {
+          "label": "Fixture Custom 107",
+          "value": "#bbbbbb",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-108": {
+          "label": "Fixture Custom 108",
+          "value": "#cccccc",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-109": {
+          "label": "Fixture Custom 109",
+          "value": "#dddddd",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-110": {
+          "label": "Fixture Custom 110",
+          "value": "#eeeeee",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-111": {
+          "label": "Fixture Custom 111",
+          "value": "#ffffff",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-112": {
+          "label": "Fixture Custom 112",
+          "value": "#000000",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-113": {
+          "label": "Fixture Custom 113",
+          "value": "#111111",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-114": {
+          "label": "Fixture Custom 114",
+          "value": "#222222",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-115": {
+          "label": "Fixture Custom 115",
+          "value": "#333333",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-116": {
+          "label": "Fixture Custom 116",
+          "value": "#444444",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-117": {
+          "label": "Fixture Custom 117",
+          "value": "#555555",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-118": {
+          "label": "Fixture Custom 118",
+          "value": "#666666",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-119": {
+          "label": "Fixture Custom 119",
+          "value": "#777777",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-120": {
+          "label": "Fixture Custom 120",
+          "value": "#888888",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-121": {
+          "label": "Fixture Custom 121",
+          "value": "#999999",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-122": {
+          "label": "Fixture Custom 122",
+          "value": "#aaaaaa",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-123": {
+          "label": "Fixture Custom 123",
+          "value": "#bbbbbb",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-124": {
+          "label": "Fixture Custom 124",
+          "value": "#cccccc",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-125": {
+          "label": "Fixture Custom 125",
+          "value": "#dddddd",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-126": {
+          "label": "Fixture Custom 126",
+          "value": "#eeeeee",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-127": {
+          "label": "Fixture Custom 127",
+          "value": "#ffffff",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-128": {
+          "label": "Fixture Custom 128",
+          "value": "#000000",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-129": {
+          "label": "Fixture Custom 129",
+          "value": "#111111",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-130": {
+          "label": "Fixture Custom 130",
+          "value": "#222222",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-131": {
+          "label": "Fixture Custom 131",
+          "value": "#333333",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-132": {
+          "label": "Fixture Custom 132",
+          "value": "#444444",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-133": {
+          "label": "Fixture Custom 133",
+          "value": "#555555",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-134": {
+          "label": "Fixture Custom 134",
+          "value": "#666666",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-135": {
+          "label": "Fixture Custom 135",
+          "value": "#777777",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-136": {
+          "label": "Fixture Custom 136",
+          "value": "#888888",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-137": {
+          "label": "Fixture Custom 137",
+          "value": "#999999",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-138": {
+          "label": "Fixture Custom 138",
+          "value": "#aaaaaa",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-139": {
+          "label": "Fixture Custom 139",
+          "value": "#bbbbbb",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-140": {
+          "label": "Fixture Custom 140",
+          "value": "#cccccc",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-141": {
+          "label": "Fixture Custom 141",
+          "value": "#dddddd",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-142": {
+          "label": "Fixture Custom 142",
+          "value": "#eeeeee",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-143": {
+          "label": "Fixture Custom 143",
+          "value": "#ffffff",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-144": {
+          "label": "Fixture Custom 144",
+          "value": "#000000",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-145": {
+          "label": "Fixture Custom 145",
+          "value": "#111111",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-146": {
+          "label": "Fixture Custom 146",
+          "value": "#222222",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-147": {
+          "label": "Fixture Custom 147",
+          "value": "#333333",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-148": {
+          "label": "Fixture Custom 148",
+          "value": "#444444",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-149": {
+          "label": "Fixture Custom 149",
+          "value": "#555555",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-150": {
+          "label": "Fixture Custom 150",
+          "value": "#666666",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-151": {
+          "label": "Fixture Custom 151",
+          "value": "#777777",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-152": {
+          "label": "Fixture Custom 152",
+          "value": "#888888",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-153": {
+          "label": "Fixture Custom 153",
+          "value": "#999999",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-154": {
+          "label": "Fixture Custom 154",
+          "value": "#aaaaaa",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-155": {
+          "label": "Fixture Custom 155",
+          "value": "#bbbbbb",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-156": {
+          "label": "Fixture Custom 156",
+          "value": "#cccccc",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-157": {
+          "label": "Fixture Custom 157",
+          "value": "#dddddd",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-158": {
+          "label": "Fixture Custom 158",
+          "value": "#eeeeee",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-159": {
+          "label": "Fixture Custom 159",
+          "value": "#ffffff",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-160": {
+          "label": "Fixture Custom 160",
+          "value": "#000000",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-161": {
+          "label": "Fixture Custom 161",
+          "value": "#111111",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-162": {
+          "label": "Fixture Custom 162",
+          "value": "#222222",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-163": {
+          "label": "Fixture Custom 163",
+          "value": "#333333",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-164": {
+          "label": "Fixture Custom 164",
+          "value": "#444444",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-165": {
+          "label": "Fixture Custom 165",
+          "value": "#555555",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-166": {
+          "label": "Fixture Custom 166",
+          "value": "#666666",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-167": {
+          "label": "Fixture Custom 167",
+          "value": "#777777",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-168": {
+          "label": "Fixture Custom 168",
+          "value": "#888888",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-169": {
+          "label": "Fixture Custom 169",
+          "value": "#999999",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-170": {
+          "label": "Fixture Custom 170",
+          "value": "#aaaaaa",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-171": {
+          "label": "Fixture Custom 171",
+          "value": "#bbbbbb",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-172": {
+          "label": "Fixture Custom 172",
+          "value": "#cccccc",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-173": {
+          "label": "Fixture Custom 173",
+          "value": "#dddddd",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-174": {
+          "label": "Fixture Custom 174",
+          "value": "#eeeeee",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-175": {
+          "label": "Fixture Custom 175",
+          "value": "#ffffff",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-176": {
+          "label": "Fixture Custom 176",
+          "value": "#000000",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-177": {
+          "label": "Fixture Custom 177",
+          "value": "#111111",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-178": {
+          "label": "Fixture Custom 178",
+          "value": "#222222",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-179": {
+          "label": "Fixture Custom 179",
+          "value": "#333333",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-180": {
+          "label": "Fixture Custom 180",
+          "value": "#444444",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-181": {
+          "label": "Fixture Custom 181",
+          "value": "#555555",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-182": {
+          "label": "Fixture Custom 182",
+          "value": "#666666",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-183": {
+          "label": "Fixture Custom 183",
+          "value": "#777777",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-184": {
+          "label": "Fixture Custom 184",
+          "value": "#888888",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-185": {
+          "label": "Fixture Custom 185",
+          "value": "#999999",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-186": {
+          "label": "Fixture Custom 186",
+          "value": "#aaaaaa",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-187": {
+          "label": "Fixture Custom 187",
+          "value": "#bbbbbb",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-188": {
+          "label": "Fixture Custom 188",
+          "value": "#cccccc",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-189": {
+          "label": "Fixture Custom 189",
+          "value": "#dddddd",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-190": {
+          "label": "Fixture Custom 190",
+          "value": "#eeeeee",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-191": {
+          "label": "Fixture Custom 191",
+          "value": "#ffffff",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-192": {
+          "label": "Fixture Custom 192",
+          "value": "#000000",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-193": {
+          "label": "Fixture Custom 193",
+          "value": "#111111",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-194": {
+          "label": "Fixture Custom 194",
+          "value": "#222222",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-195": {
+          "label": "Fixture Custom 195",
+          "value": "#333333",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-196": {
+          "label": "Fixture Custom 196",
+          "value": "#444444",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-197": {
+          "label": "Fixture Custom 197",
+          "value": "#555555",
+          "category": "color",
+          "description": ""
+        },
+        "aria-fixture-custom-198": {
+          "label": "Fixture Custom 198",
+          "value": "#666666",
+          "category": "color",
+          "description": ""
+        },
+        "aria-text-fluid-m": {
+          "label": "Text Fluid M",
+          "value": "clamp(1rem, 2vw, 1.25rem)",
+          "category": "typography",
+          "description": ""
+        }
+      },
+      "aliases": {
+        "aria-color-primary": {
+          "label": "Primary",
+          "sourceType": "token",
+          "sourceKey": "tokens.colors.palette.primary",
+          "fallback": ""
+        },
+        "aria-fixture-alias-0": {
+          "label": "Fixture Alias 0",
+          "sourceType": "custom",
+          "sourceKey": "aria-fixture-custom-0",
+          "fallback": ""
+        },
+        "aria-fixture-alias-1": {
+          "label": "Fixture Alias 1",
+          "sourceType": "custom",
+          "sourceKey": "aria-fixture-custom-1",
+          "fallback": ""
+        },
+        "aria-fixture-alias-2": {
+          "label": "Fixture Alias 2",
+          "sourceType": "custom",
+          "sourceKey": "aria-fixture-custom-2",
+          "fallback": ""
+        },
+        "aria-fixture-alias-3": {
+          "label": "Fixture Alias 3",
+          "sourceType": "custom",
+          "sourceKey": "aria-fixture-custom-3",
+          "fallback": ""
+        },
+        "aria-fixture-alias-4": {
+          "label": "Fixture Alias 4",
+          "sourceType": "custom",
+          "sourceKey": "aria-fixture-custom-4",
+          "fallback": ""
+        },
+        "aria-fixture-alias-5": {
+          "label": "Fixture Alias 5",
+          "sourceType": "custom",
+          "sourceKey": "aria-fixture-custom-5",
+          "fallback": ""
+        },
+        "aria-fixture-alias-6": {
+          "label": "Fixture Alias 6",
+          "sourceType": "custom",
+          "sourceKey": "aria-fixture-custom-6",
+          "fallback": ""
+        },
+        "aria-fixture-alias-7": {
+          "label": "Fixture Alias 7",
+          "sourceType": "custom",
+          "sourceKey": "aria-fixture-custom-7",
+          "fallback": ""
+        },
+        "aria-fixture-alias-8": {
+          "label": "Fixture Alias 8",
+          "sourceType": "custom",
+          "sourceKey": "aria-fixture-custom-8",
+          "fallback": ""
+        },
+        "aria-fixture-alias-9": {
+          "label": "Fixture Alias 9",
+          "sourceType": "custom",
+          "sourceKey": "aria-fixture-custom-9",
+          "fallback": ""
+        },
+        "aria-fixture-alias-10": {
+          "label": "Fixture Alias 10",
+          "sourceType": "custom",
+          "sourceKey": "aria-fixture-custom-10",
+          "fallback": ""
+        },
+        "aria-fixture-alias-11": {
+          "label": "Fixture Alias 11",
+          "sourceType": "custom",
+          "sourceKey": "aria-fixture-custom-11",
+          "fallback": ""
+        },
+        "aria-fixture-alias-12": {
+          "label": "Fixture Alias 12",
+          "sourceType": "custom",
+          "sourceKey": "aria-fixture-custom-12",
+          "fallback": ""
+        },
+        "aria-fixture-alias-13": {
+          "label": "Fixture Alias 13",
+          "sourceType": "custom",
+          "sourceKey": "aria-fixture-custom-13",
+          "fallback": ""
+        },
+        "aria-fixture-alias-14": {
+          "label": "Fixture Alias 14",
+          "sourceType": "custom",
+          "sourceKey": "aria-fixture-custom-14",
+          "fallback": ""
+        },
+        "aria-fixture-alias-15": {
+          "label": "Fixture Alias 15",
+          "sourceType": "custom",
+          "sourceKey": "aria-fixture-custom-15",
+          "fallback": ""
+        },
+        "aria-fixture-alias-16": {
+          "label": "Fixture Alias 16",
+          "sourceType": "custom",
+          "sourceKey": "aria-fixture-custom-16",
+          "fallback": ""
+        },
+        "aria-fixture-alias-17": {
+          "label": "Fixture Alias 17",
+          "sourceType": "custom",
+          "sourceKey": "aria-fixture-custom-17",
+          "fallback": ""
+        }
+      }
+    }
+  }
+}

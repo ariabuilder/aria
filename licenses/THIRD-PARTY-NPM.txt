@@ -1,0 +1,90 @@
+Aria — direct npm dependency licenses
+Generated from package.json via license-checker (direct dependencies only).
+Full transitive notices: run `npx license-checker --start .` in a clean install.
+
+=== production dependencies ===
+
+@ai-sdk/openai	Apache-2.0	https://github.com/vercel/ai
+@ai-sdk/openai-compatible	Apache-2.0	https://github.com/vercel/ai
+@astrojs/cloudflare	MIT	https://github.com/withastro/astro
+@astrojs/vue	MIT	https://github.com/withastro/astro
+@cloudflare/ai-chat	MIT	https://www.npmjs.com/package/@cloudflare/ai-chat
+@codemirror/commands	MIT	https://github.com/codemirror/commands
+@codemirror/lang-css	MIT	https://github.com/codemirror/lang-css
+@codemirror/lang-html	MIT	https://github.com/codemirror/lang-html
+@codemirror/lang-javascript	MIT	https://github.com/codemirror/lang-javascript
+@codemirror/lang-json	MIT	https://github.com/codemirror/lang-json
+@codemirror/lang-xml	MIT	https://github.com/codemirror/lang-xml
+@codemirror/language	MIT	https://github.com/codemirror/language
+@codemirror/state	MIT	https://github.com/codemirror/state
+@codemirror/view	MIT	https://github.com/codemirror/view
+@floating-ui/dom	MIT	https://github.com/floating-ui/floating-ui
+@internationalized/date	Apache-2.0	https://github.com/adobe/react-spectrum
+@libsql/client	MIT	https://github.com/libsql/libsql-client-ts
+@modelcontextprotocol/sdk	MIT	https://github.com/modelcontextprotocol/typescript-sdk
+@simplewebauthn/browser	MIT	https://github.com/MasterKale/SimpleWebAuthn
+@simplewebauthn/server	MIT	https://github.com/MasterKale/SimpleWebAuthn
+@tanstack/vue-table	MIT	https://github.com/TanStack/table
+@tiptap/extension-link	MIT	https://github.com/ueberdosis/tiptap
+@tiptap/extension-placeholder	MIT	https://github.com/ueberdosis/tiptap
+@tiptap/starter-kit	MIT	https://github.com/ueberdosis/tiptap
+@tiptap/vue-3	MIT	https://github.com/ueberdosis/tiptap
+@unocss/astro	MIT	https://github.com/unocss/unocss
+@vueuse/core	MIT	https://github.com/vueuse/vueuse
+agents	MIT	https://github.com/cloudflare/agents
+ai	Apache-2.0	https://github.com/vercel/ai
+astro	MIT	https://github.com/withastro/astro
+class-variance-authority	Apache-2.0	https://github.com/joe-bell/cva
+clsx	MIT	https://github.com/lukeed/clsx
+codemirror	MIT	https://github.com/codemirror/basic-setup
+colord	MIT	https://github.com/omgovich/colord
+date-fns	MIT	https://github.com/date-fns/date-fns
+drizzle-orm	Apache-2.0	https://github.com/drizzle-team/drizzle-orm
+html-to-image	MIT	https://github.com/bubkoo/html-to-image
+idb	ISC	https://github.com/jakearchibald/idb
+isomorphic-dompurify	MIT	https://github.com/kkomelin/isomorphic-dompurify
+jszip	(MIT OR GPL-3.0-or-later)	https://github.com/Stuk/jszip
+marked	MIT	https://github.com/markedjs/marked
+nodemailer	MIT-0	https://github.com/nodemailer/nodemailer
+otpauth	MIT	https://github.com/hectorm/otpauth
+reka-ui	MIT	https://github.com/unovue/reka-ui
+uuid	MIT	https://github.com/uuidjs/uuid
+vee-validate	MIT	https://github.com/logaretm/vee-validate
+vue-input-otp	MIT	https://github.com/wobsoriano/vue-input-otp
+vue-resizable-panels	MIT	https://github.com/mujahidfa/vue-resizable-panels
+vue-router	MIT	https://github.com/vuejs/router
+vue-sonner	MIT	https://github.com/xiaoluoboding/vue-sonner
+vuedraggable	MIT	https://github.com/SortableJS/Vue.Draggable
+workers-ai-provider	MIT	https://github.com/cloudflare/ai
+zod	MIT	https://github.com/colinhacks/zod
+
+=== development dependencies ===
+
+@astrojs/check	MIT	https://github.com/withastro/astro
+@astrojs/node	MIT	https://github.com/withastro/astro
+@iconify-json/cib	CC0-1.0	https://github.com/iconify/icon-sets
+@iconify-json/hugeicons	MIT	https://github.com/iconify/icon-sets
+@iconify-json/lucide	ISC	https://github.com/iconify/icon-sets
+@types/node	MIT	https://github.com/DefinitelyTyped/DefinitelyTyped
+@types/nodemailer	MIT	https://github.com/DefinitelyTyped/DefinitelyTyped
+@unocss/preset-icons	MIT	https://github.com/unocss/unocss
+@unocss/preset-typography	MIT	https://github.com/unocss/unocss
+@unocss/preset-wind	MIT	https://github.com/unocss/unocss
+@unocss/reset	MIT	https://github.com/unocss/unocss
+@unocss/transformer-directives	MIT	https://github.com/unocss/unocss
+@unocss/transformer-variant-group	MIT	https://github.com/unocss/unocss
+@vitejs/plugin-vue	MIT	https://github.com/vitejs/vite-plugin-vue
+@vitest/ui	MIT	https://github.com/vitest-dev/vitest
+@vue/test-utils	MIT	https://github.com/vuejs/test-utils
+happy-dom	MIT	https://github.com/capricorn86/happy-dom
+jsdom	MIT	https://github.com/jsdom/jsdom
+tsx	MIT	https://github.com/privatenumber/tsx
+typescript	Apache-2.0	https://github.com/microsoft/TypeScript
+unocss	MIT	https://github.com/unocss/unocss
+vitest	MIT	https://github.com/vitest-dev/vitest
+wrangler	MIT OR Apache-2.0	https://github.com/cloudflare/workers-sdk
+
+=== notable transitive licenses (direct dep tree) ===
+
+caniuse-lite@1.0.30001779	CC-BY-4.0	https://github.com/browserslist/caniuse-lite
+@img/sharp-libvips-darwin-arm64@1.2.4	LGPL-3.0-or-later	https://github.com/lovell/sharp-libvips

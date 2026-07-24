@@ -1,0 +1,4 @@
+name = "aria-builder"
+
+[vars]
+SITE_URL = "https://fixture.aria.build"

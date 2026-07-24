@@ -1,0 +1,147 @@
+---
+/**
+ * Aria Studio
+ *
+ * Requires authentication.
+ */
+import "../admin/styles/globals.css";
+import "../admin/styles/code-editor.css";
+import "../admin/styles/slide-panel.css";
+import "../admin/styles/themes/aria.css";
+import "../admin/styles/themes/astro.css";
+import "../admin/styles/themes/cloudflare.css";
+import "../admin/styles/view-transitions.css";
+import "../admin/styles/theme-transitions.css";
+import faviconLight from "../admin/assets/favicon-light.png";
+import faviconDark from "../admin/assets/favicon-dark.png";
+import { resolveStudioFaviconHrefs } from "../admin/lib/studioFavicon";
+import ServerPreloader from "../components/preloader/ServerPreloader.astro";
+import { PRELOADER_COLORS } from "../lib/preloader/theme";
+import outfitFont from "../admin/assets/fonts/outfit-variable.woff2";
+import { getStorageAdapterAsync } from "../lib/storage/getStorageAdapter";
+import {
+  parseAcceptedLanguages,
+  resolveStudioLocale,
+} from "../lib/localization/studioLocale";
+
+export const prerender = false;
+
+if (!Astro.locals.user) {
+  return Astro.redirect("/admin/login");
+}
+
+const sessionUser = Astro.locals.user;
+const studioLocale = resolveStudioLocale({
+  preference: sessionUser.preferences?.studio?.locale,
+  acceptedLanguages: parseAcceptedLanguages(
+    Astro.request.headers.get("accept-language"),
+  ),
+});
+const serverStart =
+  (globalThis as typeof globalThis & { __ARIA_SERVER_START?: number })
+    .__ARIA_SERVER_START ?? Date.now();
+(
+  globalThis as typeof globalThis & { __ARIA_SERVER_START?: number }
+).__ARIA_SERVER_START = serverStart;
+
+// SSR-hydrate the site name so the dashboard h1 (LCP element) renders with
+// the correct text on the first paint — no async fetch delay, no text swap.
+let ssrSiteName: string | undefined;
+let ssrFavicon: string | undefined;
+try {
+  const adapter = await getStorageAdapterAsync(Astro.locals);
+  const siteSettings = await adapter.getSiteSettings();
+  ssrSiteName = siteSettings?.siteName?.trim() || undefined;
+  ssrFavicon = siteSettings?.favicon?.trim() || undefined;
+} catch {
+  // Non-critical — client will fetch settings via Astro action normally.
+  ssrSiteName = undefined;
+  ssrFavicon = undefined;
+}
+
+const studioFaviconHrefs = resolveStudioFaviconHrefs({
+  favicon: ssrFavicon,
+  defaultLightHref: faviconLight.src,
+  defaultDarkHref: faviconDark.src,
+});
+---
+
+<!doctype html>
+<html
+  lang={studioLocale}
+  dir="ltr"
+  data-aria-user-id={sessionUser.id}
+  data-aria-studio-locale={studioLocale}
+>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Aria Builder</title>
+    <link rel="preload" href={outfitFont} as="font" type="font/woff2" crossorigin="anonymous" />
+    <link
+      rel="icon"
+      href={studioFaviconHrefs.light}
+      id="aria-favicon-light"
+      data-aria-favicon-default-href={faviconLight.src}
+    />
+    <link
+      rel="icon"
+      href={studioFaviconHrefs.dark}
+      id="aria-favicon-dark"
+      media="(prefers-color-scheme: dark)"
+      data-aria-favicon-default-href={faviconDark.src}
+    />
+    <script is:inline define:vars={{ userId: sessionUser.id, foucKeyPrefix: "aria-appearance:", preloaderColors: PRELOADER_COLORS, ssrSiteName }}>
+      (function () {
+        var html = document.documentElement;
+        var systemDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+        var isDark = systemDark;
+        var themeId = "aria";
+
+        try {
+          var raw = localStorage.getItem(foucKeyPrefix + userId);
+          if (raw) {
+            var parsed = JSON.parse(raw);
+            if (parsed && typeof parsed === "object") {
+              if (parsed.themeId === "astro" || parsed.themeId === "aria" || parsed.themeId === "cloudflare") {
+                themeId = parsed.themeId;
+              }
+              if (parsed.colorScheme === "dark") isDark = true;
+              else if (parsed.colorScheme === "light") isDark = false;
+              else if (parsed.colorScheme === "system") isDark = systemDark;
+            }
+          }
+        } catch (_) {}
+
+        html.classList.toggle("dark", isDark);
+        html.classList.remove("theme-aria", "theme-astro", "theme-cloudflare");
+        html.classList.add("theme-" + themeId);
+        html.setAttribute("data-theme", themeId);
+
+        var palette = preloaderColors[themeId][isDark ? "dark" : "light"];
+        html.style.setProperty("--preloader-bg", palette.background);
+        html.style.setProperty("--preloader-bar-bg", palette.barBackground);
+        html.style.setProperty("--preloader-bar-border", palette.barBorder);
+        html.style.setProperty("--preloader-fill", palette.fill);
+        html.style.setProperty("--preloader-grid-line", palette.gridLine);
+        html.style.setProperty("--preloader-text", palette.text);
+
+        var lightIcon = document.getElementById("aria-favicon-light");
+        if (lightIcon) lightIcon.media = isDark ? "not all" : "all";
+        var darkIcon = document.getElementById("aria-favicon-dark");
+        if (darkIcon) darkIcon.media = isDark ? "all" : "not all";
+
+        html.dataset.ariaInitialDark = isDark ? "1" : "0";
+        html.dataset.ariaInitialTheme = themeId;
+        window.__ARIA_SSR_SITE_NAME = typeof ssrSiteName === "string" && ssrSiteName.length > 0 ? ssrSiteName : undefined;
+      })();
+    </script>
+  </head>
+  <body data-aria-server-start={serverStart} data-aria-user-id={sessionUser.id}>
+    <ServerPreloader />
+    <div id="app"></div>
+    <script>
+      import "../admin/main.ts";
+    </script>
+  </body>
+</html>

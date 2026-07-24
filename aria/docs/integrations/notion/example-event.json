@@ -1,0 +1,31 @@
+{
+  "id": "10000000-0000-4000-8000-000000000001",
+  "type": "cms.entry.published.v1",
+  "schemaVersion": 1,
+  "siteId": "20000000-0000-4000-8000-000000000001",
+  "occurredAt": "2026-07-20T12:00:00.000Z",
+  "aggregate": {
+    "type": "cms.entry",
+    "id": "launch-notes",
+    "version": "01J123EXAMPLE",
+    "sequence": 1
+  },
+  "actor": {
+    "id": "30000000-0000-4000-8000-000000000001"
+  },
+  "source": "studio",
+  "data": {
+    "entry": {
+      "id": "launch-notes",
+      "collectionId": "posts",
+      "version": "01J123EXAMPLE",
+      "publishedAt": "2026-07-20T12:00:00.000Z"
+    },
+    "locale": {
+      "locale": "en",
+      "title": "Launch notes",
+      "slug": "launch-notes",
+      "body": "Aria is live."
+    }
+  }
+}

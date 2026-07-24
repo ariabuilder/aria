@@ -1,0 +1,225 @@
+---
+import {
+  ARIA_MARK_ACCENT_PATH,
+  ARIA_MARK_BODY_PATH,
+  ARIA_MARK_TRANSFORM,
+  ARIA_MARK_VIEWBOX,
+} from "../../lib/preloader/ariaMark";
+
+---
+
+<div
+  id="aria-preloader"
+  role="progressbar"
+  aria-label="Loading Aria"
+  aria-valuemin="0"
+  aria-valuemax="100"
+  aria-valuenow="0"
+>
+  <svg
+    class="server-preloader__mark"
+    viewBox={ARIA_MARK_VIEWBOX}
+    fill-rule="evenodd"
+    clip-rule="evenodd"
+    preserveAspectRatio="xMidYMid meet"
+    xmlns="http://www.w3.org/2000/svg"
+    aria-hidden="true"
+  >
+    <g transform={ARIA_MARK_TRANSFORM}>
+      <path class="server-preloader__body" d={ARIA_MARK_BODY_PATH}></path>
+      <path class="server-preloader__accent-guide" d={ARIA_MARK_ACCENT_PATH}></path>
+      <path
+        class="server-preloader__accent-progress"
+        d={ARIA_MARK_ACCENT_PATH}
+        pathLength="1"
+        data-preloader-accent
+      ></path>
+      <path
+        class="server-preloader__accent-solid"
+        d={ARIA_MARK_ACCENT_PATH}
+        data-preloader-accent-solid
+      ></path>
+    </g>
+  </svg>
+</div>
+
+<script is:inline>
+  (function () {
+    var root = document.getElementById("aria-preloader");
+    if (!root) return;
+
+    var accent = root.querySelector("[data-preloader-accent]");
+    var accentSolid = root.querySelector("[data-preloader-accent-solid]");
+    var startedAt = performance.now();
+    var progress = 0;
+    var completing = false;
+    var progressFrame = 0;
+
+    function smoothstep(value) {
+      var clamped = Math.min(1, Math.max(0, value));
+      return clamped * clamped * (3 - 2 * clamped);
+    }
+
+    function renderProgress() {
+      var normalized = Math.min(100, Math.max(0, progress));
+      root.setAttribute("aria-valuenow", String(Math.round(normalized)));
+      if (accent) accent.style.strokeDashoffset = String(1 - normalized / 100);
+      if (accentSolid) {
+        accentSolid.style.opacity = String(smoothstep((normalized - 68) / 32));
+      }
+    }
+
+    function advanceProgress(now) {
+      if (completing) return;
+      var elapsed = Math.max(0, now - startedAt);
+      progress = Math.min(97 * (1 - Math.exp(-elapsed / 1050)), 97);
+      renderProgress();
+      progressFrame = requestAnimationFrame(advanceProgress);
+    }
+
+    progressFrame = requestAnimationFrame(advanceProgress);
+
+    window.hideAriaPreloader = function () {
+      if (completing) return;
+      completing = true;
+      cancelAnimationFrame(progressFrame);
+
+      var completionStartedAt = performance.now();
+      var completionStart = progress;
+      var completionDuration = Math.min(
+        520,
+        Math.max(320, (100 - completionStart) * 5),
+      );
+
+      function finishProgress(now) {
+        var elapsed = now - completionStartedAt;
+        var ratio = Math.min(1, Math.max(0, elapsed / completionDuration));
+        var eased = 1 - Math.pow(1 - ratio, 3);
+        progress = completionStart + (100 - completionStart) * eased;
+        renderProgress();
+
+        if (ratio < 1) {
+          progressFrame = requestAnimationFrame(finishProgress);
+          return;
+        }
+
+        window.setTimeout(function () {
+          root.classList.add("is-hiding");
+          window.setTimeout(function () {
+            root.remove();
+            window.dispatchEvent(new CustomEvent("aria-preloader-hidden"));
+          }, 240);
+        }, 120);
+      }
+
+      progressFrame = requestAnimationFrame(finishProgress);
+    };
+
+    window.setTimeout(function () {
+      if (window.hideAriaPreloader) window.hideAriaPreloader();
+    }, 8000);
+  })();
+</script>
+
+<style>
+  #aria-preloader {
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    background: var(--background);
+    opacity: 1;
+    transition: opacity 220ms ease-out;
+  }
+
+  #aria-preloader.is-hiding {
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  #aria-preloader::before {
+    position: absolute;
+    inset: 0;
+    background-image: radial-gradient(
+      circle,
+      color-mix(in oklch, var(--foreground) 18%, transparent) 1.15px,
+      transparent 1.15px
+    );
+    background-size: 24px 24px;
+    content: "";
+    opacity: 0;
+    pointer-events: none;
+    -webkit-mask-image: radial-gradient(
+      ellipse at center,
+      black 50%,
+      transparent 75%
+    );
+    mask-image: radial-gradient(ellipse at center, black 50%, transparent 75%);
+    animation: server-preloader-grid-in 720ms ease-out 80ms forwards;
+  }
+
+  :global(.dark) #aria-preloader::before {
+    background-image: radial-gradient(
+      circle,
+      color-mix(in oklch, var(--foreground) 10%, transparent) 1.15px,
+      transparent 1.15px
+    );
+  }
+
+  .server-preloader__mark {
+    position: relative;
+    z-index: 2;
+    display: block;
+    width: 8rem;
+    height: calc(8rem * 621 / 727);
+    overflow: visible;
+  }
+
+  .server-preloader__body {
+    fill: color-mix(in oklch, var(--foreground) 80%, transparent);
+    opacity: 0;
+    animation: server-preloader-body-in 480ms ease-out 80ms forwards;
+  }
+
+  :global(.dark) .server-preloader__body {
+    fill: color-mix(in oklch, var(--foreground) 70%, transparent);
+  }
+
+  .server-preloader__accent-guide,
+  .server-preloader__accent-progress {
+    fill: none;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-width: 2.25;
+  }
+
+  .server-preloader__accent-guide {
+    stroke: color-mix(in oklch, var(--preloader-fill, var(--primary)) 14%, transparent);
+  }
+
+  .server-preloader__accent-progress {
+    stroke: var(--preloader-fill, var(--primary));
+    stroke-dasharray: 1;
+    stroke-dashoffset: 1;
+    will-change: stroke-dashoffset;
+  }
+
+  .server-preloader__accent-solid {
+    fill: var(--preloader-fill, var(--primary));
+    opacity: 0;
+    will-change: opacity;
+  }
+
+  @keyframes server-preloader-body-in { to { opacity: 1; } }
+  @keyframes server-preloader-grid-in { to { opacity: 0.5; } }
+
+  @media (prefers-reduced-motion: reduce) {
+    #aria-preloader::before { opacity: 0.5; animation: none; }
+    .server-preloader__body { opacity: 1; animation: none; }
+    .server-preloader__accent-progress,
+    .server-preloader__accent-solid { transition: none; }
+  }
+</style>

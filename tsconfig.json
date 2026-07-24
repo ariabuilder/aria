@@ -1,0 +1,21 @@
+{
+  "extends": "astro/tsconfigs/strict",
+  "compilerOptions": {
+    "paths": {
+      "@/*": ["./aria/admin/*", "./aria/*", "./src/*"],
+      "@aria-email/smtp-runtime": ["./aria/lib/email/providers/smtp-node-runtime.ts"]
+    }
+  },
+  "include": [
+    ".astro/types.d.ts",
+    "**/*",
+    "dev/reference/.plugin-structure",
+    "aria/lib/types/global.d.ts"
+  ],
+  "exclude": [
+    "dist",
+    "todo",
+    "public/vendor",
+    "aria/admin/assets/js"
+  ]
+}

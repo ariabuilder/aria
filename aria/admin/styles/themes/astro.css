@@ -1,0 +1,146 @@
+:root {
+  --astro-light-bg: oklch(0.99 0.0005 195);
+  --astro-light-sidebar: oklch(0.93 0.003 312);
+  --astro-light-panel: oklch(0.94 0.004 312);
+  --astro-light-text: oklch(0.25 0.003 312);
+  --astro-light-muted: oklch(0.45 0.01 312);
+  --astro-light-border: oklch(0.80 0.01 312);
+  --astro-light-input: oklch(0.97 0.002 312);
+  --astro-border-subtle-light: oklch(0.82 0.01 312 / 0.65);
+
+  --astro-sidebar: oklch(0.25 0.01 308.04);
+  --astro-background: oklch(0.14 0 308.45);
+  --astro-black: #101319;
+  --astro-gray-700: oklch(0.22 0.001 195);
+  --astro-gray-600: #23262d;
+  --astro-gray-500: #343841;
+  --astro-gray-400: #545864;
+  --astro-gray-300: oklch(0.6 0.0025 312);
+  --astro-gray-200: #bfc1c9;
+  --astro-gray-100: oklch(0.87 0.0232 308.17);
+  --astro-blue: #3245ff;
+  --astro-green: #4af2c8;
+  --astro-purple: #AE4CDC;
+  --astro-purple-light: #E8CCF4;
+  --astro-red: #d83333;
+  --astro-orange: #f8e42e;
+  --astro-yellow: #ff7d54;
+  --astro-border-subtle: oklch(0.20 0.002 312 / 0.55);
+
+  /* Semantic aliases used by the Aria theme layer */
+  --astro-bg: var(--astro-background);
+  --astro-editor-bg: var(--astro-sidebar);
+  --astro-panel-bg: var(--astro-gray-700);
+  --astro-divider: var(--astro-gray-400);
+  --astro-button-text: var(--astro-gray-300);
+  --astro-text: var(--astro-gray-100);
+  --astro-accent: oklch(0.2 0.0015 312);
+  --astro-highlights: var(--astro-green);
+  --astro-warning: var(--astro-red);
+  --astro-highlight-modified: var(--astro-green);
+  --astro-constants: var(--astro-purple);
+  --astro-classes: var(--astro-purple-light);
+  --astro-operators: var(--astro-yellow);
+  --astro-codeblock: var(--astro-gray-600);
+  --astro-variables: var(--astro-gray-200);
+  --astro-border: oklch(0.25 0.002 312);
+  --astro-input: oklch(0.18 0.0012 312);
+  --astro-border-hover: #858b9866;
+  --astro-surface-overlay: #23262d80;
+}
+
+/* Astro dark — existing behavior, gated on .dark */
+:root.theme-astro.dark,
+:root[data-theme="astro"].dark {
+  color-scheme: dark;
+
+  --background: var(--astro-bg);
+  --foreground: var(--astro-text);
+  --card: var(--astro-panel-bg);
+  --card-foreground: var(--astro-text);
+  --popover: var(--astro-panel-bg);
+  --popover-foreground: var(--astro-text);
+  --primary: var(--astro-purple);
+  --preloader-fill: var(--primary);
+  --primary-foreground: var(--astro-purple-light);
+  --secondary: var(--astro-gray-600);
+  --secondary-foreground: var(--astro-text);
+  --muted: var(--astro-gray-700);
+  --muted-foreground: var(--astro-button-text);
+  --accent: var(--astro-accent);
+  --accent-foreground: var(--astro-text);
+  --destructive: var(--astro-warning);
+  --border: var(--astro-border);
+  --input: var(--astro-input);
+  --ring: var(--astro-border-subtle);
+
+  --sidebar: var(--astro-editor-bg);
+  --sidebar-foreground: var(--astro-text);
+  --sidebar-primary: var(--astro-accent);
+  --sidebar-primary-foreground: var(--astro-text);
+  --sidebar-accent: var(--astro-gray-600);
+  --sidebar-accent-foreground: var(--astro-text);
+  --sidebar-border: var(--astro-border-subtle);
+  --sidebar-ring: var(--astro-divider);
+
+  --color-bg: var(--astro-editor-bg);
+  --color-surface: var(--astro-panel-bg);
+  --color-border: var(--astro-border);
+  --color-border-hover: var(--astro-border-hover);
+  --color-hover: var(--astro-surface-overlay);
+  --color-text: var(--astro-text);
+  --color-text-secondary: var(--astro-variables);
+  --color-text-tertiary: var(--astro-button-text);
+  --color-accent: var(--astro-accent);
+
+  --flickering-grid-color: var(--astro-gray-400);
+  --flickering-grid-accent: var(--astro-purple);
+}
+
+/* Astro light — new palette branch */
+:root.theme-astro:not(.dark),
+:root[data-theme="astro"]:not(.dark) {
+  color-scheme: light;
+
+  --background: var(--astro-light-bg);
+  --foreground: var(--astro-light-text);
+  --card: var(--astro-light-panel);
+  --card-foreground: var(--astro-light-text);
+  --popover: var(--astro-light-panel);
+  --popover-foreground: var(--astro-light-text);
+  --primary: var(--astro-purple);
+  --preloader-fill: var(--primary);
+  --primary-foreground: oklch(0.98 0.02 312);
+  --secondary: oklch(0.92 0.006 312);
+  --secondary-foreground: var(--astro-light-text);
+  --muted: oklch(0.94 0.004 312);
+  --muted-foreground: var(--astro-light-muted);
+  --accent: oklch(0.93 0.02 312);
+  --accent-foreground: var(--astro-light-text);
+  --destructive: var(--astro-red);
+  --border: var(--astro-light-border);
+  --input: var(--astro-light-input);
+  --ring: var(--astro-border-subtle-light);
+
+  --sidebar: var(--astro-light-sidebar);
+  --sidebar-foreground: var(--astro-light-text);
+  --sidebar-primary: var(--astro-purple);
+  --sidebar-primary-foreground: oklch(0.98 0.02 312);
+  --sidebar-accent: oklch(0.92 0.015 312);
+  --sidebar-accent-foreground: var(--astro-light-text);
+  --sidebar-border: var(--astro-border-subtle-light);
+  --sidebar-ring: var(--astro-light-border);
+
+  --color-bg: var(--astro-light-sidebar);
+  --color-surface: var(--astro-light-panel);
+  --color-border: var(--astro-light-border);
+  --color-border-hover: oklch(0.75 0.012 312 / 0.45);
+  --color-hover: oklch(0.9 0.01 312 / 0.5);
+  --color-text: var(--astro-light-text);
+  --color-text-secondary: var(--astro-light-muted);
+  --color-text-tertiary: oklch(0.62 0.012 312);
+  --color-accent: var(--astro-purple);
+
+  --flickering-grid-color: var(--astro-light-muted);
+  --flickering-grid-accent: var(--astro-purple);
+}

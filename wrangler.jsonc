@@ -1,0 +1,148 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "aria-builder",
+  "main": "aria/worker/index.ts",
+  // Keep this at or below the newest date supported by the workerd version
+  // pinned in package-lock.json; a future date prevents local edge dev startup.
+  "compatibility_date": "2026-06-24",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": true,
+  "assets": {
+    "directory": "dist",
+    "binding": "aria_assets",
+  },
+  "vars": {
+    "ARIA_RUNTIME": "cloudflare",
+    // Webhooks remain unavailable until one fail-closed production mode is
+    // configured. Use an exact host allowlist or a deployment-owned proxy.
+    // "ARIA_WEBHOOK_EGRESS_MODE": "allowlist",
+    // "ARIA_WEBHOOK_EGRESS_ALLOWLIST": "hooks.example.com",
+  },
+  // Placeholder resource IDs: the Deploy to Cloudflare button provisions real
+  // resources and rewrites these IDs in the cloned repo. Never commit real
+  // account IDs here — private resources belong in a gitignored wrangler.toml,
+  // which takes precedence over this file when both exist.
+  "d1_databases": [
+    {
+      "binding": "aria_db",
+      "database_name": "aria-db",
+      "database_id": "00000000-0000-0000-0000-000000000000",
+      "migrations_dir": "aria/migrations",
+    },
+  ],
+  "kv_namespaces": [
+    {
+      "binding": "aria_cache",
+      "id": "00000000000000000000000000000000",
+    },
+    {
+      "binding": "session",
+      "id": "00000000000000000000000000000000",
+    },
+  ],
+  "r2_buckets": [
+    {
+      "binding": "aria_r2",
+      "bucket_name": "aria-media",
+    },
+  ],
+  "images": {
+    "binding": "aria_images",
+  },
+  "cache": {
+    "enabled": true,
+  },
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "aria_studio_agent",
+        "class_name": "AriaStudioAgent",
+      },
+      {
+        "name": "aria_studio_live",
+        "class_name": "AriaStudioLive",
+      },
+    ],
+  },
+  "migrations": [
+    {
+      "tag": "v1_agent",
+      "new_sqlite_classes": ["AriaStudioAgent"],
+    },
+    {
+      "tag": "v2_studio_live",
+      "new_sqlite_classes": ["AriaStudioLive"],
+    },
+  ],
+  "ai": {
+    "binding": "ai",
+  },
+  "queues": {
+    "producers": [
+      {
+        "binding": "aria_email_queue",
+        "queue": "aria-email-delivery",
+      },
+      {
+        "binding": "aria_thumbnail_queue",
+        "queue": "aria-thumbnail-generation",
+      },
+      {
+        "binding": "aria_integration_queue",
+        "queue": "aria-integration-delivery",
+      },
+    ],
+    "consumers": [
+      {
+        "queue": "aria-email-delivery",
+        "max_batch_size": 10,
+        "max_batch_timeout": 5,
+        "max_retries": 5,
+        "dead_letter_queue": "aria-email-delivery-dlq",
+      },
+      {
+        "queue": "aria-email-delivery-dlq",
+        "max_batch_size": 10,
+        "max_batch_timeout": 5,
+        "max_retries": 2,
+      },
+      {
+        "queue": "aria-thumbnail-generation",
+        "max_batch_size": 2,
+        "max_batch_timeout": 5,
+        "max_retries": 3,
+      },
+      {
+        "queue": "aria-integration-delivery",
+        "max_batch_size": 10,
+        "max_batch_timeout": 5,
+        "max_retries": 5,
+        "dead_letter_queue": "aria-integration-delivery-dlq",
+      },
+      {
+        "queue": "aria-integration-delivery-dlq",
+        "max_batch_size": 10,
+        "max_batch_timeout": 5,
+        "max_retries": 2,
+      },
+    ],
+  },
+  "triggers": {
+    "crons": ["*/5 * * * *"],
+  },
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 0.1,
+    "logs": {
+      "enabled": true,
+      "head_sampling_rate": 0.1,
+      "invocation_logs": true,
+      "persist": true,
+    },
+    "traces": {
+      "enabled": false,
+      "head_sampling_rate": 0.01,
+      "persist": true,
+    },
+  },
+}

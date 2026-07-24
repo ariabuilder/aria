@@ -1,0 +1,30 @@
+{
+  "id": "left-sidebar",
+  "name": "Left Sidebar",
+  "title": "Left Sidebar",
+  "description": "Layout with left sidebar",
+  "nodes": [],
+  "slots": [
+    {
+      "name": "header",
+      "label": "Header",
+      "defaultContent": []
+    },
+    {
+      "name": "left",
+      "label": "Left Sidebar"
+    },
+    {
+      "name": "main",
+      "label": "Main Content",
+      "isDefault": true
+    },
+    {
+      "name": "footer",
+      "label": "Footer",
+      "defaultContent": []
+    }
+  ],
+  "version": "1780266340511",
+  "updatedAt": "2026-05-31T22:25:40.511Z"
+}

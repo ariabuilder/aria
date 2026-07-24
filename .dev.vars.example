@@ -1,0 +1,57 @@
+# Optional local development secrets.
+#
+# Copy to `.dev.vars` for local Cloudflare-style development. Do not commit
+# real secrets.
+
+# ARIA_EMAIL_SECRET_KEY_ID=v1
+# ARIA_EMAIL_SECRET_KEY_V1=replace-with-32-random-bytes-base64
+
+# Required to create or authenticate Site API credentials during local
+# development. The Cloudflare deploy command generates and stores the initial
+# production keyring automatically. Manual deployments may configure these as
+# Worker secrets. Keep prior numbered keys during credential/cursor rotation.
+# ARIA_API_KEYRING_KEY_ID=v1
+# ARIA_API_KEYRING_KEY_V1=replace-with-32-random-bytes-base64
+
+# Site-local OAuth (RFC 8628 device flow) is disabled by default. The
+# Cloudflare deploy command sets both values automatically on first deploy
+# (enabled + canonical workers.dev origin) and preserves them on redeploy, so
+# this manual pair is only for local development. When enabling locally, set an
+# explicit canonical issuer origin. HTTP is only accepted for loopback hosts
+# while NODE_ENV=development.
+# ARIA_OAUTH_ENABLED=true
+# ARIA_CANONICAL_ORIGIN=http://127.0.0.1:4321
+
+# Webhook delivery is fail-closed. Local development may target only loopback
+# receivers. Cloudflare production should use `allowlist` with exact approved
+# hosts or `proxy`; Node production requires `proxy` and a deployment-owned
+# HTTPS egress service.
+# ARIA_WEBHOOK_EGRESS_MODE=loopback-development
+# ARIA_WEBHOOK_EGRESS_ALLOWLIST=hooks.example.com,*.automation.example.com
+# ARIA_WEBHOOK_EGRESS_PROXY_URL=https://egress.example.com/webhooks
+
+# Node deployments run `npm run integrations:worker` beside the web process.
+# ARIA_INTEGRATION_WORKER_INTERVAL_MS=5000
+
+# Cloudflare Turnstile legacy/manual secret (optional). Never commit a
+# production secret. Aria-created widgets use the encrypted secret below.
+# TURNSTILE_SECRET_KEY=replace-with-turnstile-test-or-development-secret
+
+# One-time platform configuration for Aria's self-service Turnstile setup.
+# The account ID is not sensitive; the token and encryption key must be Worker
+# secrets in production. Generate the encryption key with `openssl rand -base64 32`.
+# ARIA_CLOUDFLARE_ACCOUNT_ID=your-cloudflare-account-id
+# ARIA_CLOUDFLARE_API_TOKEN=token-with-turnstile-sites-write
+# ARIA_TURNSTILE_ENCRYPTION_KEY_ID=v1
+# ARIA_TURNSTILE_ENCRYPTION_KEY_V1=32-random-bytes-base64
+
+# Optional Studio traffic metrics for a Cloudflare-managed custom domain.
+# Prefer a dedicated secret limited to Zone Analytics Read for the site's zone.
+# Zone Read is optional and only enables Aria's domain-to-zone mismatch check.
+# The Zone ID is an identifier, not a secret. workers.dev-only sites should use
+# Cloudflare's Worker metrics dashboard instead of zone traffic metrics.
+# ARIA_CLOUDFLARE_ANALYTICS_TOKEN=token-with-zone-analytics-read
+# ARIA_CLOUDFLARE_ZONE_ID=your-custom-domain-zone-id
+
+# Optional Cloudflare API token for remote content/media push scripts.
+# ARIA_CLOUDFLARE_API_TOKEN=replace-with-d1-r2-token

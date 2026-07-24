@@ -1,0 +1,86 @@
+# Build output
+dist/
+.astro/
+/build/
+out/
+/todo/
+.cursor/
+.opencode/
+
+# Cloudflare local state
+.wrangler/
+wrangler.lock
+wrangler.toml
+
+# Dependencies
+node_modules/
+
+# Environment and secrets
+.env
+.env.local
+.env.*.local
+.env.production
+.env.staging
+.env.development
+.env.test
+.dev.vars
+.dev.vars.*
+!.dev.vars.example
+credentials.json
+secrets.json
+*.pem
+id_rsa
+id_rsa.pub
+id_ed25519
+id_ed25519.pub
+
+# Unsafe binary artifacts
+*.exe
+*.dll
+*.so
+*.dylib
+*.jar
+*.bin
+*.apk
+*.dmg
+*.iso
+
+# Local data
+*.db
+*.sqlite
+*.sqlite3
+pages.db
+aria/storage/generated/
+aria/storage/exports/
+aria/storage/snapshots/
+aria/storage/thumbnails/
+public/uploads/*
+!public/uploads/.gitkeep
+
+# Logs and reports
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+coverage/
+.nyc_output/
+*.lcov
+aria/tests/.check-errors.txt
+
+# OS/editor files
+.DS_Store
+._*
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Temp/cache
+*.tmp
+*.temp
+.tmp/
+tmp/
+temp/
+.cache/

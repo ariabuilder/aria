@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta name="referrer" content="no-referrer" />
+    <title>Connect to Aria</title>
+    <link rel="stylesheet" href="/oauth-device.css" />
+  </head>
+  <body>
+    <main>
+      <h1>Connect to Aria</h1>
+      <p id="intro">Enter the code shown in Figma.</p>
+      <form id="code-form">
+        <label for="user-code">Connection code</label>
+        <input
+          id="user-code"
+          name="user_code"
+          inputmode="text"
+          autocomplete="one-time-code"
+          maxlength="9"
+          placeholder="ABCD-EFGH"
+          required
+        />
+        <button type="submit">Continue</button>
+      </form>
+      <section id="review" hidden>
+        <p class="eyebrow">Requesting access</p>
+        <h2 id="client-name"></h2>
+        <form id="decision-form">
+          <fieldset>
+            <legend>Allow</legend>
+            <div id="scopes"></div>
+          </fieldset>
+          <div class="actions">
+            <button id="deny" class="secondary" type="button">Deny</button>
+            <button type="submit">Allow connection</button>
+          </div>
+        </form>
+      </section>
+      <p id="message" role="status"></p>
+    </main>
+    <script src="/oauth-device.js" defer></script>
+  </body>
+</html>

@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Security vulnerability
+    url: https://github.com/ariabuilder/aria/security/advisories/new
+    about: Report suspected vulnerabilities privately. If private reporting is unavailable, see SECURITY.md.

@@ -1,0 +1,253 @@
+---
+/**
+ * NodeRenderer - Recursive Node Rendering Component
+ *
+ * Renders hierarchical BuilderNode structures into HTML/Astro components.
+ * Handles:
+ * - Recursive children rendering
+ * - Style application from StyleMap
+ * - Slot assignments
+ * - Hydration directives
+ * - Component resolution from block registry
+ *
+ * @example
+ * ```astro
+ * <NodeRenderer nodes={pageNodes} />
+ * ```
+ */
+
+import type {
+  BuilderNode,
+  StyleMap,
+  Responsive,
+  BreakpointDefinition,
+} from "../types/nodes";
+import { DEFAULT_BREAKPOINTS } from "../types/nodes";
+import { getBlockRegistry } from "../blocks/blockRegistry";
+import { log } from "../utils/logger";
+import { getStorageAdapterAsync } from "../storage/getStorageAdapter";
+import {
+  createDefaultUniversalDesignSystem,
+  resolveBreakpointDefinitionsFromDesignSystem,
+} from "../styles/universalDesignSystem";
+import { resolveNodeClasses } from "../blocks/resolveNodeClasses";
+
+interface Props {
+  nodes: BuilderNode | BuilderNode[];
+  slot?: string;
+  /** Custom breakpoints (optional, defaults to system breakpoints) */
+  breakpoints?: BreakpointDefinition[];
+}
+
+const { nodes, breakpoints: customBreakpoints } = Astro.props;
+
+// Normalize to array
+const nodeArray = Array.isArray(nodes) ? nodes : [nodes];
+
+// Get block registry for component resolution
+const registry = getBlockRegistry();
+
+// Get breakpoints from props, storage, or use defaults
+let breakpoints: BreakpointDefinition[] =
+  customBreakpoints || DEFAULT_BREAKPOINTS;
+if (!customBreakpoints) {
+  // Try to load canonical breakpoints from the design system
+  try {
+    const adapter = await getStorageAdapterAsync();
+    const [settings, designSystem] = await Promise.all([
+      adapter.getSiteSettings(),
+      adapter
+        .getDesignSystem()
+        .then((value) => value ?? createDefaultUniversalDesignSystem()),
+    ]);
+    void settings;
+    breakpoints = resolveBreakpointDefinitionsFromDesignSystem(designSystem);
+  } catch {
+    // Use defaults if loading fails
+  }
+}
+
+/**
+ * Convert StyleMap to CSS string with dynamic breakpoints
+ */
+function stylesToCSS(
+  styles: StyleMap = {},
+  nodeId: string,
+  bps: BreakpointDefinition[],
+): string {
+  const cssLines: string[] = [];
+
+  // Base styles (first breakpoint or 'base')
+  const baseStyles: string[] = [];
+  const baseBp = bps.find((bp) => bp.name === "base") || bps[0];
+
+  for (const [property, value] of Object.entries(styles)) {
+    if (value && typeof value === "object") {
+      const responsive = value as Responsive<string>;
+      const baseValue = responsive[baseBp.name];
+      if (baseValue) {
+        const cssProperty = property.replace(/([A-Z])/g, "-$1").toLowerCase();
+        baseStyles.push(`${cssProperty}: ${baseValue}`);
+      }
+    }
+  }
+
+  if (baseStyles.length > 0) {
+    cssLines.push(`[data-node-id="${nodeId}"] { ${baseStyles.join("; ")} }`);
+  }
+
+  // Responsive styles for all non-base breakpoints
+  for (const bp of bps) {
+    if (bp.name === "base" || bp.minWidth === "0px") continue;
+
+    const responsiveStyles: string[] = [];
+
+    for (const [property, value] of Object.entries(styles)) {
+      if (value && typeof value === "object") {
+        const responsive = value as Responsive<string>;
+        const bpValue = responsive[bp.name];
+        if (bpValue) {
+          const cssProperty = property.replace(/([A-Z])/g, "-$1").toLowerCase();
+          responsiveStyles.push(`${cssProperty}: ${bpValue}`);
+        }
+      }
+    }
+
+    if (responsiveStyles.length > 0) {
+      cssLines.push(
+        `@media (min-width: ${bp.minWidth}) { [data-node-id="${nodeId}"] { ${responsiveStyles.join("; ")} } }`,
+      );
+    }
+  }
+
+  return cssLines.join("\n");
+}
+
+function getHydrationDirective(node: BuilderNode): string {
+  if (!node.hydration || node.hydration.mode === "static") {
+    return "";
+  }
+
+  switch (node.hydration.mode) {
+    case "load":
+      return "client:load";
+    case "idle":
+      return "client:idle";
+    case "visible":
+      return "client:visible";
+    case "media":
+      return node.hydration.media
+        ? `client:media="${node.hydration.media}"`
+        : "client:idle";
+    case "only":
+      return node.hydration.framework
+        ? `client:only="${node.hydration.framework}"`
+        : "client:only";
+    default:
+      return "";
+  }
+}
+
+async function renderNode(node: BuilderNode) {
+  // Get component from registry
+  const blockDef = registry.blocks[node.type];
+
+  if (!blockDef) {
+    console.warn(`Unknown block type: ${node.type}`);
+    return null;
+  }
+
+  // Import the component dynamically
+  let Component;
+  try {
+    const module = await import(/* @vite-ignore */ blockDef.componentPath);
+    Component = module.default;
+  } catch (error) {
+    log("error", `Failed to load component ${node.type}`, {
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return null;
+  }
+
+  return {
+    Component,
+    node,
+    blockDef,
+  };
+}
+
+const renderedNodes = await Promise.all(nodeArray.map(renderNode));
+---
+
+<!-- Inject styles for all nodes -->
+<style
+  is:global
+  set:html={nodeArray
+    .map((node) => stylesToCSS(node.styles, node.id, breakpoints))
+    .join("\n")}
+></style>
+
+<!-- Render nodes -->
+{
+  renderedNodes.map((rendered) => {
+    if (!rendered) return null;
+
+    const { Component, node } = rendered;
+    const hydrationDirective = getHydrationDirective(node);
+
+    // Prepare props with data-node-id for selection
+    const componentProps = {
+      ...node.props,
+      "data-node-id": node.id,
+      class: resolveNodeClasses(node),
+      slot: node.slot,
+      ...(node.a11y?.role && { role: node.a11y.role }),
+      ...(node.a11y?.ariaLabel && { "aria-label": node.a11y.ariaLabel }),
+      ...(node.a11y?.ariaDescribedBy && {
+        "aria-describedby": node.a11y.ariaDescribedBy,
+      }),
+      ...(node.a11y?.ariaLabelledBy && {
+        "aria-labelledby": node.a11y.ariaLabelledBy,
+      }),
+      ...(node.a11y?.ariaHidden !== undefined && {
+        "aria-hidden": node.a11y.ariaHidden,
+      }),
+      ...(node.a11y?.ariaExpanded !== undefined && {
+        "aria-expanded": node.a11y.ariaExpanded,
+      }),
+      ...(node.a11y?.ariaControls && {
+        "aria-controls": node.a11y.ariaControls,
+      }),
+      ...(node.a11y?.tabIndex !== undefined && {
+        tabIndex: node.a11y.tabIndex,
+      }),
+      // Add interaction handlers (as data attributes for client-side JS)
+      ...(node.interactions?.onClick && {
+        "data-onclick": node.interactions.onClick,
+      }),
+      ...(node.interactions?.onHover && {
+        "data-onhover": node.interactions.onHover,
+      }),
+      ...(node.interactions?.onScroll && {
+        "data-onscroll": node.interactions.onScroll,
+      }),
+      ...(node.interactions?.animations && {
+        "data-animations": JSON.stringify(node.interactions.animations),
+      }),
+      ...(node.variants?.default && { "data-variant": node.variants.default }),
+      // Add data source info for debugging/hydration
+      ...(node.dataSource && { "data-source": node.dataSource.type }),
+    };
+
+    return (
+      <Component
+        {...componentProps}
+        {...(hydrationDirective ? { [hydrationDirective]: true } : {})}
+      >
+        {node.children && node.children.length > 0 && (
+          <Astro.self nodes={node.children} />
+        )}
+      </Component>
+    );
+  })
+}

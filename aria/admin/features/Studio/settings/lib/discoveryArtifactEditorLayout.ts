@@ -1,0 +1,23 @@
+export const DISCOVERY_ARTIFACT_EDITOR_FONT_SIZE_PX = 13;
+export const DISCOVERY_ARTIFACT_EDITOR_LINE_HEIGHT = 1.7;
+export const DISCOVERY_ARTIFACT_EDITOR_LINE_HEIGHT_PX =
+  DISCOVERY_ARTIFACT_EDITOR_FONT_SIZE_PX * DISCOVERY_ARTIFACT_EDITOR_LINE_HEIGHT;
+export const DISCOVERY_ARTIFACT_EDITOR_VERTICAL_PADDING_PX = 24;
+export const DISCOVERY_ARTIFACT_EDITOR_MAX_LINES = 40;
+export const DISCOVERY_ARTIFACT_EDITOR_MIN_LINES = 4;
+export const DISCOVERY_ARTIFACT_PANEL_CHROME_PX = 84;
+
+export function discoveryArtifactEditorHeightPx(lineCount: number): number {
+  const lines = Math.max(
+    DISCOVERY_ARTIFACT_EDITOR_MIN_LINES,
+    Math.min(Math.max(lineCount, 1), DISCOVERY_ARTIFACT_EDITOR_MAX_LINES),
+  );
+  return (
+    lines * DISCOVERY_ARTIFACT_EDITOR_LINE_HEIGHT_PX +
+    DISCOVERY_ARTIFACT_EDITOR_VERTICAL_PADDING_PX
+  );
+}
+
+export function discoveryArtifactMaxEditorHeightPx(): number {
+  return discoveryArtifactEditorHeightPx(DISCOVERY_ARTIFACT_EDITOR_MAX_LINES);
+}

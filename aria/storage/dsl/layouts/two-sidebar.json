@@ -1,0 +1,34 @@
+{
+  "id": "two-sidebar",
+  "name": "Two Sidebars",
+  "title": "Two Sidebars",
+  "description": "Layout with two sidebars",
+  "nodes": [],
+  "slots": [
+    {
+      "name": "header",
+      "label": "Header",
+      "defaultContent": []
+    },
+    {
+      "name": "left",
+      "label": "Left Sidebar"
+    },
+    {
+      "name": "main",
+      "label": "Main Content",
+      "isDefault": true
+    },
+    {
+      "name": "right",
+      "label": "Right Sidebar"
+    },
+    {
+      "name": "footer",
+      "label": "Footer",
+      "defaultContent": []
+    }
+  ],
+  "version": "1780266340567",
+  "updatedAt": "2026-05-31T22:25:40.567Z"
+}

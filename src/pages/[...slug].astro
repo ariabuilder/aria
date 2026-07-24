@@ -1,0 +1,1291 @@
+---
+/**
+ * Public Page Route - Serves Published SSR with Authenticated Preview
+ * Public requests resolve the published page revision only. Preview.
+ */
+
+import { getStorageAdapterAsync } from "../../aria/lib/storage/getStorageAdapter";
+import type { LayoutDSL, PageDSL } from "../../aria/lib/types/nodes";
+import { LayoutDSLSchema, PageDSLSchema } from "../../aria/lib/schemas/nodes";
+import { renderPageDslToHtml } from "../../aria/lib/rendering/renderPageDslToHtml";
+import { loadCollectionPublicPageRoute } from "../../aria/lib/rendering/resolvePublicPageRoute";
+import type { PublicPageRouteStage } from "../../aria/lib/rendering/resolvePublicPageRoute";
+import { resolveCmsEntrySeoOverride } from "../../aria/lib/rendering/resolveCmsEntrySeo";
+import { resolvePaginationPageFromQuery } from "../../aria/lib/cms/resolvePagination";
+import { log } from "../../aria/lib/utils/logger";
+import {
+  getPublicPageCacheTags,
+  getPublicLayoutCacheTag,
+  getPublicCollectionEntryCacheTags,
+  recordSsrServed
+} from "../../aria/lib/cache/service";
+import {
+  getAuthAdapterAsync,
+  getSessionIdFromCookies,
+  hashToken
+} from "../../aria/lib/auth";
+import {
+  buildPageAccessCookieName,
+  clearPageAccessCookie,
+  evaluatePagePolicyRoute,
+  hasValidPageAccessSession,
+  sanitizePagePolicy
+} from "../../aria/lib/pages/policy";
+import { readSessionUserFromLocals } from "../../aria/lib/runtime/requestLocals";
+import { createDefaultUniversalDesignSystem } from "../../aria/lib/styles/universalDesignSystem";
+import {
+  normalizeContentLocalization,
+  resolveContentLocaleDirection
+} from "../../aria/lib/localization/contentLocale";
+import {
+  isSelfCanonicalPublicUrl,
+  localizePublicPath,
+  resolveLocalizedCanonicalUrl,
+  resolvePublicLocalePath,
+  toAbsolutePublicUrl
+} from "../../aria/lib/localization/publicRoutes";
+import { normalizeLocalizedRoute } from "../../aria/lib/localization/siteTranslations";
+import { listApprovedPublicComments } from "../../aria/lib/cms/services/publicComments";
+import { renderPublicCommentSection } from "../../aria/lib/cms/publicCommentHtml";
+import {
+  renderPublicBootstrapPlaceholderHtml,
+  renderPublicNotFoundFallbackHtml,
+  resolvePublicBootstrapState,
+} from "../../aria/lib/site/publicBootstrapPlaceholder";
+
+export const prerender = false;
+
+const STATIC_ASSET_EXTENSIONS = [
+  '.jpg', '.jpeg', '.png', '.gif', '.svg', '.webp', '.ico', '.avif',
+  '.pdf', '.woff', '.woff2', '.ttf', '.eot', '.otf',
+  '.css', '.js', '.json', '.xml', '.txt', '.map'
+] as const;
+
+const CACHE_HEADERS = {
+  PUBLIC_SSR: 'public, max-age=0, s-maxage=300, stale-while-revalidate=86400',
+  PREVIEW: 'no-store, must-revalidate',
+  COOKIE_VARIANT: 'no-store, must-revalidate',
+  ERROR: 'no-store'
+} as const;
+
+/**
+ * Normalizes URL pathname to storage slug format.
+ * Removes leading slash and handles root/empty paths.
+ */
+function normalizeSlug(pathname: string): string {
+  if (!pathname || pathname === '/') return '';
+  return pathname.startsWith('/') ? pathname.slice(1) : pathname;
+}
+
+/**
+ * Sanitizes slug to prevent path traversal attacks.
+ * Blocks attempts to access parent directories or absolute paths.
+ */
+function sanitizeSlug(slug: string): string {
+  if (slug.includes('..') || slug.includes('//') || slug.startsWith('/')) {
+    throw new Error('Invalid path: path traversal detected');
+  }
+
+  // Block null bytes and control characters
+  if (/[\x00-\x1f]/.test(slug)) {
+    throw new Error('Invalid path: control characters detected');
+  }
+
+  return slug;
+}
+
+function appendToBody(html: string, footer: string): string {
+  return html.replace(/<\/body>/i, `${footer}</body>`);
+}
+
+/**
+ * Checks if request is for a static asset that should be handled by Astro/CDN.
+ */
+function isStaticAsset(pathname: string): boolean {
+  const lowerPath = pathname.toLowerCase();
+  return STATIC_ASSET_EXTENSIONS.some(ext => lowerPath.endsWith(ext));
+}
+
+/**
+ * Parses URL path into segments for hierarchical validation.
+ * Returns empty array for root path.
+ */
+function parsePathSegments(slug: string): string[] {
+  if (!slug) return [];
+  return slug.split('/').filter(Boolean);
+}
+
+/**
+ * Extracts leaf slug from path segments.
+ * Returns 'index' for root path to maintain consistency.
+ */
+function getLeafSlug(segments: string[]): string {
+  return segments.length > 0 ? segments[segments.length - 1] : 'index';
+}
+
+/**
+ * Verifies that page hierarchy matches URL path
+ * structure. For URL /parent/child/grandchild: - Validates grandchild.
+ */
+async function verifyPageHierarchy(
+  page: PageDSL,
+  segments: string[],
+  loadPage: (slug: string) => Promise<PageDSL | null>
+): Promise<{ isValid: boolean; reason?: string }> {
+  // Single segment or root - only check that page has no parent (unless it's supposed to)
+  if (segments.length === 0) {
+    // Root path - page should have no parent
+    if (page.parent) {
+      return {
+        isValid: false,
+        reason: `Root page has parent "${page.parent}"`
+      };
+    }
+    return { isValid: true };
+  }
+
+  let currentPage = page;
+
+  // Walk up the hierarchy, matching each segment to expected parent
+  for (let i = segments.length - 2; i >= 0; i--) {
+    const expectedParentSlug = segments[i];
+
+    if (currentPage.parent !== expectedParentSlug) {
+      return {
+        isValid: false,
+        reason: `Segment "${segments[i + 1]}" parent mismatch: expected "${expectedParentSlug}", got "${currentPage.parent || 'null'}"`
+      };
+    }
+
+    // Fetch parent to continue walking up the tree
+    try {
+      const parentPage = await loadPage(expectedParentSlug);
+
+      if (!parentPage) {
+        return {
+          isValid: false,
+          reason: `Parent page "${expectedParentSlug}" not found`
+        };
+      }
+
+      currentPage = parentPage;
+    } catch (error) {
+      return {
+        isValid: false,
+        reason: `Failed to fetch parent "${expectedParentSlug}": ${error instanceof Error ? error.message : 'Unknown error'}`
+      };
+    }
+  }
+
+  // After walking all segments, the current page should have no parent (it's the root)
+  if (currentPage.parent) {
+    return {
+      isValid: false,
+      reason: `Root segment "${segments[0]}" has unexpected parent "${currentPage.parent}"`
+    };
+  }
+
+  return { isValid: true };
+}
+
+/**
+ * Builds the canonical URL path for a page by walking its parent chain.
+ * Given a child page with slug "child-01" and parent "parent", returns "/parent/child-01".
+ */
+async function buildCanonicalPagePath(
+  page: PageDSL,
+  loadPage: (slug: string) => Promise<PageDSL | null>
+): Promise<string> {
+  const slugs: string[] = [page.slug];
+  let current: PageDSL | null = page;
+
+  while (current?.parent && current.parent !== "index") {
+    slugs.unshift(current.parent);
+    const parent = await loadPage(current.parent);
+    if (!parent) break;
+    current = parent;
+  }
+
+  if (slugs.length === 1 && slugs[0] === "index") return "/";
+  return `/${slugs.join("/")}`;
+}
+
+function escapeHeadAttribute(value: string): string {
+  return value.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
+}
+
+function isSelfCanonicalPage(input: {
+  page: PageDSL;
+  pathname: string;
+  baseUrl: string;
+}): boolean {
+  return isSelfCanonicalPublicUrl({
+    canonical: input.page.settings?.seo?.canonical,
+    pathname: input.pathname,
+    baseUrl: input.baseUrl,
+  });
+}
+
+async function buildLocaleAlternateHead(input: {
+  adapter: Awaited<ReturnType<typeof getStorageAdapterAsync>>;
+  page: PageDSL;
+  settings: ReturnType<typeof normalizeContentLocalization>;
+  baseUrl: string;
+}): Promise<string> {
+  const defaultPath = await buildCanonicalPagePath(
+    input.page,
+    (slug) => input.adapter.getPublishedPageDSL(slug),
+  );
+  const links = new Map<string, string>();
+  if (
+    input.page.settings?.seo?.noindex !== true &&
+    isSelfCanonicalPage({
+      page: input.page,
+      pathname: defaultPath,
+      baseUrl: input.baseUrl,
+    })
+  ) {
+    links.set(
+      input.settings.defaultLocale,
+      toAbsolutePublicUrl(defaultPath, input.baseUrl),
+    );
+  }
+  const translatedRoutes = await input.adapter.listPublishedPageLocaleRoutes(input.page.id);
+  for (const route of translatedRoutes) {
+    if (!input.settings.locales.some((item) => item.enabled && item.code === route.locale)) continue;
+    const resolved = await input.adapter.resolvePublishedPageLocale(
+      route.locale,
+      route.pathnameKey,
+    );
+    if (!resolved || resolved.version.seo.noindex) continue;
+    links.set(
+      route.locale,
+      resolveLocalizedCanonicalUrl({
+        pathname: resolved.route.pathname,
+        locale: route.locale,
+        settings: input.settings,
+        baseUrl: input.baseUrl,
+      }),
+    );
+  }
+  return [...links.entries()]
+    .map(([hrefLang, href]) => `<link rel="alternate" hreflang="${escapeHeadAttribute(hrefLang)}" href="${escapeHeadAttribute(href)}" />`)
+    .concat(
+      links.has(input.settings.defaultLocale)
+        ? [`<link rel="alternate" hreflang="x-default" href="${escapeHeadAttribute(links.get(input.settings.defaultLocale)!)}" />`]
+        : [],
+    )
+    .join("\n");
+}
+
+async function resolveLocalizedLayout(input: {
+  adapter: Awaited<ReturnType<typeof getStorageAdapterAsync>>;
+  locale: string;
+  layoutId: string | null;
+  fallbackLayoutVersion: string | null;
+}): Promise<LayoutDSL | null> {
+  if (!input.layoutId) return null;
+  const localeMeta = await input.adapter.getLayoutLocaleMeta(
+    input.layoutId,
+    input.locale,
+  );
+  if (localeMeta?.publishedVersion) {
+    const localized = await input.adapter.getLayoutLocaleVersion(
+      input.layoutId,
+      input.locale,
+      localeMeta.publishedVersion,
+    );
+    const parsed = localized ? LayoutDSLSchema.safeParse(localized.dsl) : null;
+    if (parsed?.success) return parsed.data;
+  }
+  return input.fallbackLayoutVersion
+    ? await input.adapter.getLayoutDSL(input.layoutId, input.fallbackLayoutVersion)
+    : await input.adapter.getLayoutDSL(input.layoutId);
+}
+
+/**
+ * CMS templates and not-found pages are selected by canonical owner identity,
+ * never by a locale page-route claim. Public CMS routes remain.
+ */
+async function resolvePublishedLocalizedOwnerPage(input: {
+  adapter: Awaited<ReturnType<typeof getStorageAdapterAsync>>;
+  page: PageDSL;
+  locale: string;
+  defaultLocale: string;
+}): Promise<{
+  page: PageDSL;
+  version: import("../../aria/lib/localization/siteTranslationSchemas").PageLocaleVersion | null;
+}>
+{
+  if (input.locale === input.defaultLocale) {
+    return { page: input.page, version: null };
+  }
+  const meta = await input.adapter.getPageLocaleMeta(input.page.id, input.locale);
+  if (!meta?.publishedVersion) return { page: input.page, version: null };
+  const version = await input.adapter.getPageLocaleVersion(
+    input.page.id,
+    input.locale,
+    meta.publishedVersion,
+  );
+  const parsed = version ? PageDSLSchema.safeParse(version.dsl) : null;
+  return parsed?.success
+    ? { page: parsed.data, version }
+    : { page: input.page, version: null };
+}
+
+/**
+ * Renders page DSL to HTML (canonical pipeline shared with publish, snapshots, preview).
+ */
+async function renderPageToHtml(
+  page: PageDSL,
+  requestPath: string,
+  adapter: Awaited<ReturnType<typeof getStorageAdapterAsync>>,
+  logger: (level: string, message: string, meta?: Record<string, unknown>) => void,
+  accessMode?: PageDSL['accessMode'],
+  cms?: Parameters<typeof renderPageDslToHtml>[0]['cms'],
+  locale?: string,
+  direction?: "ltr" | "rtl",
+  seoOverride?: Parameters<typeof renderPageDslToHtml>[0]["seoOverride"],
+  headHTMLPrefix?: string,
+  layoutOverride?: LayoutDSL | null,
+): Promise<{ html: string; cspHeaderValue: string }> {
+  let globalCSSHref: string | undefined;
+  try {
+    const designSystem = await adapter
+      .getDesignSystem()
+      .then((value) => value ?? createDefaultUniversalDesignSystem());
+    const hasCompiledCSS = Boolean(
+      designSystem.artifacts.globalCSS && designSystem.artifacts.globalCSSHash,
+    );
+    if (hasCompiledCSS) {
+      const hash = designSystem.artifacts.globalCSSHash?.trim();
+      globalCSSHref = `/styles/global.css${
+        hash ? `?v=${encodeURIComponent(hash)}` : ""
+      }`;
+    }
+  } catch (error) {
+    logger("warn", "Failed to load design system for global CSS href", { error });
+  }
+
+  return renderPageDslToHtml({
+    page,
+    adapter,
+    pathOrSlug: requestPath,
+    globalCSSHref,
+    accessMode: accessMode ?? page.accessMode,
+    cms,
+    locale,
+    direction,
+    seoOverride,
+    headHTMLPrefix,
+    layoutOverride,
+    logger: (level, message, meta) => logger(level, message, meta),
+  });
+}
+
+async function buildCollectionPageCmsOptions(
+  adapter: Awaited<ReturnType<typeof getStorageAdapterAsync>>,
+  collectionRoute: NonNullable<Awaited<ReturnType<typeof loadCollectionPublicPageRoute>>>,
+  stage: PublicPageRouteStage,
+  searchParams: URLSearchParams,
+  locale: string,
+) {
+  const entry = await adapter.getEntry({
+    collectionId: collectionRoute.entryContext.collectionId,
+    idOrSlug: collectionRoute.entryContext.slug,
+    locale,
+  });
+  const routeLocale = entry?.locales.find((candidate) => candidate.locale === locale);
+  const entrySeo = routeLocale
+    ? resolveCmsEntrySeoOverride({
+        entryTitle: routeLocale.title,
+        frontmatter: routeLocale.frontmatter,
+      })
+    : undefined;
+  const pagination = resolvePaginationPageFromQuery({
+    pageParam: "page",
+    rawQueryValue: searchParams.get("page") ?? undefined,
+  });
+
+  return {
+    preview: stage !== "published",
+    locale,
+    entryContext: collectionRoute.entryContext,
+    entrySeo,
+    pagination,
+  } as const;
+}
+
+/**
+ * Sets appropriate cache headers based on content type and rendering method.
+ */
+type AstroResponseInit = ResponseInit & { readonly headers: Headers };
+
+function setCacheHeaders(
+  response: AstroResponseInit,
+  contentType:
+    | 'public-ssr'
+    | 'preview'
+    | 'cookie-variant'
+    | 'vary-cookie'
+    | 'error'
+): void {
+  response.headers.set('content-type', 'text/html; charset=utf-8');
+
+  const cacheHeader = contentType === 'public-ssr'
+    ? CACHE_HEADERS.PUBLIC_SSR
+    : contentType === 'preview'
+    ? CACHE_HEADERS.PREVIEW
+    : contentType === 'cookie-variant' || contentType === 'vary-cookie'
+    ? CACHE_HEADERS.COOKIE_VARIANT
+    : CACHE_HEADERS.ERROR;
+
+  response.headers.set('cache-control', cacheHeader);
+
+  if (
+    contentType === 'preview' ||
+    contentType === 'cookie-variant' ||
+    contentType === 'vary-cookie'
+  ) {
+    response.headers.set('vary', 'Cookie');
+  }
+}
+
+function setPublicCacheTags(
+  response: AstroResponseInit,
+  page: Pick<PageDSL, 'id' | 'slug'>,
+  layoutId?: string | null,
+  localized?: { locale: string; version: string; pathnameKey: string } | null,
+): void {
+  response.headers.set(
+    'cache-tag',
+    [
+      ...getPublicPageCacheTags({ ...page, ...localized }),
+      ...(layoutId ? [getPublicLayoutCacheTag(layoutId)] : []),
+    ].join(','),
+  );
+}
+
+/**
+ * Structured logger with severity levels for better observability.
+ */
+function createLogger(context: string) {
+  return (level: string, message: string, meta?: any) => {
+    const logMessage = `[${context}] ${message}`;
+    const logData = meta ? { ...meta } : undefined;
+
+    switch (level) {
+      case 'error':
+        log('error', logMessage, logData);
+        break;
+      case 'warn':
+        log('warn', logMessage, logData);
+        break;
+      case 'info':
+        log('info', logMessage, logData);
+        break;
+      default:
+        log('debug', logMessage, logData);
+    }
+  };
+}
+
+type PasswordGateState = {
+  slug: string;
+  title: string;
+  description: string;
+};
+
+const logger = createLogger('SSR');
+let html: string | null = null;
+let passwordGate: PasswordGateState | null = null;
+
+try {
+  // Step 1: Parse and validate request
+  // Do not open storage for assets that reached the catch-all route.
+  if (isStaticAsset(Astro.url.pathname)) {
+    logger('info', `Static asset detected, skipping: ${Astro.url.pathname}`);
+    return Astro.redirect(`/${normalizeSlug(Astro.url.pathname)}`, 404);
+  }
+  const adapter = await getStorageAdapterAsync(Astro.locals);
+  const siteSettings = await adapter.getSiteSettings();
+  const authAdapter = await getAuthAdapterAsync(Astro.locals);
+  const bootstrap = resolvePublicBootstrapState({
+    userCount: await authAdapter.countUsers(),
+    onboarding: siteSettings?.onboarding,
+  });
+  if (!bootstrap.ready) {
+    return new Response(
+      renderPublicBootstrapPlaceholderHtml({ ctaHref: bootstrap.ctaHref }),
+      {
+        status: 200,
+        headers: {
+          "Content-Type": "text/html; charset=utf-8",
+          "Cache-Control": "no-store",
+          "X-Robots-Tag": "noindex, nofollow",
+        },
+      },
+    );
+  }
+  const localization = normalizeContentLocalization(
+    siteSettings?.localization?.content,
+  );
+  const localeRoute = resolvePublicLocalePath({
+    pathname: Astro.url.pathname,
+    settings: localization,
+  });
+  const locale = (Astro.locals as import("../../aria/lib/cloudflare/env").RuntimeLocals)
+    .publicLocale ?? localeRoute.locale;
+  const routePathname =
+    (Astro.locals as import("../../aria/lib/cloudflare/env").RuntimeLocals)
+      .publicLocalePathname ?? localeRoute.pathname;
+  const rawSlug = normalizeSlug(routePathname);
+
+  // Sanitize to prevent path traversal
+  const pageSlug = sanitizeSlug(rawSlug);
+  const segments = parsePathSegments(pageSlug);
+  const leafSlug = getLeafSlug(segments);
+
+  logger('info', `Resolving path "${pageSlug}"`, {
+    segments: segments.length,
+    leaf: leafSlug
+  });
+
+  // Step 2: Initialize storage adapter
+  const isPreviewRequest =
+    Astro.url.searchParams.get('preview') === '1' ||
+    Astro.url.searchParams.get('draft') === '1';
+  let previewUser = readSessionUserFromLocals(Astro.locals);
+
+  if (isPreviewRequest && !previewUser) {
+    const sessionId = getSessionIdFromCookies(Astro.cookies);
+    if (sessionId) {
+      const authAdapter = await getAuthAdapterAsync(Astro.locals);
+      previewUser = await authAdapter.getSessionUser(sessionId);
+      if (previewUser) {
+        Astro.locals.user = previewUser;
+      }
+    }
+  }
+
+  const isAuthenticatedPreview = isPreviewRequest && Boolean(previewUser);
+
+  if (isPreviewRequest && !isAuthenticatedPreview) {
+    logger('warn', `Blocked unauthenticated preview for "${pageSlug}"`);
+    return Astro.rewrite('/404');
+  } else {
+    // A published non-default locale resolves only through its own immutable
+    // route/version record. It never falls through to canonical pages.
+    const canResolveDirectPage = locale === localization.defaultLocale;
+    const loadPage = !canResolveDirectPage
+      ? async (_slug: string) => null
+      : isAuthenticatedPreview
+      ? (slug: string) => adapter.getPageDSL(slug)
+      : (slug: string) => adapter.getPublishedPageDSL(slug);
+
+    let localizedRoute: Awaited<
+      ReturnType<typeof adapter.resolvePublishedPageLocale>
+    > = null;
+    if (!canResolveDirectPage && !isAuthenticatedPreview) {
+      try {
+        const lookup = normalizeLocalizedRoute(routePathname);
+        localizedRoute = await adapter.resolvePublishedPageLocale(
+          locale,
+          lookup.pathnameKey,
+        );
+      } catch {
+        // Unsafe or malformed localized spellings are not route candidates.
+        localizedRoute = null;
+      }
+    }
+    if (
+      localizedRoute &&
+      (Astro.request.method === "GET" || Astro.request.method === "HEAD")
+    ) {
+      const canonicalPath = localizePublicPath({
+        pathname: localizedRoute.route.pathname,
+        locale,
+        settings: localization,
+      });
+      if (Astro.url.pathname !== canonicalPath) {
+        const target = new URL(Astro.url);
+        target.pathname = canonicalPath;
+        return Astro.redirect(target, 308);
+      }
+    }
+    const localizedPage = localizedRoute
+      ? PageDSLSchema.safeParse(localizedRoute.version.dsl)
+      : null;
+    if (localizedRoute && !localizedPage?.success) {
+      logger('error', 'Published localized route has an invalid page snapshot', {
+        pageId: localizedRoute.version.pageId,
+        locale,
+        version: localizedRoute.version.version,
+      });
+      return Astro.rewrite('/404');
+    }
+
+    // Step 3: Fetch page and verify existence
+    const page = localizedPage?.success ? localizedPage.data : await loadPage(leafSlug);
+
+    if (!page) {
+      const collectionStage: PublicPageRouteStage = isAuthenticatedPreview
+        ? "draft"
+        : "published";
+      const collectionRoute = await loadCollectionPublicPageRoute(adapter, {
+        pathname: routePathname,
+        stage: collectionStage,
+        locale,
+      });
+
+      if (!collectionRoute || localizedRoute) {
+        logger('warn', `Page not found: ${leafSlug}`);
+        return Astro.rewrite('/404');
+      }
+
+      const policy = await adapter.getPagePolicy(collectionRoute.templatePage.id);
+
+      if (!policy) {
+        logger('error', `Missing page policy for collection template "${collectionRoute.templatePage.id}"`, {
+          pageId: collectionRoute.templatePage.id,
+          collectionId: collectionRoute.entryContext.collectionId,
+        });
+        return Astro.rewrite('/404');
+      }
+
+      let hasValidPasswordGrant = false;
+
+      if (!isAuthenticatedPreview && policy.accessMode === 'password') {
+        const cookieName = buildPageAccessCookieName(policy.id);
+        const rawAccessToken = Astro.cookies.get(cookieName)?.value;
+
+        if (rawAccessToken) {
+          const tokenHash = await hashToken(rawAccessToken);
+          const accessSession = await adapter.getPageAccessSession(
+            policy.id,
+            tokenHash,
+          );
+
+          hasValidPasswordGrant = hasValidPageAccessSession({
+            policy,
+            session: accessSession,
+          });
+
+          if (hasValidPasswordGrant) {
+            await adapter.touchPageAccessSession(tokenHash);
+          } else {
+            if (accessSession) {
+              await adapter.deletePageAccessSession(tokenHash);
+            }
+
+            clearPageAccessCookie({
+              cookies: Astro.cookies,
+              pageId: policy.id,
+            });
+          }
+        }
+      }
+
+      const routeDecision = evaluatePagePolicyRoute({
+        policy,
+        isAuthenticatedPreview,
+        hasValidPasswordGrant,
+        routeContext: "cms-entry",
+      });
+
+      if (routeDecision.mode === 'rewrite-404') {
+        logger('info', `Policy rewrote collection URL "${pageSlug}" to 404`, {
+          systemRole: policy.systemRole,
+          accessMode: policy.accessMode,
+          mode: isAuthenticatedPreview ? 'preview' : 'public',
+        });
+        return Astro.rewrite('/404');
+      }
+
+      if (routeDecision.mode === 'render-password-gate') {
+        const sanitizedPolicy = sanitizePagePolicy(policy);
+        passwordGate = {
+          slug: sanitizedPolicy.slug,
+          title: sanitizedPolicy.promptTitle ?? 'Password required',
+          description:
+            sanitizedPolicy.promptDescription ??
+            'This page is protected. Enter the password to continue.',
+        };
+
+        Astro.response.status = 200;
+        setCacheHeaders(Astro.response, 'cookie-variant');
+
+        logger('info', `Rendering password gate for collection URL "${pageSlug}"`, {
+          pageId: policy.id,
+        });
+      } else {
+        const localizedTemplate = !isAuthenticatedPreview
+          ? await resolvePublishedLocalizedOwnerPage({
+              adapter,
+              page: collectionRoute.templatePage,
+              locale,
+              defaultLocale: localization.defaultLocale,
+            })
+          : { page: collectionRoute.templatePage, version: null };
+        const cmsOptions = await buildCollectionPageCmsOptions(
+          adapter,
+          collectionRoute,
+          collectionStage,
+          Astro.url.searchParams,
+          locale,
+        );
+        const feedCollection = !isAuthenticatedPreview
+          ? await adapter.getCollection(collectionRoute.entryContext.collectionId)
+          : null;
+        const collectionFeedPath =
+          feedCollection?.supports.includes("rss") &&
+          feedCollection.schema.rss?.enabled
+            ? localizePublicPath({
+                pathname: `/${feedCollection.name}/rss.xml`,
+                locale,
+                settings: localization,
+              })
+            : null;
+        const collectionFeedTitle = feedCollection?.schema.rss?.title ?? feedCollection?.label;
+        const collectionFeedHead = collectionFeedPath
+          ? `<link rel="alternate" type="application/rss+xml" title="${escapeHeadAttribute(collectionFeedTitle ?? "RSS feed")}" href="${escapeHeadAttribute(collectionFeedPath)}" />`
+          : undefined;
+
+        const rendered = await renderPageToHtml(
+          localizedTemplate.page,
+          routePathname,
+          adapter,
+          logger,
+          policy.accessMode,
+          cmsOptions,
+          localizedTemplate.version ? locale : undefined,
+          localizedTemplate.version
+            ? resolveContentLocaleDirection(
+                localization.locales.find((item) => item.code === locale)!,
+              )
+            : undefined,
+          localizedTemplate.version
+            ? {
+                title: localizedTemplate.version.seo.title ?? undefined,
+                description: localizedTemplate.version.seo.description ?? undefined,
+                ogImage: localizedTemplate.version.seo.ogImage ?? undefined,
+                noindex: localizedTemplate.version.seo.noindex,
+                nofollow: localizedTemplate.version.seo.nofollow,
+              }
+            : undefined,
+          collectionFeedHead,
+          localizedTemplate.version
+            ? await resolveLocalizedLayout({
+                adapter,
+                locale,
+                layoutId: localizedTemplate.version.layoutId ?? localizedTemplate.page.layout ?? null,
+                fallbackLayoutVersion: localizedTemplate.version.fallbackLayoutVersion,
+              })
+            : null,
+        );
+        html = rendered.html;
+        if (
+          !isAuthenticatedPreview &&
+          feedCollection?.supports.includes("comments") &&
+          feedCollection.schema.comments?.enabled
+        ) {
+          try {
+            const comments = await listApprovedPublicComments(adapter, {
+              collectionId: collectionRoute.entryContext.collectionId,
+              entryId: collectionRoute.entryContext.entryId,
+              locale,
+              limit: 25,
+            });
+            html = appendToBody(
+              html,
+              renderPublicCommentSection({
+                collectionId: collectionRoute.entryContext.collectionId,
+                entryId: collectionRoute.entryContext.entryId,
+                locale,
+                comments,
+              }),
+            );
+          } catch {
+            // A publication or policy change during render hides comments.
+          }
+        }
+        Astro.response.headers.set('content-security-policy', rendered.cspHeaderValue);
+
+        logger('info', `Rendered CMS template route for "${pageSlug}"`, {
+          mode: isAuthenticatedPreview ? 'preview' : 'published',
+          collectionId: collectionRoute.entryContext.collectionId,
+          entryId: collectionRoute.entryContext.entryId,
+          size: html.length,
+        });
+
+        recordSsrServed();
+
+        if (routeDecision.usePublicCacheTags) {
+          const cacheTags = [
+            ...getPublicPageCacheTags({
+              id: collectionRoute.templatePage.id,
+              slug: collectionRoute.templatePage.slug,
+              ...(localizedTemplate.version
+                ? {
+                    locale,
+                    version: localizedTemplate.version.version,
+                    pathnameKey: routePathname,
+                  }
+                : {}),
+            }),
+            ...getPublicCollectionEntryCacheTags({
+              collectionId: collectionRoute.entryContext.collectionId,
+              entryId: collectionRoute.entryContext.entryId,
+              templatePageId: collectionRoute.templatePage.id,
+            }),
+          ];
+          Astro.response.headers.set(
+            'cache-tag',
+            [...new Set(cacheTags)].join(','),
+          );
+        }
+
+        setCacheHeaders(
+          Astro.response,
+          routeDecision.cacheProfile,
+        );
+      }
+    } else {
+      // Step 4: Verify hierarchical path matches parent-child relationships
+      const { isValid, reason } = localizedRoute
+        ? { isValid: true }
+        : await verifyPageHierarchy(page, segments, loadPage);
+
+      if (!isValid) {
+        logger('warn', `Invalid hierarchy for "${pageSlug}": ${reason}`);
+        // Build the canonical path from the page's own parent chain and
+        // redirect to it. This handles cases where:
+        //   - A child page is visited at its bare slug ("/child" → "/parent/child")
+        //   - A wrong parent segment is in the URL ("/wrong/child" → "/parent/child")
+        // This provides a safety net for old bookmarks, shared links, and
+        // ensures crawlers converge on the canonical URL.
+        const canonicalPath = await buildCanonicalPagePath(page, loadPage);
+        if (canonicalPath !== `/${rawSlug}`) {
+          logger('info', `Redirecting to canonical path "${canonicalPath}"`);
+          return Astro.redirect(canonicalPath, 301);
+        }
+        return Astro.rewrite('/404');
+      } else {
+        const policy = await adapter.getPagePolicy(page.id);
+
+        if (!policy) {
+          logger('error', `Missing page policy for "${leafSlug}"`, {
+            pageId: page.id,
+          });
+          return Astro.rewrite('/404');
+        }
+
+        let hasValidPasswordGrant = false;
+
+        if (!isAuthenticatedPreview && policy.accessMode === 'password') {
+          const cookieName = buildPageAccessCookieName(policy.id);
+          const rawAccessToken = Astro.cookies.get(cookieName)?.value;
+
+          if (rawAccessToken) {
+            const tokenHash = await hashToken(rawAccessToken);
+            const accessSession = await adapter.getPageAccessSession(
+              policy.id,
+              tokenHash,
+            );
+
+            hasValidPasswordGrant = hasValidPageAccessSession({
+              policy,
+              session: accessSession,
+            });
+
+            if (hasValidPasswordGrant) {
+              await adapter.touchPageAccessSession(tokenHash);
+            } else {
+              if (accessSession) {
+                await adapter.deletePageAccessSession(tokenHash);
+              }
+
+              clearPageAccessCookie({
+                cookies: Astro.cookies,
+                pageId: policy.id,
+              });
+            }
+          }
+        }
+
+        const routeDecision = evaluatePagePolicyRoute({
+          policy,
+          isAuthenticatedPreview,
+          hasValidPasswordGrant,
+          routeContext: "direct",
+        });
+
+        if (routeDecision.mode === 'rewrite-404') {
+          logger('info', `Policy rewrote "${pageSlug}" to 404`, {
+            systemRole: policy.systemRole,
+            accessMode: policy.accessMode,
+            mode: isAuthenticatedPreview ? 'preview' : 'public',
+          });
+          return Astro.rewrite('/404');
+        }
+
+        if (routeDecision.mode === 'render-password-gate') {
+          const sanitizedPolicy = sanitizePagePolicy(policy);
+          passwordGate = {
+            slug: sanitizedPolicy.slug,
+            title: sanitizedPolicy.promptTitle ?? 'Password required',
+            description:
+              sanitizedPolicy.promptDescription ??
+              'This page is protected. Enter the password to continue.',
+          };
+
+          Astro.response.status = 200;
+          setCacheHeaders(Astro.response, 'cookie-variant');
+
+          logger('info', `Rendering password gate for "${pageSlug}"`, {
+            pageId: policy.id,
+          });
+        } else {
+          logger('info', `Page validated: ${page.title}`, {
+            nodeCount: page.nodes?.length || 0,
+            hasLayout: !!page.layout,
+            mode: isAuthenticatedPreview ? 'preview' : 'public'
+          });
+
+          logger('info', `Rendering DSL for "${leafSlug}"`, {
+            mode: isAuthenticatedPreview ? 'preview' : 'published'
+          });
+
+          const localeAlternateHead = !isAuthenticatedPreview
+            ? await buildLocaleAlternateHead({
+                adapter,
+                page,
+                settings: localization,
+                baseUrl: siteSettings?.siteUrl ?? Astro.url.origin,
+              })
+            : undefined;
+          const localizedLayout = localizedRoute
+            ? await resolveLocalizedLayout({
+                adapter,
+                locale,
+                layoutId: localizedRoute.version.layoutId ?? page.layout ?? null,
+                fallbackLayoutVersion: localizedRoute.version.fallbackLayoutVersion,
+              })
+            : null;
+
+          const rendered = await renderPageToHtml(
+            page,
+            Astro.url.pathname,
+            adapter,
+            logger,
+            policy.accessMode,
+            undefined,
+            localizedRoute ? locale : undefined,
+            localizedRoute
+              ? resolveContentLocaleDirection(
+                  localization.locales.find((item) => item.code === locale)!,
+                )
+              : undefined,
+            localizedRoute
+              ? {
+                  title: localizedRoute.version.seo.title ?? undefined,
+                  description: localizedRoute.version.seo.description ?? undefined,
+                  ogImage: localizedRoute.version.seo.ogImage ?? undefined,
+                  canonical: resolveLocalizedCanonicalUrl({
+                    pathname: localizedRoute.route.pathname,
+                    locale,
+                    settings: localization,
+                    baseUrl: siteSettings?.siteUrl ?? Astro.url.origin,
+                  }),
+                  noindex: localizedRoute.version.seo.noindex,
+                  nofollow: localizedRoute.version.seo.nofollow,
+                }
+              : undefined,
+            localeAlternateHead,
+            localizedLayout,
+          );
+          html = rendered.html;
+          Astro.response.headers.set('content-security-policy', rendered.cspHeaderValue);
+
+          logger('info', `Generated HTML for "${leafSlug}"`, {
+            size: html?.length || 0
+          });
+          recordSsrServed();
+
+          if (routeDecision.usePublicCacheTags) {
+            setPublicCacheTags(Astro.response, {
+              id: page.id,
+              slug: page.slug,
+            }, localizedRoute?.version.layoutId ?? page.layout ?? null,
+            localizedRoute
+              ? {
+                  locale,
+                  version: localizedRoute.version.version,
+                  pathnameKey: localizedRoute.route.pathnameKey,
+                }
+              : null);
+          }
+
+          setCacheHeaders(
+            Astro.response,
+            routeDecision.cacheProfile,
+          );
+        }
+      }
+    }
+  }
+} catch (error) {
+  // Step 7: Error handling with detailed logging
+  const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+  const errorStack = error instanceof Error ? error.stack : undefined;
+
+  logger('error', `Request failed for "${Astro.url.pathname}"`, {
+    error: errorMessage,
+    stack: errorStack
+  });
+
+  Astro.response.status = 500;
+  setCacheHeaders(Astro.response, 'error');
+  html = null;
+}
+---
+
+{html ? (
+  <Fragment set:html={html} />
+) : passwordGate ? (
+  <html lang="en">
+    <head>
+      <meta charset="utf-8" />
+      <meta name="viewport" content="width=device-width, initial-scale=1" />
+      <meta name="robots" content="noindex, nofollow" />
+      <title>{passwordGate.title}</title>
+      <style>
+        :root {
+          color-scheme: light;
+          --gate-bg: radial-gradient(circle at top, rgba(16, 185, 129, 0.15), transparent 34%), linear-gradient(180deg, #f7fbfa 0%, #eff5f3 100%);
+          --gate-card: rgba(255, 255, 255, 0.92);
+          --gate-border: rgba(15, 23, 42, 0.08);
+          --gate-text: #10231d;
+          --gate-muted: #4d675f;
+          --gate-accent: #0f9f73;
+          --gate-accent-dark: #0c7c59;
+          --gate-shadow: 0 24px 80px rgba(16, 35, 29, 0.12);
+        }
+
+        * {
+          box-sizing: border-box;
+        }
+
+        body {
+          margin: 0;
+          min-height: 100vh;
+          display: grid;
+          place-items: center;
+          padding: 24px;
+          background: var(--gate-bg);
+          color: var(--gate-text);
+          font-family: "Instrument Sans", "Avenir Next", "Segoe UI", sans-serif;
+        }
+
+        main {
+          width: min(100%, 460px);
+        }
+
+        .gate-card {
+          background: var(--gate-card);
+          border: 1px solid var(--gate-border);
+          border-radius: 28px;
+          padding: 32px;
+          box-shadow: var(--gate-shadow);
+          backdrop-filter: blur(18px);
+        }
+
+        .gate-eyebrow {
+          margin: 0 0 12px;
+          font-size: 0.78rem;
+          font-weight: 700;
+          letter-spacing: 0.16em;
+          text-transform: uppercase;
+          color: var(--gate-accent-dark);
+        }
+
+        h1 {
+          margin: 0;
+          font-size: clamp(2rem, 5vw, 2.75rem);
+          line-height: 0.95;
+          letter-spacing: -0.04em;
+        }
+
+        .gate-copy {
+          margin: 16px 0 0;
+          font-size: 1rem;
+          line-height: 1.6;
+          color: var(--gate-muted);
+        }
+
+        .gate-form {
+          margin-top: 28px;
+          display: grid;
+          gap: 14px;
+        }
+
+        .gate-label {
+          display: grid;
+          gap: 8px;
+          font-size: 0.94rem;
+          font-weight: 600;
+        }
+
+        .gate-input {
+          width: 100%;
+          border: 1px solid rgba(15, 23, 42, 0.14);
+          border-radius: 14px;
+          padding: 14px 16px;
+          font: inherit;
+          background: rgba(255, 255, 255, 0.85);
+          color: inherit;
+        }
+
+        .gate-input:focus {
+          outline: 2px solid rgba(15, 159, 115, 0.24);
+          outline-offset: 2px;
+          border-color: rgba(15, 159, 115, 0.55);
+        }
+
+        .gate-submit {
+          appearance: none;
+          border: 0;
+          border-radius: 999px;
+          padding: 14px 18px;
+          font: inherit;
+          font-weight: 700;
+          color: white;
+          background: linear-gradient(135deg, var(--gate-accent) 0%, var(--gate-accent-dark) 100%);
+          cursor: pointer;
+        }
+
+        .gate-submit[disabled] {
+          opacity: 0.7;
+          cursor: wait;
+        }
+
+        .gate-error {
+          margin: 0;
+          min-height: 1.25rem;
+          font-size: 0.92rem;
+          color: #b42318;
+        }
+
+        .gate-meta {
+          margin-top: 20px;
+          font-size: 0.84rem;
+          color: var(--gate-muted);
+        }
+      </style>
+    </head>
+    <body>
+      <main>
+        <section class="gate-card">
+          <p class="gate-eyebrow">Protected page</p>
+          <h1>{passwordGate.title}</h1>
+          <p class="gate-copy">{passwordGate.description}</p>
+
+          <form class="gate-form" data-page-access-form data-page-slug={passwordGate.slug}>
+            <label class="gate-label" for="page-access-password">
+              Password
+              <input
+                class="gate-input"
+                id="page-access-password"
+                name="password"
+                type="password"
+                autocomplete="current-password"
+                required
+              />
+            </label>
+            <button class="gate-submit" type="submit">Continue</button>
+            <p class="gate-error" data-page-access-error aria-live="polite"></p>
+          </form>
+
+          <p class="gate-meta">Access is granted with a page-scoped cookie and rechecked whenever the policy changes.</p>
+        </section>
+      </main>
+
+      <script is:inline type="module">
+        import { actions } from 'astro:actions';
+
+        const form = document.querySelector('[data-page-access-form]');
+        if (form instanceof HTMLFormElement) {
+          const passwordInput = form.querySelector('input[name="password"]');
+          const errorElement = form.querySelector('[data-page-access-error]');
+          const submitButton = form.querySelector('button[type="submit"]');
+          const slug = form.dataset.pageSlug ?? '';
+
+          form.addEventListener('submit', async (event) => {
+            event.preventDefault();
+
+            if (!(passwordInput instanceof HTMLInputElement)) {
+              return;
+            }
+
+            const password = passwordInput.value;
+            if (!password) {
+              if (errorElement instanceof HTMLElement) {
+                errorElement.textContent = 'Password is required.';
+              }
+              return;
+            }
+
+            if (submitButton instanceof HTMLButtonElement) {
+              submitButton.disabled = true;
+            }
+            if (errorElement instanceof HTMLElement) {
+              errorElement.textContent = '';
+            }
+
+            try {
+              const result = await actions.pages.verifyAccessPassword({
+                slug,
+                password,
+              });
+
+              if (result.error) {
+                if (errorElement instanceof HTMLElement) {
+                  errorElement.textContent = result.error.message ?? 'Unable to unlock this page.';
+                }
+                return;
+              }
+
+              window.location.reload();
+            } catch (error) {
+              if (errorElement instanceof HTMLElement) {
+                errorElement.textContent =
+                  error instanceof Error
+                    ? error.message
+                    : 'Unable to unlock this page.';
+              }
+            } finally {
+              if (submitButton instanceof HTMLButtonElement) {
+                submitButton.disabled = false;
+              }
+            }
+          });
+        }
+      </script>
+    </body>
+  </html>
+) : Astro.response.status === 500 ? (
+  <html lang="en">
+    <head>
+      <meta charset="utf-8" />
+      <meta name="viewport" content="width=device-width, initial-scale=1" />
+      <meta name="robots" content="noindex, nofollow" />
+      <title>Server Error</title>
+    </head>
+    <body>
+      <h1>500 - Server Error</h1>
+      <p>An unexpected error occurred while processing your request.</p>
+    </body>
+  </html>
+) : (
+  <Fragment set:html={renderPublicNotFoundFallbackHtml({ pathname: Astro.url.pathname })} />
+)}

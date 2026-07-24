@@ -1,0 +1,11 @@
+# Minimal wrangler fixture for wrangler-config tests (OSS starter shape).
+
+[[d1_databases]]
+binding = "aria_db"
+database_name = "aria-db"
+database_id = "00000000-0000-0000-0000-000000000000"
+migrations_dir = "aria/migrations"
+
+[[r2_buckets]]
+binding = "aria_r2"
+bucket_name = "aria-media"

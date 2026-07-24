@@ -1,0 +1,84 @@
+/* CodeMirror editor tokens — derived from semantic theme variables */
+
+:root {
+  --code-editor-bg: var(--background);
+  --code-editor-foreground: var(--foreground);
+  --code-editor-gutter-foreground: color-mix(
+    in srgb,
+    var(--muted-foreground) 48%,
+    transparent
+  );
+  --code-editor-gutter-active: color-mix(
+    in srgb,
+    var(--foreground) 72%,
+    transparent
+  );
+  --code-editor-active-line: color-mix(
+    in srgb,
+    var(--foreground) 4%,
+    transparent
+  );
+  --code-editor-selection: color-mix(in srgb, var(--primary) 26%, transparent);
+  --code-editor-cursor: var(--foreground);
+  --code-editor-token-keyword: var(--primary);
+  --code-editor-token-name: var(--foreground);
+  --code-editor-token-string: color-mix(
+    in srgb,
+    var(--accent) 78%,
+    var(--foreground)
+  );
+  --code-editor-token-literal: color-mix(
+    in srgb,
+    var(--primary) 62%,
+    var(--foreground)
+  );
+  --code-editor-token-comment: var(--muted-foreground);
+  --code-editor-token-type: color-mix(
+    in srgb,
+    var(--accent) 54%,
+    var(--foreground)
+  );
+  --code-editor-token-tag: color-mix(
+    in srgb,
+    var(--primary) 52%,
+    var(--foreground)
+  );
+  --code-editor-token-punctuation: color-mix(
+    in srgb,
+    var(--foreground) 72%,
+    transparent
+  );
+  --code-editor-token-operator: color-mix(
+    in srgb,
+    var(--foreground) 84%,
+    transparent
+  );
+}
+
+.code-editor-shell .cm-editor {
+  height: 100%;
+}
+
+.code-editor-shell .cm-scroller {
+  min-height: 100%;
+}
+
+.code-editor-shell .cm-gutterElement {
+  padding-inline: 12px 10px;
+}
+
+.code-editor-shell .cm-content {
+  display: block;
+  font-family:
+    ui-monospace,
+    SFMono-Regular,
+    Menlo,
+    Monaco,
+    Consolas,
+    Liberation Mono,
+    Courier New,
+    monospace;
+  font-size: 13px;
+  line-height: 1.7;
+  tab-size: 2;
+}

@@ -1,0 +1,23 @@
+{
+  "id": "aria-to-notion",
+  "version": 1,
+  "direction": "aria_to_notion",
+  "eventType": "cms.entry.published.v1",
+  "payloadMode": "published_snapshot",
+  "ariaScopes": [],
+  "notionApiVersion": "2026-03-11",
+  "identity": "<siteId>:<collectionId>:<entryId>:<locale>",
+  "idempotency": "event.id",
+  "ordering": "aggregate.sequence",
+  "serializationKey": "<siteId>:<aggregate.type>:<aggregate.id>",
+  "sourceOfTruth": "aria",
+  "writeBackToAria": false,
+  "requiredNotionProperties": {
+    "Name": "title",
+    "Aria ID": "rich_text",
+    "Aria Version": "rich_text",
+    "Aria Sequence": "number",
+    "Aria Event ID": "rich_text",
+    "Aria Source": "select"
+  }
+}

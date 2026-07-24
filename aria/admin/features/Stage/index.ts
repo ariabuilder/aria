@@ -1,0 +1,95 @@
+/**
+ * Stage canvas: preview iframe, overlays, and editing surface.
+ */
+
+export { default as StageFrame } from "./components/StageFrame.vue";
+export { default as StageViewport } from "./components/StageViewport.vue";
+export { default as StageOverlays } from "./components/StageOverlays.vue";
+export { default as StageCanvasRuntime } from "./components/StageCanvasRuntime.vue";
+export { default as StageCommandRail } from "./components/StageCommandRail.vue";
+export { default as StageSidebar } from "./components/StageSidebar.vue";
+
+export {
+  useIframeSetup,
+  useComponentConversion,
+  useCanvasUtils,
+  useToolbarActions,
+  useStageSignals,
+  useOverlayListeners,
+  useSlotActions,
+  useDropReorder,
+  useStageSelection,
+  useStageAppBindings,
+  useStageShellSync,
+  useStageChromeState,
+  coerceStageEditingTabForItemType,
+  useStageEditingTabState,
+  useStageDialogState,
+  useStageWorkspaceState,
+  useStagePreviewState,
+  usePreview,
+  usePreviewSignals,
+  useStageDisplayState,
+  useStageShellBindings,
+  useStageShellActions,
+  useStageSidebarLoadActions,
+  useStageLayoutActions,
+  useStageHistoryActions,
+  useStagePersistenceActions,
+  useStageMutationActions,
+  useStageLoadingActions,
+  useStageContentSyncActions,
+  useStageComponentActions,
+  useStageCanvasActions,
+  useStageShellWorkspaceBindings,
+  useStageWorkspaceBindings,
+} from "./composables";
+
+export type {
+  UseIframeSetupOptions,
+  UseIframeSetupReturn,
+  UseComponentConversionOptions,
+  UseComponentConversionReturn,
+  UseStageSelectionOptions,
+  UseStageSelectionReturn,
+  UseStageAppBindingsDeps,
+  UseStageAppBindingsReturn,
+  UseStageShellSyncDeps,
+  UseStageChromeStateDeps,
+  UseStageChromeStateReturn,
+  UseStageEditingTabStateDeps,
+  UseStageEditingTabStateReturn,
+  UseStageDialogStateDeps,
+  UseStageDialogStateReturn,
+  UseStageWorkspaceStateDeps,
+  UseStageWorkspaceStateReturn,
+  UseStagePreviewStateReturn,
+  UseStageDisplayStateReturn,
+  UseStageShellBindingsDeps,
+  UseStageShellBindingsReturn,
+  UseStageShellActionsDeps,
+  UseStageShellActionsReturn,
+  UseStageSidebarLoadActionsDeps,
+  UseStageSidebarLoadActionsReturn,
+  UseStageLayoutActionsDeps,
+  UseStageLayoutActionsReturn,
+  UseStageHistoryActionsReturn,
+  UseStagePersistenceActionsDeps,
+  UseStagePersistenceActionsReturn,
+  UseStageMutationActionsDeps,
+  UseStageMutationActionsReturn,
+  UseStageLoadingActionsDeps,
+  UseStageLoadingActionsReturn,
+  UseStageContentSyncActionsDeps,
+  UseStageContentSyncActionsReturn,
+  UseStageComponentActionsDeps,
+  UseStageComponentActionsReturn,
+  UseStageCanvasActionsDeps,
+  UseStageCanvasActionsReturn,
+  UseStageShellWorkspaceBindingsDeps,
+  UseStageShellWorkspaceBindingsReturn,
+  UseStageWorkspaceBindingsDeps,
+  UseStageWorkspaceBindingsReturn,
+} from "./composables";
+
+export type * from "./types";

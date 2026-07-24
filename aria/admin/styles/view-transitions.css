@@ -1,0 +1,57 @@
+/* ==========================================================================
+   VIEW TRANSITIONS API — Scoped to opt-in elements only
+   ========================================================================== */
+
+/*
+ * NOTE: We do NOT animate ::view-transition-new(root) or ::view-transition-old(root)
+ * because that causes the entire page (including sidebar) to flash/translate on every
+ * navigation. Instead, only specific elements with view-transition-name will animate.
+ */
+
+/*
+ * Suppress the default root cross-fade — without this, the entire viewport
+ * (including the sidebar) fades on every navigation, which overrides snappy
+ * animations like spring opens.
+ */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+}
+
+/* Per-element duration via --vt-duration CSS custom property (default 400ms) */
+::view-transition-group(.page-title),
+::view-transition-group(.card-item),
+::view-transition-group(.table-row),
+::view-transition-group(.sidebar-item) {
+  animation-duration: var(--vt-duration, 400ms);
+  animation-timing-function: cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+/* Page title transitions */
+.page-title {
+  view-transition-name: page-title;
+}
+
+/* Card transitions */
+.card-item {
+  view-transition-name: var(--vt-name, none);
+}
+
+/* Table row transitions */
+.table-row {
+  view-transition-name: var(--vt-name, none);
+}
+
+/* Sidebar item transitions */
+.sidebar-item {
+  view-transition-name: var(--vt-name, none);
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*),
+  ::view-transition-new(*),
+  ::view-transition-old(*) {
+    animation: none !important;
+  }
+}

@@ -1,0 +1,272 @@
+{
+  "schemaVersion": 1,
+  "snapshotVersion": "84a53bf7bfdf0f24d6a8",
+  "packs": {
+    "lucide": {
+      "key": "lucide",
+      "label": "Lucide",
+      "category": "icon",
+      "catalogPath": "packs/lucide/catalog.595836a0332b750f.json",
+      "catalogHash": "595836a0332b750f",
+      "iconCount": 2019,
+      "shards": [
+        {
+          "key": "000-ax-ar",
+          "path": "packs/lucide/shards/000-ax-ar.dae4679d17ff6490.json",
+          "hash": "dae4679d17ff6490",
+          "count": 122
+        },
+        {
+          "key": "001-ar-bl",
+          "path": "packs/lucide/shards/001-ar-bl.af7f4b8e7b48d7ab.json",
+          "hash": "af7f4b8e7b48d7ab",
+          "count": 116
+        },
+        {
+          "key": "002-bl-ca",
+          "path": "packs/lucide/shards/002-bl-ca.f2f5b62e5bae108a.json",
+          "hash": "f2f5b62e5bae108a",
+          "count": 108
+        },
+        {
+          "key": "003-ca-ci",
+          "path": "packs/lucide/shards/003-ca-ci.0ac7892923b76b94.json",
+          "hash": "0ac7892923b76b94",
+          "count": 123
+        },
+        {
+          "key": "004-ci-cr",
+          "path": "packs/lucide/shards/004-ci-cr.0ca194b84c039bde.json",
+          "hash": "0ca194b84c039bde",
+          "count": 119
+        },
+        {
+          "key": "005-cr-fi",
+          "path": "packs/lucide/shards/005-cr-fi.3277fb06a59d7986.json",
+          "hash": "3277fb06a59d7986",
+          "count": 114
+        },
+        {
+          "key": "006-fi-fo",
+          "path": "packs/lucide/shards/006-fi-fo.c7b1f2e99cab81a1.json",
+          "hash": "c7b1f2e99cab81a1",
+          "count": 106
+        },
+        {
+          "key": "007-fo-gr",
+          "path": "packs/lucide/shards/007-fo-gr.525091aaf1a573d8.json",
+          "hash": "525091aaf1a573d8",
+          "count": 113
+        },
+        {
+          "key": "008-gr-la",
+          "path": "packs/lucide/shards/008-gr-la.7232b038e0369eb9.json",
+          "hash": "7232b038e0369eb9",
+          "count": 111
+        },
+        {
+          "key": "009-la-me",
+          "path": "packs/lucide/shards/009-la-me.af7f6ddc7c1a7ebd.json",
+          "hash": "af7f6ddc7c1a7ebd",
+          "count": 119
+        },
+        {
+          "key": "010-me-no",
+          "path": "packs/lucide/shards/010-me-no.05d24e4278fe50e9.json",
+          "hash": "05d24e4278fe50e9",
+          "count": 119
+        },
+        {
+          "key": "011-no-pi",
+          "path": "packs/lucide/shards/011-no-pi.bc1f63ae7a03e84d.json",
+          "hash": "bc1f63ae7a03e84d",
+          "count": 110
+        },
+        {
+          "key": "012-pi-ro",
+          "path": "packs/lucide/shards/012-pi-ro.17c24f3ffa870e0e.json",
+          "hash": "17c24f3ffa870e0e",
+          "count": 108
+        },
+        {
+          "key": "013-rs-sk",
+          "path": "packs/lucide/shards/013-rs-sk.4d8a073931064eb4.json",
+          "hash": "4d8a073931064eb4",
+          "count": 112
+        },
+        {
+          "key": "014-sk-sq",
+          "path": "packs/lucide/shards/014-sk-sq.af3fa5d2b6bdb618.json",
+          "hash": "af3fa5d2b6bdb618",
+          "count": 118
+        },
+        {
+          "key": "015-sq-to",
+          "path": "packs/lucide/shards/015-sq-to.9f7a25e2b82fbe76.json",
+          "hash": "9f7a25e2b82fbe76",
+          "count": 117
+        },
+        {
+          "key": "016-to-vo",
+          "path": "packs/lucide/shards/016-to-vo.235fe49010dbe5fd.json",
+          "hash": "235fe49010dbe5fd",
+          "count": 116
+        },
+        {
+          "key": "017-vo-zo",
+          "path": "packs/lucide/shards/017-vo-zo.cbcb4b0cc9e697f1.json",
+          "hash": "cbcb4b0cc9e697f1",
+          "count": 68
+        }
+      ]
+    },
+    "coreui-brands": {
+      "key": "coreui-brands",
+      "label": "CoreUI Brands",
+      "category": "brand",
+      "catalogPath": "packs/coreui-brands/catalog.ccb97306ee0217d0.json",
+      "catalogHash": "ccb97306ee0217d0",
+      "iconCount": 830,
+      "shards": [
+        {
+          "key": "000-50-ap",
+          "path": "packs/coreui-brands/shards/000-50-ap.f29e9cc21317923c.json",
+          "hash": "f29e9cc21317923c",
+          "count": 39
+        },
+        {
+          "key": "001-ap-az",
+          "path": "packs/coreui-brands/shards/001-ap-az.681c7e97eb523716.json",
+          "hash": "681c7e97eb523716",
+          "count": 29
+        },
+        {
+          "key": "002-ba-ca",
+          "path": "packs/coreui-brands/shards/002-ba-ca.aa7f12755d55620e.json",
+          "hash": "aa7f12755d55620e",
+          "count": 38
+        },
+        {
+          "key": "003-ca-co",
+          "path": "packs/coreui-brands/shards/003-ca-co.3717a37030c9751f.json",
+          "hash": "3717a37030c9751f",
+          "count": 36
+        },
+        {
+          "key": "004-co-co",
+          "path": "packs/coreui-brands/shards/004-co-co.ada151f8cfb00f9b.json",
+          "hash": "ada151f8cfb00f9b",
+          "count": 5
+        },
+        {
+          "key": "005-co-cr",
+          "path": "packs/coreui-brands/shards/005-co-cr.727ccdf744154e1f.json",
+          "hash": "727ccdf744154e1f",
+          "count": 16
+        },
+        {
+          "key": "006-cr-dr",
+          "path": "packs/coreui-brands/shards/006-cr-dr.c150e72b729aa677.json",
+          "hash": "c150e72b729aa677",
+          "count": 42
+        },
+        {
+          "key": "007-dr-fe",
+          "path": "packs/coreui-brands/shards/007-dr-fe.25ae649cd0fda5e7.json",
+          "hash": "25ae649cd0fda5e7",
+          "count": 45
+        },
+        {
+          "key": "008-fi-gl",
+          "path": "packs/coreui-brands/shards/008-fi-gl.abe24a45a99ce799.json",
+          "hash": "abe24a45a99ce799",
+          "count": 35
+        },
+        {
+          "key": "009-gl-gr",
+          "path": "packs/coreui-brands/shards/009-gl-gr.1cb522030542c9c9.json",
+          "hash": "1cb522030542c9c9",
+          "count": 29
+        },
+        {
+          "key": "010-gr-ht",
+          "path": "packs/coreui-brands/shards/010-gr-ht.2a5279d8f37427ea.json",
+          "hash": "2a5279d8f37427ea",
+          "count": 34
+        },
+        {
+          "key": "011-ht-jo",
+          "path": "packs/coreui-brands/shards/011-ht-jo.b67296c3ca432ebd.json",
+          "hash": "b67296c3ca432ebd",
+          "count": 36
+        },
+        {
+          "key": "012-jq-lg",
+          "path": "packs/coreui-brands/shards/012-jq-lg.3dba86caf74ce764.json",
+          "hash": "3dba86caf74ce764",
+          "count": 40
+        },
+        {
+          "key": "013-li-mi",
+          "path": "packs/coreui-brands/shards/013-li-mi.966cab335aabdd78.json",
+          "hash": "966cab335aabdd78",
+          "count": 45
+        },
+        {
+          "key": "014-mi-oc",
+          "path": "packs/coreui-brands/shards/014-mi-oc.7f3e4961a848a056.json",
+          "hash": "7f3e4961a848a056",
+          "count": 45
+        },
+        {
+          "key": "015-oc-po",
+          "path": "packs/coreui-brands/shards/015-oc-po.6181dc1108d463e8.json",
+          "hash": "6181dc1108d463e8",
+          "count": 48
+        },
+        {
+          "key": "016-po-re",
+          "path": "packs/coreui-brands/shards/016-po-re.4e570aa97f59514d.json",
+          "hash": "4e570aa97f59514d",
+          "count": 39
+        },
+        {
+          "key": "017-re-sk",
+          "path": "packs/coreui-brands/shards/017-re-sk.093fdc74ac8a4a12.json",
+          "hash": "093fdc74ac8a4a12",
+          "count": 44
+        },
+        {
+          "key": "018-sk-st",
+          "path": "packs/coreui-brands/shards/018-sk-st.8f05a13c5ef2f918.json",
+          "hash": "8f05a13c5ef2f918",
+          "count": 42
+        },
+        {
+          "key": "019-st-te",
+          "path": "packs/coreui-brands/shards/019-st-te.444c9a52eacafa0b.json",
+          "hash": "444c9a52eacafa0b",
+          "count": 35
+        },
+        {
+          "key": "020-te-va",
+          "path": "packs/coreui-brands/shards/020-te-va.6599fa56d33693fd.json",
+          "hash": "6599fa56d33693fd",
+          "count": 47
+        },
+        {
+          "key": "021-ve-yx",
+          "path": "packs/coreui-brands/shards/021-ve-yx.655dfd753c5058a4.json",
+          "hash": "655dfd753c5058a4",
+          "count": 45
+        },
+        {
+          "key": "022-ya-zu",
+          "path": "packs/coreui-brands/shards/022-ya-zu.7f210847eb84566f.json",
+          "hash": "7f210847eb84566f",
+          "count": 16
+        }
+      ]
+    }
+  }
+}
