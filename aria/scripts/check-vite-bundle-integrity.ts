@@ -38,6 +38,7 @@ type BundleProblem = {
   message: string;
 };
 
+/** Recursively lists files below a generated bundle directory. */
 async function listFiles(directory: string): Promise<string[]> {
   const entries = await readdir(directory, { withFileTypes: true });
   const files = await Promise.all(
@@ -49,6 +50,7 @@ async function listFiles(directory: string): Promise<string[]> {
   return files.flat();
 }
 
+/** Collects configured Cloudflare binding names from nested configuration data. */
 function collectBindingNames(
   name: ts.BindingName,
   bindings: Set<string>,
@@ -161,6 +163,7 @@ function propertyNameText(name: ts.PropertyName): string | undefined {
   return undefined;
 }
 
+/** Checks the generated Worker entry for unsupported runtime dependencies. */
 async function inspectWorkerEntry(): Promise<BundleProblem[]> {
   const source = await readFile(workerEntryPath, "utf8");
   const sourceFile = ts.createSourceFile(
@@ -243,6 +246,7 @@ async function inspectWorkerEntry(): Promise<BundleProblem[]> {
   return problems;
 }
 
+/** Inspects a Worker runtime chunk for imports and globals that workerd cannot load. */
 async function inspectWorkerRuntimeFile(
   filePath: string,
 ): Promise<BundleProblem[]> {
@@ -271,6 +275,7 @@ function bindingNames<T extends { binding: string }>(
   return new Set(bindings.map(({ binding }) => binding));
 }
 
+/** Checks every generated Wrangler bundle file for integrity problems. */
 async function inspectWranglerBundle(): Promise<BundleProblem[]> {
   const source = await readFile(wranglerConfigPath, "utf8");
   const parsedJson: unknown = JSON.parse(source);
@@ -354,6 +359,7 @@ async function inspectWranglerBundle(): Promise<BundleProblem[]> {
   return problems;
 }
 
+/** Runs all generated bundle integrity checks and reports any problems. */
 async function main(): Promise<void> {
   const entries = await readdir(clientAssetsDir, { withFileTypes: true });
   const workerRuntimeFiles = (await listFiles(workerServerDir)).filter((file) =>

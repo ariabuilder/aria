@@ -10,6 +10,7 @@ import {
   type CommandResult,
 } from "./node-command";
 
+/** Adds Wrangler-specific defaults while preserving caller options. */
 function wranglerOptions(options: CommandOptions): CommandOptions {
   return {
     ...options,
@@ -22,6 +23,7 @@ function wranglerOptions(options: CommandOptions): CommandOptions {
   };
 }
 
+/** Runs Wrangler synchronously through its installed JavaScript entrypoint. */
 export function runWranglerSync(
   args: readonly string[],
   options: CommandOptions = {},
@@ -34,6 +36,7 @@ export function runWranglerSync(
   );
 }
 
+/** Runs Wrangler asynchronously through its installed JavaScript entrypoint. */
 export function runWrangler(
   args: readonly string[],
   options: CommandOptions = {},
@@ -41,18 +44,21 @@ export function runWrangler(
   return runPackageBin("wrangler", "wrangler", args, wranglerOptions(options));
 }
 
+/** Restricts a temporary directory to its owner on supported platforms. */
 function protectDirectorySync(directory: string): void {
   if (process.platform !== "win32") {
     chmodSync(directory, 0o700);
   }
 }
 
+/** Restricts a temporary directory to its owner on supported platforms. */
 async function protectDirectory(directory: string): Promise<void> {
   if (process.platform !== "win32") {
     await chmod(directory, 0o700);
   }
 }
 
+/** Runs a synchronous operation with SQL stored in a protected temporary file. */
 export function withTemporarySqlFileSync<T>(
   sql: string,
   operation: (sqlPath: string) => T,
@@ -73,6 +79,7 @@ export function withTemporarySqlFileSync<T>(
   }
 }
 
+/** Runs an asynchronous operation with SQL stored in a protected temporary file. */
 export async function withTemporarySqlFile<T>(
   sql: string,
   operation: (sqlPath: string) => Promise<T>,

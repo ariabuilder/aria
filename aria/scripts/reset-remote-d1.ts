@@ -216,6 +216,7 @@ export function buildRemoteD1ResetSql(
   ].join("\n");
 }
 
+/** Parses the verification query returned after a remote reset. */
 export function parseResetVerification(json: string): {
   migrationCount: number;
   userCount: number;
@@ -237,6 +238,7 @@ export function parseResetVerification(json: string): {
   return { userCount, migrationCount };
 }
 
+/** Runs Wrangler and returns its JSON output. */
 function runWranglerJson(args: readonly string[]): string {
   return runWranglerSync([...args, ...WRANGLER_CONFIG_ARGS], {
     cwd: process.cwd(),
@@ -246,6 +248,7 @@ function runWranglerJson(args: readonly string[]): string {
   }).stdout;
 }
 
+/** Executes SQL through Wrangler using a protected temporary file. */
 function runWranglerSqlJson(args: readonly string[], sql: string): string {
   return runWranglerJson([...args, "--command", sql]);
 }
@@ -274,6 +277,7 @@ This resets only the configured remote D1 database. KV, R2, Queues, and
 Durable Object state are not modified.`);
 }
 
+/** Validates reset options, backs up the database, and performs the reset. */
 async function main(): Promise<void> {
   const options = parseRemoteResetArgs(
     process.argv.slice(2),

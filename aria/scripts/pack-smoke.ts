@@ -30,6 +30,7 @@ function formatBytes(bytes: number): string {
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 }
 
+/** Runs npm through its JavaScript CLI inside the package smoke workspace. */
 async function runNpm(
   args: string[],
   options: { cwd?: string; env?: NodeJS.ProcessEnv } = {},

@@ -19,6 +19,7 @@ const CLOUDFLARE_FREE_GZIP_WORKER_LIMIT_BYTES = 3_000_000;
 const MAX_STATIC_ASSET_FILES = 20_000;
 const MAX_STATIC_ASSET_BYTES = 25 * 1024 * 1024;
 
+/** Recursively lists generated files for Cloudflare free-tier checks. */
 async function listFiles(directory: string): Promise<string[]> {
   const entries = await readdir(directory, { withFileTypes: true });
   const nested = await Promise.all(
@@ -51,6 +52,7 @@ async function inspectWorkerUpload(): Promise<number> {
   return Math.ceil(Number(match[1]) * 1024);
 }
 
+/** Runs every Cloudflare bundle and static asset limit check. */
 async function main(): Promise<void> {
   const [gzipWorkerBytes, assetFiles] = await Promise.all([
     inspectWorkerUpload(),

@@ -44,6 +44,7 @@ function readApiToken(): string {
   return token;
 }
 
+/** Executes one SQL statement through the Cloudflare D1 HTTP API. */
 async function executeD1HttpQuery(input: {
   accountId: string;
   databaseId: string;
@@ -137,6 +138,7 @@ function createHttpPreparedStatement(input: {
   };
 }
 
+/** Creates a remote D1 adapter that sends statements through Cloudflare's API. */
 export async function createD1HttpDatabase(input?: {
   binding?: string;
   accountId?: string;

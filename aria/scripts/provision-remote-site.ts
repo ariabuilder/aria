@@ -2,6 +2,7 @@ import { resolveSiteUrl } from "./bootstrap-remote-storage";
 import { applyD1Migrations } from "./apply-d1-migrations";
 import { isMainModule } from "./lib/node-command";
 
+/** Provisions remote storage, applies migrations, and seeds starter content. */
 export async function provisionRemoteSite(): Promise<void> {
   const claimUrl = resolveSiteUrl();
   console.log("🔧 Provisioning remote Aria site...\n");

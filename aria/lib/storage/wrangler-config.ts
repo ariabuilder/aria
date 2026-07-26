@@ -26,6 +26,7 @@ export const WRANGLER_CONFIG_CANDIDATES = [
   "wrangler.jsonc",
 ] as const;
 
+/** Finds the first supported Wrangler configuration in a directory. */
 export function resolveWranglerConfigPath(cwd = process.cwd()): string | null {
   for (const filename of WRANGLER_CONFIG_CANDIDATES) {
     const candidate = resolve(cwd, filename);
@@ -36,6 +37,7 @@ export function resolveWranglerConfigPath(cwd = process.cwd()): string | null {
   return null;
 }
 
+/** Reads the Worker name from a supported Wrangler configuration file. */
 export function readWorkerNameFromWranglerConfig(
   configPath: string,
 ): string | null {
@@ -51,12 +53,14 @@ export function readWorkerNameFromWranglerConfig(
   return raw.match(/"name"\s*:\s*"([^"]+)"/)?.[1] ?? null;
 }
 
+/** Reads a Wrangler TOML file from disk. */
 export function readWranglerToml(
   configPath = resolve(process.cwd(), "wrangler.toml"),
 ): string {
   return readFileSync(configPath, "utf-8");
 }
 
+/** Parses a named D1 binding from Wrangler TOML. */
 export function parseD1BindingFromWrangler(
   toml: string,
   bindingName = process.env.ARIA_D1_BINDING || "aria_db",
@@ -91,6 +95,7 @@ export function parseD1BindingFromWrangler(
   throw new Error(`D1 binding "${bindingName}" was not found in wrangler.toml`);
 }
 
+/** Parses a named R2 binding from Wrangler TOML. */
 export function parseR2BindingFromWrangler(
   toml: string,
   bindingName = process.env.ARIA_R2_BINDING || "aria_r2",
@@ -123,11 +128,13 @@ export function parseR2BindingFromWrangler(
   throw new Error(`R2 binding "${bindingName}" was not found in wrangler.toml`);
 }
 
+/** Returns the public R2 URL declared in a Wrangler TOML file. */
 export function readR2PublicUrlFromWrangler(toml: string): string | undefined {
   const match = toml.match(/^\s*R2_PUBLIC_URL\s*=\s*"([^"]+)"/m);
   return match?.[1];
 }
 
+/** Locates the active local Wrangler D1 SQLite database, if one exists. */
 export function resolveLocalWranglerD1SqlitePath(
   cwd = process.cwd(),
 ): string | null {

@@ -8,6 +8,7 @@ const workspaceRoot = resolve(import.meta.dirname, "../..");
 
 type RuntimeTarget = "cloudflare" | "node";
 
+/** Builds the environment variables needed for an Aria runtime target. */
 function runtimeEnvironment(target: RuntimeTarget): NodeJS.ProcessEnv {
   return {
     ARIA_RUNTIME: target,
@@ -21,6 +22,7 @@ function runtimeEnvironment(target: RuntimeTarget): NodeJS.ProcessEnv {
   };
 }
 
+/** Runs a repository TypeScript script from the workspace root. */
 async function runScript(
   script: string,
   args: readonly string[] = [],
@@ -31,6 +33,7 @@ async function runScript(
   });
 }
 
+/** Runs Astro with the selected Aria runtime environment. */
 async function runAstro(
   args: readonly string[],
   runtime?: RuntimeTarget,
@@ -42,6 +45,7 @@ async function runAstro(
   });
 }
 
+/** Builds the Cloudflare bundle and runs its post-build validation checks. */
 export async function buildCloudflare(): Promise<void> {
   await runScript("aria/scripts/generate-icon-assets.ts");
   await runScript("aria/scripts/check-icon-worker-boundary.ts");
@@ -52,6 +56,7 @@ export async function buildCloudflare(): Promise<void> {
   await runScript("aria/scripts/check-cloudflare-free-limits.ts");
 }
 
+/** Dispatches a cross-platform project command to its underlying toolchain. */
 export async function runProjectCommand(
   command: string,
   args: readonly string[] = [],

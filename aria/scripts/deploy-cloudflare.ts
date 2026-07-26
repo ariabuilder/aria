@@ -291,6 +291,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
 
+/** Creates the production command runner used by the deployment workflow. */
 function createCommandRunner(): DeployCommandRunner {
   const environment = { ...process.env, CI: "true" };
   return {
@@ -475,6 +476,7 @@ export function decideApiKeyringDeployment(
   return "preserve";
 }
 
+/** Throws when an allowed-to-fail command did not complete successfully. */
 function requireSuccessfulCommand(
   result: CapturedCommandResult,
   description: string,
@@ -506,6 +508,7 @@ function readRemoteSecretNames(runner: DeployCommandRunner): string[] {
   );
 }
 
+/** Reads protected key requirements from every remote credential table. */
 function readProtectedKeyState(
   runner: DeployCommandRunner,
   databaseBinding: string,
@@ -533,6 +536,7 @@ function readProtectedKeyState(
   );
 }
 
+/** Reads queue consumers and returns null when the queue does not exist. */
 function readQueueConsumers(
   runner: DeployCommandRunner,
   queueName: string,
@@ -592,6 +596,7 @@ function assertQueueOwnership(
   }
 }
 
+/** Creates missing queues and protects queues owned by another Worker. */
 function ensureQueues(
   runner: DeployCommandRunner,
   workerName: string,
@@ -711,6 +716,7 @@ function deployWorkerAndCapture(
   return `${result.stdout}\n${result.stderr}`;
 }
 
+/** Uploads Worker secrets from a protected file that is always removed. */
 async function uploadWorkerSecrets(
   runner: DeployCommandRunner,
   secrets: Record<string, string>,
@@ -787,6 +793,7 @@ export type DeployCloudflareOptions = Readonly<{
   workerName?: string;
 }>;
 
+/** Runs the complete Cloudflare provisioning and Worker deployment workflow. */
 export async function deployCloudflare(
   options: DeployCloudflareOptions = {},
 ): Promise<ApiKeyringDeploymentDecision> {

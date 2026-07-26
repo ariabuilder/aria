@@ -1,6 +1,7 @@
 import { readCloudflareAccountIdFromEnvironment } from "../../lib/cloudflare/account";
 import { runWrangler } from "./wrangler-command";
 
+/** Resolves the Cloudflare account ID from the environment or Wrangler login. */
 export async function resolveCloudflareAccountId(): Promise<string> {
   const fromEnvironment = readCloudflareAccountIdFromEnvironment();
   if (fromEnvironment) {

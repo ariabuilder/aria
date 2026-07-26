@@ -59,6 +59,7 @@ function interpolateSql(sql: string, args: readonly unknown[]): string {
   return sql.replace(/\?/g, () => sqlLiteral(args[nextIndex++]));
 }
 
+/** Executes interpolated SQL through Wrangler and returns its D1 result. */
 async function executeLiteralRemoteSql<T extends D1QueryRow>(input: {
   binding: string;
   sql: string;
@@ -178,6 +179,7 @@ function createLiteralWranglerD1Database(
   };
 }
 
+/** Reports whether an Aria-specific Cloudflare API token is configured. */
 function hasAriaCloudflareApiToken(): boolean {
   return Boolean(
     process.env.ARIA_CLOUDFLARE_API_TOKEN?.trim() ||

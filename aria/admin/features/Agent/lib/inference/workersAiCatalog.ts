@@ -21,6 +21,7 @@ function resolveWorkersAiApiToken(): string | undefined {
   );
 }
 
+/** Resolves the Workers AI account without importing Node-only tooling in Workers. */
 async function resolveWorkersAiAccountId(): Promise<string | undefined> {
   const fromEnvironment = readCloudflareAccountIdFromEnvironment();
   if (fromEnvironment) {
@@ -50,6 +51,7 @@ function normalizeWorkersAiModel(entry: {
   return { id, name };
 }
 
+/** Fetches the Workers AI model catalog with a static fallback on failure. */
 export async function fetchWorkersAiCatalog(): Promise<CatalogModel[]> {
   const token = resolveWorkersAiApiToken();
   if (!token) {

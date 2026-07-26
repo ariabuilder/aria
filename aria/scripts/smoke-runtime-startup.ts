@@ -13,6 +13,7 @@ const STARTUP_PATH = "/api/v1/openapi.json";
 const STARTUP_TIMEOUT_MS = 90_000;
 type RuntimeTarget = "cloudflare" | "node";
 
+/** Reserves and releases an available local port for a runtime smoke test. */
 async function availablePort(): Promise<number> {
   const server = createServer();
   await new Promise<void>((resolve, reject) => {
@@ -30,10 +31,12 @@ async function availablePort(): Promise<number> {
   return address.port;
 }
 
+/** Formats captured command output for startup failure messages. */
 function commandOutput(label: string, output: string): string {
   return `${label}:\n${output.trim() || "(none)"}`;
 }
 
+/** Throws when the development server exits before it becomes ready. */
 export function assertServerStillRunning(input: {
   result: CommandResult | undefined;
   runtime: RuntimeTarget;
@@ -56,10 +59,12 @@ export function assertServerStillRunning(input: {
   );
 }
 
+/** Treats any non-server-error HTTP response as proof of runtime readiness. */
 export function isReadyResponse(status: number): boolean {
   return status < 500;
 }
 
+/** Polls a runtime endpoint until it responds or the startup deadline expires. */
 async function waitForServer(input: {
   result: () => CommandResult | undefined;
   runtime: RuntimeTarget;
@@ -95,6 +100,7 @@ async function waitForServer(input: {
   );
 }
 
+/** Starts one runtime, verifies readiness, and always stops the child process. */
 async function smokeRuntime(input: {
   port: number;
   runtime: RuntimeTarget;

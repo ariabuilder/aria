@@ -13,6 +13,7 @@ import { runWranglerSync } from "./lib/wrangler-command";
 const GENERATED_SQL_DIR = resolve(process.cwd(), "aria/storage/generated");
 const OUTPUT_SQL = resolve(GENERATED_SQL_DIR, "seed-starter-cms-entries.sql");
 
+/** Adds any missing starter seed records to the remote D1 database. */
 async function main(): Promise<void> {
   const databaseBinding = process.env.ARIA_D1_BINDING || "aria_db";
   mkdirSync(GENERATED_SQL_DIR, { recursive: true });

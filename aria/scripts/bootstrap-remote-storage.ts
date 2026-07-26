@@ -136,6 +136,7 @@ function collectionIdByNameSql(collectionName: string): string {
   return `(SELECT id FROM aria_collections WHERE name = ${sqlLiteral(collectionName)} LIMIT 1)`;
 }
 
+/** Appends SQL for one collection and its configured fields. */
 function appendCollectionInsert(
   buffer: SqlBuffer,
   collection: AriaCollection,
@@ -174,6 +175,7 @@ function appendCollectionInsert(
   );
 }
 
+/** Appends starter layout records and their serialized design data. */
 function appendStarterLayouts(
   buffer: SqlBuffer,
   layouts: StarterLayoutSeed[],
@@ -206,6 +208,7 @@ function appendStarterLayouts(
   }
 }
 
+/** Appends one generated system page to the bootstrap SQL buffer. */
 function appendSystemPage(
   buffer: SqlBuffer,
   page: PageDSL,
@@ -295,6 +298,7 @@ function appendStarterMainNavCollection(buffer: SqlBuffer, now: string): void {
   appendCollectionInsert(buffer, mainNavCollection);
 }
 
+/** Appends one starter CMS entry and its field values. */
 function appendStarterCmsEntryRecord(
   buffer: SqlBuffer,
   record: AriaEntryRecord,
@@ -337,12 +341,14 @@ function appendStarterCmsEntryRecord(
   }
 }
 
+/** Appends every starter CMS entry to the bootstrap SQL. */
 function appendStarterCmsEntryInserts(buffer: SqlBuffer, now: string): void {
   for (const record of buildStarterCmsEntryRecords(now)) {
     appendStarterCmsEntryRecord(buffer, record);
   }
 }
 
+/** Appends starter CMS collections, fields, entries, and system pages. */
 function appendStarterCms(buffer: SqlBuffer, now: string): void {
   const { tags, authors } = buildStarterCollectionDefinitions({
     collectionIdByName: {},
@@ -384,6 +390,7 @@ function appendStarterCms(buffer: SqlBuffer, now: string): void {
   );
 }
 
+/** Appends starter design-system records. */
 function appendStarterDesign(buffer: SqlBuffer, now: string): void {
   const rows = serializeStoredDesignSystemRows(buildStarterDesignSystem(), now);
   for (const row of rows) {
@@ -394,6 +401,7 @@ function appendStarterDesign(buffer: SqlBuffer, now: string): void {
   }
 }
 
+/** Appends the initial site settings record. */
 function appendStarterSiteSettings(buffer: SqlBuffer, now: string): void {
   buffer.append(
     `INSERT OR IGNORE INTO aria_site_settings (id, settings_json, updated_at) VALUES (?, ?, ?)`,
@@ -401,6 +409,7 @@ function appendStarterSiteSettings(buffer: SqlBuffer, now: string): void {
   );
 }
 
+/** Reads a named variable from the Wrangler TOML vars section. */
 function extractVarValueFromWranglerToml(
   contents: string,
   key: string,
@@ -502,6 +511,7 @@ export function resolveSiteUrl(
   }
 }
 
+/** Builds the SQL used to seed a fresh remote Aria database. */
 export async function buildBootstrapSql(): Promise<string> {
   const now = new Date().toISOString();
   const buffer = new SqlBuffer();
@@ -544,6 +554,7 @@ export async function buildStarterCmsEntriesOnlySql(): Promise<string> {
   ].join("\n");
 }
 
+/** Builds and applies the selected remote bootstrap operation. */
 async function main() {
   const databaseBinding = process.env.ARIA_D1_BINDING || "aria_db";
   const local = process.argv.includes("--local");

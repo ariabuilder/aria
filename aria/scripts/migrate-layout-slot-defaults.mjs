@@ -42,6 +42,7 @@ const FOOTER_CONTENT = [
   },
 ];
 
+/** Adds default content to empty header and footer slots. */
 function withSlotDefaults(slots) {
   return slots.map((slot) => {
     if (slot.name === "header" && !slot.defaultContent?.length) {

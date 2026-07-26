@@ -14,6 +14,7 @@ import {
 } from "../../storage/wrangler-config";
 import { runWranglerSync } from "../../../scripts/lib/wrangler-command";
 
+/** Creates an R2 bucket adapter backed by shell-independent Wrangler commands. */
 export function createWranglerCliR2Bucket(input: {
   local: boolean;
   bucketName?: string;

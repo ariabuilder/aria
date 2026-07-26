@@ -29,10 +29,12 @@ export type CommandOptions = Readonly<{
   stdio?: StdioOptions;
 }>;
 
+/** Builds a child-process environment without mutating the current process. */
 function commandEnvironment(overrides?: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
   return { ...process.env, ...overrides };
 }
 
+/** Resolves a package manifest and reports an actionable missing-install error. */
 function packageManifestPath(packageName: string, cwd = process.cwd()): string {
   try {
     return require.resolve(`${packageName}/package.json`, { paths: [cwd] });
@@ -44,6 +46,7 @@ function packageManifestPath(packageName: string, cwd = process.cwd()): string {
   }
 }
 
+/** Resolves the executable declared by an installed package manifest. */
 export function resolvePackageBin(
   packageName: string,
   binName?: string,
@@ -75,6 +78,7 @@ export function resolvePackageBin(
   return resolvedBin;
 }
 
+/** Locates npm's JavaScript CLI without relying on a platform-specific shim. */
 export function resolveNpmCli(env: NodeJS.ProcessEnv = process.env): string {
   const candidates = [
     env.npm_execpath,
@@ -94,10 +98,12 @@ export function resolveNpmCli(env: NodeJS.ProcessEnv = process.env): string {
   return npmCli;
 }
 
+/** Formats a Node command failure for a human-readable error message. */
 function formatFailure(args: readonly string[]): string {
   return `Command failed: ${process.execPath} ${args.join(" ")}`;
 }
 
+/** Runs Node synchronously with shell-independent argument handling. */
 export function runNodeArgsSync(
   args: readonly string[],
   options: CommandOptions = {},
@@ -132,6 +138,7 @@ export function runNodeArgsSync(
   return commandResult;
 }
 
+/** Runs Node asynchronously while collecting bounded stdout and stderr output. */
 export async function runNodeArgs(
   args: readonly string[],
   options: CommandOptions = {},
@@ -200,6 +207,7 @@ export async function runNodeArgs(
   return commandResult;
 }
 
+/** Runs a JavaScript entrypoint synchronously with the current Node executable. */
 export function runNodeFileSync(
   entrypoint: string,
   args: readonly string[] = [],
@@ -208,6 +216,7 @@ export function runNodeFileSync(
   return runNodeArgsSync([entrypoint, ...args], options);
 }
 
+/** Runs a JavaScript entrypoint asynchronously with the current Node executable. */
 export function runNodeFile(
   entrypoint: string,
   args: readonly string[] = [],
@@ -216,6 +225,7 @@ export function runNodeFile(
   return runNodeArgs([entrypoint, ...args], options);
 }
 
+/** Runs an installed package binary synchronously through Node. */
 export function runPackageBinSync(
   packageName: string,
   binName: string,
@@ -229,6 +239,7 @@ export function runPackageBinSync(
   );
 }
 
+/** Runs an installed package binary asynchronously through Node. */
 export function runPackageBin(
   packageName: string,
   binName: string,
@@ -242,6 +253,7 @@ export function runPackageBin(
   );
 }
 
+/** Runs a TypeScript entrypoint synchronously through the installed tsx loader. */
 export function runTypeScriptSync(
   script: string,
   args: readonly string[] = [],
@@ -254,6 +266,7 @@ export function runTypeScriptSync(
   );
 }
 
+/** Runs a TypeScript entrypoint asynchronously through the installed tsx loader. */
 export function runTypeScript(
   script: string,
   args: readonly string[] = [],
@@ -266,6 +279,7 @@ export function runTypeScript(
   );
 }
 
+/** Runs npm's JavaScript CLI without invoking a shell-specific npm shim. */
 export function runNpmCli(
   args: readonly string[],
   options: CommandOptions = {},
@@ -277,6 +291,7 @@ export function runNpmCli(
   );
 }
 
+/** Normalizes a path for reliable main-module comparisons across platforms. */
 function normalizedPath(pathname: string, platform: NodeJS.Platform): string {
   let normalized: string;
   try {
@@ -287,6 +302,7 @@ function normalizedPath(pathname: string, platform: NodeJS.Platform): string {
   return platform === "win32" ? normalized.toLowerCase() : normalized;
 }
 
+/** Returns whether the supplied module URL is the current process entrypoint. */
 export function isMainModule(
   moduleUrl: string,
   argvPath = process.argv[1],

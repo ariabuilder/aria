@@ -115,6 +115,7 @@ async function createLocalSourceAdapter() {
   return new SQLiteStorageAdapter(client, NO_STARTER_SEED_OPTIONS);
 }
 
+/** Creates the local or remote storage adapter used as the push target. */
 async function createPushTargetAdapter(options: CliOptions) {
   if (options.local) {
     const sqlitePath = resolveLocalWranglerD1SqlitePath();
@@ -235,6 +236,7 @@ async function collectLocalDslValidationIssues(): Promise<
   return issues;
 }
 
+/** Plans and applies the requested content push. */
 async function runContentPush(options: CliOptions): Promise<{
   failed: number;
   conflicted: number;
@@ -364,6 +366,7 @@ async function runContentPush(options: CliOptions): Promise<{
   };
 }
 
+/** Parses CLI options, validates local content, and executes the push. */
 async function main() {
   loadDotenv();
 

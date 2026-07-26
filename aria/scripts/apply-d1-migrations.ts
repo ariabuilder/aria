@@ -10,6 +10,7 @@ import {
 import { isMainModule, runTypeScriptSync } from "./lib/node-command";
 import { runWranglerSync } from "./lib/wrangler-command";
 
+/** Applies local or remote D1 migrations and verifies the resulting schema. */
 export async function applyD1Migrations(
   target: "local" | "remote",
   databaseBinding = process.env.ARIA_D1_BINDING || "aria_db",
