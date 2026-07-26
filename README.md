@@ -19,7 +19,7 @@
   </a>
 </p>
 <br />
-<p align="center">An open alternative to WordPress plugins and Webflow lock-in:<br>Visual editing, a real CMS, and an AI engineer in Astro.</p>
+<p align="center"><b>The open-source visual platform for Astro</b>. Build responsive pages, manage content with a complete CMS, define a shared design system, and control technical SEO. Aria includes a built-in AI agent with bring-your-own-key support and MCP for external tools. <b>Full access from day one. No feature tiers. No lock-in</b>.</p>
 
 <p align="center">
   <a href="#-quick-start">Quick start</a> ⌁
