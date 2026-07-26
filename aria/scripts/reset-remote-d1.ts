@@ -1,16 +1,18 @@
-#!/usr/bin/env -S npx tsx
 /**
  * Destructively reset the configured remote D1 database in
  * place. The database resource and binding stay unchanged.
  */
 
-import { execFileSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { mkdirSync } from "node:fs";
 import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
 
 import { resolveWranglerConfigPath } from "../lib/storage/wrangler-config";
+import { applyD1Migrations } from "./apply-d1-migrations";
+import { isMainModule } from "./lib/node-command";
+import {
+  runWranglerSync,
+  withTemporarySqlFileSync,
+} from "./lib/wrangler-command";
 
 type RemoteResetOptions = {
   binding: string;
@@ -52,10 +54,12 @@ const VERIFY_QUERY = `
   SELECT COUNT(*) AS migration_count FROM d1_migrations;
 `;
 
+/** Returns whether a parsed value is a non-null JSON record. */
 function isRecord(value: unknown): value is JsonRecord {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+/** Reads an inline string value from a named CLI flag. */
 function stringFlagValue(argument: string, flag: string): string | undefined {
   const prefix = `${flag}=`;
   return argument.startsWith(prefix)
@@ -63,6 +67,7 @@ function stringFlagValue(argument: string, flag: string): string | undefined {
     : undefined;
 }
 
+/** Parses and validates remote D1 reset command arguments. */
 export function parseRemoteResetArgs(
   argv: readonly string[],
   defaultBinding = "aria_db",
@@ -106,6 +111,7 @@ export function parseRemoteResetArgs(
   return { binding, confirm, dryRun, help };
 }
 
+/** Parses database identity information from Wrangler JSON output. */
 export function parseD1DatabaseInfo(json: string): D1DatabaseInfo {
   const parsed: unknown = JSON.parse(json);
   if (!isRecord(parsed)) {
@@ -121,6 +127,7 @@ export function parseD1DatabaseInfo(json: string): D1DatabaseInfo {
   return { id, name };
 }
 
+/** Rejects a remote reset unless the required confirmation matches. */
 export function assertRemoteResetConfirmed(
   confirmation: string | undefined,
   database: D1DatabaseInfo,
@@ -135,6 +142,7 @@ export function assertRemoteResetConfirmed(
   );
 }
 
+/** Parses row groups returned by Wrangler D1 commands. */
 export function parseWranglerRows(json: string): JsonRecord[][] {
   const parsed: unknown = JSON.parse(json);
   const batches = Array.isArray(parsed) ? parsed : [parsed];
@@ -158,6 +166,7 @@ export function parseWranglerRows(json: string): JsonRecord[][] {
   });
 }
 
+/** Parses schema objects returned by a D1 metadata query. */
 export function parseD1SchemaObjects(json: string): D1SchemaObject[] {
   const rows = parseWranglerRows(json).flat();
   const objects: D1SchemaObject[] = [];
@@ -183,10 +192,12 @@ export function parseD1SchemaObjects(json: string): D1SchemaObject[] {
   return objects;
 }
 
+/** Quotes a SQLite identifier for use in generated reset statements. */
 export function quoteSqlIdentifier(identifier: string): string {
   return `"${identifier.replaceAll('"', '""')}"`;
 }
 
+/** Builds SQL that removes all resettable objects from a remote D1 database. */
 export function buildRemoteD1ResetSql(
   schemaObjects: readonly D1SchemaObject[],
 ): string {
@@ -214,6 +225,7 @@ export function buildRemoteD1ResetSql(
   ].join("\n");
 }
 
+/** Parses the verification query returned after a remote reset. */
 export function parseResetVerification(json: string): {
   migrationCount: number;
   userCount: number;
@@ -235,27 +247,22 @@ export function parseResetVerification(json: string): {
   return { userCount, migrationCount };
 }
 
+/** Runs Wrangler and returns its JSON output. */
 function runWranglerJson(args: readonly string[]): string {
-  return execFileSync("npx", ["wrangler", ...args, ...WRANGLER_CONFIG_ARGS], {
+  return runWranglerSync([...args, ...WRANGLER_CONFIG_ARGS], {
     cwd: process.cwd(),
     encoding: "utf8",
     env: { ...process.env, CI: "true" },
-    stdio: ["ignore", "pipe", "inherit"],
-  });
+    stdio: ["ignore", "pipe", "pipe"],
+  }).stdout;
 }
 
-function run(
-  command: string,
-  args: readonly string[],
-  extraEnv: Record<string, string> = {},
-): void {
-  execFileSync(command, [...args], {
-    cwd: process.cwd(),
-    env: { ...process.env, ...extraEnv, CI: "true" },
-    stdio: "inherit",
-  });
+/** Executes SQL through Wrangler using a protected temporary file. */
+function runWranglerSqlJson(args: readonly string[], sql: string): string {
+  return runWranglerJson([...args, "--command", sql]);
 }
 
+/** Builds a timestamped path for a D1 backup file. */
 function backupPath(databaseName: string): string {
   const timestamp = new Date().toISOString().replaceAll(":", "-");
   const safeName = databaseName.replace(/[^a-zA-Z0-9._-]/g, "-");
@@ -266,6 +273,7 @@ function backupPath(databaseName: string): string {
   );
 }
 
+/** Prints usage instructions for the remote D1 reset command. */
 function printUsage(): void {
   console.log(`Usage:
   npm run storage:reset-remote -- --dry-run
@@ -280,6 +288,7 @@ This resets only the configured remote D1 database. KV, R2, Queues, and
 Durable Object state are not modified.`);
 }
 
+/** Validates reset options, backs up the database, and performs the reset. */
 async function main(): Promise<void> {
   const options = parseRemoteResetArgs(
     process.argv.slice(2),
@@ -295,14 +304,10 @@ async function main(): Promise<void> {
     runWranglerJson(["d1", "info", options.binding, "--json"]),
   );
   const schemaObjects = parseD1SchemaObjects(
-    runWranglerJson([
-      "d1",
-      "execute",
-      options.binding,
-      "--remote",
-      `--command=${SCHEMA_QUERY}`,
-      "--json",
-    ]),
+    runWranglerSqlJson(
+      ["d1", "execute", options.binding, "--remote", "--json"],
+      SCHEMA_QUERY,
+    ),
   );
 
   console.log(`Remote D1 target: ${database.name} (${database.id})`);
@@ -325,8 +330,7 @@ async function main(): Promise<void> {
   const outputPath = backupPath(database.name);
   mkdirSync(dirname(outputPath), { recursive: true });
   console.warn(`\nExporting mandatory recovery backup to ${outputPath}`);
-  run("npx", [
-    "wrangler",
+  runWranglerSync([
     "d1",
     "export",
     options.binding,
@@ -336,41 +340,30 @@ async function main(): Promise<void> {
     ...WRANGLER_CONFIG_ARGS,
   ]);
 
-  const tempDirectory = mkdtempSync(resolve(tmpdir(), "aria-d1-reset-"));
-  const resetSqlPath = resolve(tempDirectory, "reset.sql");
-
-  try {
-    writeFileSync(resetSqlPath, buildRemoteD1ResetSql(schemaObjects), "utf8");
-    console.warn(
-      `\nResetting ${database.name}. Requests using this database may fail until migrations finish.`,
-    );
-    run("npx", [
-      "wrangler",
-      "d1",
-      "execute",
-      options.binding,
-      "--remote",
-      `--file=${resetSqlPath}`,
-      "--yes",
-      ...WRANGLER_CONFIG_ARGS,
-    ]);
-
-    run("npx", ["tsx", "aria/scripts/apply-d1-migrations.ts", "--remote"], {
-      ARIA_D1_BINDING: options.binding,
-    });
-  } finally {
-    rmSync(tempDirectory, { recursive: true, force: true });
-  }
+  withTemporarySqlFileSync(
+    buildRemoteD1ResetSql(schemaObjects),
+    (resetSqlPath) => {
+      console.warn(
+        `\nResetting ${database.name}. Requests using this database may fail until migrations finish.`,
+      );
+      runWranglerSync([
+        "d1",
+        "execute",
+        options.binding,
+        "--remote",
+        `--file=${resetSqlPath}`,
+        "--yes",
+        ...WRANGLER_CONFIG_ARGS,
+      ]);
+    },
+  );
+  await applyD1Migrations("remote", options.binding);
 
   const verification = parseResetVerification(
-    runWranglerJson([
-      "d1",
-      "execute",
-      options.binding,
-      "--remote",
-      `--command=${VERIFY_QUERY}`,
-      "--json",
-    ]),
+    runWranglerSqlJson(
+      ["d1", "execute", options.binding, "--remote", "--json"],
+      VERIFY_QUERY,
+    ),
   );
 
   console.log(`\nRemote D1 reset complete: ${database.name}`);
@@ -381,11 +374,7 @@ async function main(): Promise<void> {
   console.log("KV, R2, Queues, and Durable Object state were not changed.");
 }
 
-const isMain = process.argv[1]
-  ? resolve(process.argv[1]) === fileURLToPath(import.meta.url)
-  : false;
-
-if (isMain) {
+if (isMainModule(import.meta.url)) {
   main().catch((error) => {
     console.error("\nRemote D1 reset failed.");
     console.error(error instanceof Error ? error.message : String(error));

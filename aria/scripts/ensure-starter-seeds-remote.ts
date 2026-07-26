@@ -1,19 +1,19 @@
-#!/usr/bin/env -S npx tsx
 /**
  * Incremental starter CMS entry seed for an existing remote D1 database.
  * Safe on installs that already have blog/authors/tags collections from bootstrap.
  */
 
-import { execFileSync } from "child_process";
 import { mkdirSync, writeFileSync } from "fs";
 import { resolve } from "path";
 
 import { buildStarterCmsEntriesOnlySql } from "./bootstrap-remote-storage";
 import { resolveWranglerConfigPath } from "../lib/storage/wrangler-config";
+import { runWranglerSync } from "./lib/wrangler-command";
 
 const GENERATED_SQL_DIR = resolve(process.cwd(), "aria/storage/generated");
 const OUTPUT_SQL = resolve(GENERATED_SQL_DIR, "seed-starter-cms-entries.sql");
 
+/** Adds any missing starter seed records to the remote D1 database. */
 async function main(): Promise<void> {
   const databaseBinding = process.env.ARIA_D1_BINDING || "aria_db";
   mkdirSync(GENERATED_SQL_DIR, { recursive: true });
@@ -22,10 +22,8 @@ async function main(): Promise<void> {
 
   console.log(`📝 Written to: ${OUTPUT_SQL}`);
   const configPath = resolveWranglerConfigPath();
-  execFileSync(
-    "npx",
+  runWranglerSync(
     [
-      "wrangler",
       "d1",
       "execute",
       databaseBinding,

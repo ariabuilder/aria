@@ -1,28 +1,21 @@
-#!/usr/bin/env node
 /**
  * Apply D1 migrations via wrangler, reconciling legacy local wrangler state first.
  */
-
-import { execFileSync } from "node:child_process";
 
 import { reconcileLegacyWranglerD1Migrations } from "../lib/storage/reconcileWranglerD1Migrations";
 import {
   resolveLocalWranglerD1SqlitePath,
   resolveWranglerConfigPath,
 } from "../lib/storage/wrangler-config";
+import { isMainModule, runTypeScriptSync } from "./lib/node-command";
+import { runWranglerSync } from "./lib/wrangler-command";
 
-const DATABASE_BINDING = process.env.ARIA_D1_BINDING || "aria_db";
-const local = process.argv.includes("--local");
-const remote = process.argv.includes("--remote");
-
-if (local === remote) {
-  console.error("Specify exactly one of --local or --remote");
-  process.exitCode = 1;
-} else {
-  await main();
-}
-
-async function main(): Promise<void> {
+/** Applies local or remote D1 migrations and verifies the resulting schema. */
+export async function applyD1Migrations(
+  target: "local" | "remote",
+  databaseBinding = process.env.ARIA_D1_BINDING || "aria_db",
+): Promise<void> {
+  const local = target === "local";
   if (local) {
     const sqlitePath = resolveLocalWranglerD1SqlitePath();
     if (sqlitePath) {
@@ -46,14 +39,12 @@ async function main(): Promise<void> {
     );
   }
 
-  execFileSync(
-    "npx",
+  runWranglerSync(
     [
-      "wrangler",
       "d1",
       "migrations",
       "apply",
-      DATABASE_BINDING,
+      databaseBinding,
       local ? "--local" : "--remote",
       "--config",
       configPath,
@@ -64,7 +55,7 @@ async function main(): Promise<void> {
     },
   );
 
-  const verificationArgs = ["tsx", "aria/scripts/verify-localization-schema.ts"];
+  const verificationArgs: string[] = [];
   if (local) {
     const sqlitePath = resolveLocalWranglerD1SqlitePath();
     if (!sqlitePath) {
@@ -77,12 +68,21 @@ async function main(): Promise<void> {
     verificationArgs.push("--remote");
   }
 
-  execFileSync(
-    "npx",
+  runTypeScriptSync(
+    "aria/scripts/verify-localization-schema.ts",
     verificationArgs,
     {
       stdio: "inherit",
       env: { ...process.env, CI: "true" },
     },
   );
+}
+
+if (isMainModule(import.meta.url)) {
+  const local = process.argv.includes("--local");
+  const remote = process.argv.includes("--remote");
+  if (local === remote) {
+    throw new Error("Specify exactly one of --local or --remote");
+  }
+  await applyD1Migrations(local ? "local" : "remote");
 }

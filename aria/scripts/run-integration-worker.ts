@@ -1,5 +1,3 @@
-#!/usr/bin/env -S npx tsx
-
 import { getApiSqlDatabase } from "../lib/api/database";
 import { readApiKeyring } from "../lib/api/crypto";
 import { runNodeIntegrationWorker } from "../lib/integrations/nodeWorker";
@@ -8,6 +6,7 @@ import { readWebhookEgressPolicy } from "../lib/integrations/webhooks/egress";
 const controller = new AbortController();
 let stopping = false;
 
+/** Forwards a termination signal to the integration Worker process. */
 function stop(signal: string): void {
   if (stopping) return;
   stopping = true;

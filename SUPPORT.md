@@ -15,6 +15,8 @@ Please include:
 
 - Aria version, commit, or branch.
 - Node version.
+- Operating system and terminal (for example Windows PowerShell or Command
+  Prompt).
 - Runtime mode: `npm run dev`, `npm run dev:edge`, preview, or deployed
   Cloudflare Worker.
 - Relevant Cloudflare services involved: D1, R2, KV, Queues, Durable Objects,

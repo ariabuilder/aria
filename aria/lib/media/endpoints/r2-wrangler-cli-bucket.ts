@@ -2,7 +2,6 @@
  * R2 bucket access via wrangler CLI (local or remote persistence).
  */
 
-import { execFileSync } from "node:child_process";
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -13,7 +12,9 @@ import {
   readWranglerToml,
   resolveWranglerConfigPath,
 } from "../../storage/wrangler-config";
+import { runWranglerSync } from "../../../scripts/lib/wrangler-command";
 
+/** Creates an R2 bucket adapter backed by shell-independent Wrangler commands. */
 export function createWranglerCliR2Bucket(input: {
   local: boolean;
   bucketName?: string;
@@ -26,23 +27,26 @@ export function createWranglerCliR2Bucket(input: {
   const configPath = resolveWranglerConfigPath();
   const configArgs = configPath ? ["--config", configPath] : [];
 
+  /** Builds the Wrangler object path for a bucket key. */
   function objectPath(key: string): string {
     return `${objectPrefix}${key}`;
   }
 
+  /** Runs a Wrangler R2 command with the configured location and config. */
   function runWrangler(args: string[]): Buffer {
-    return execFileSync(
-      "npx",
-      ["wrangler", "r2", "object", ...args, locationFlag, ...configArgs],
+    const result = runWranglerSync(
+      ["r2", "object", ...args, locationFlag, ...configArgs],
       {
         cwd: process.cwd(),
         stdio: ["pipe", "pipe", "pipe"],
         env: { ...process.env, CI: "true" },
       },
     );
+    return Buffer.from(result.stdout);
   }
 
   return {
+    /** Reads object metadata through a temporary Wrangler download. */
     async head(key) {
       const tempDir = mkdtempSync(join(tmpdir(), "aria-r2-head-"));
       const outfile = join(tempDir, "object.bin");
@@ -61,6 +65,7 @@ export function createWranglerCliR2Bucket(input: {
       }
     },
 
+    /** Returns the empty listing supported by this command adapter. */
     async list() {
       return {
         objects: [],
@@ -68,6 +73,7 @@ export function createWranglerCliR2Bucket(input: {
       };
     },
 
+    /** Uploads an object through a protected temporary file. */
     async put(key, value, options) {
       const tempDir = mkdtempSync(join(tmpdir(), "aria-r2-put-"));
       const infile = join(tempDir, "upload.bin");
@@ -99,6 +105,7 @@ export function createWranglerCliR2Bucket(input: {
       }
     },
 
+    /** Downloads an object through Wrangler into temporary storage. */
     async get(key) {
       const tempDir = mkdtempSync(join(tmpdir(), "aria-r2-get-"));
       const outfile = join(tempDir, "object.bin");
@@ -108,6 +115,7 @@ export function createWranglerCliR2Bucket(input: {
         const data = readFileSync(outfile);
 
         return {
+          /** Returns the downloaded object data as an ArrayBuffer. */
           async arrayBuffer() {
             return data.buffer.slice(
               data.byteOffset,
@@ -122,6 +130,7 @@ export function createWranglerCliR2Bucket(input: {
       }
     },
 
+    /** Deletes an object through Wrangler and tolerates missing keys. */
     async delete(key) {
       try {
         runWrangler(["delete", objectPath(key)]);

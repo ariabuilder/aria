@@ -1,6 +1,3 @@
-import { execFile } from "node:child_process";
-import { promisify } from "node:util";
-
 import { createD1HttpDatabase } from "./d1-http-database";
 import type {
   D1PreparedStatementLike,
@@ -9,10 +6,12 @@ import type {
 } from "./d1-database-types";
 import { D1_SAFE_INLINE_STATEMENT_BYTES } from "./push-validation";
 import { resolveWranglerConfigPath } from "./wrangler-config";
+import { runWrangler } from "../../scripts/lib/wrangler-command";
 
-export type { D1PreparedStatementLike, RemoteD1DatabaseLike } from "./d1-database-types";
-
-const execFileAsync = promisify(execFile);
+export type {
+  D1PreparedStatementLike,
+  RemoteD1DatabaseLike,
+} from "./d1-database-types";
 
 type RemoteD1Result<T extends D1QueryRow = D1QueryRow> = {
   results?: T[];
@@ -27,6 +26,7 @@ type RemotePreparedStatement = D1PreparedStatementLike & {
   toSQL(): string;
 };
 
+/** Serializes a bound value as a safe SQL literal for Wrangler. */
 function sqlLiteral(value: unknown): string {
   if (value === null || value === undefined) {
     return "NULL";
@@ -47,6 +47,7 @@ function sqlLiteral(value: unknown): string {
   return `'${String(value).replace(/'/g, "''")}'`;
 }
 
+/** Replaces positional SQL placeholders with escaped literal values. */
 function interpolateSql(sql: string, args: readonly unknown[]): string {
   const placeholderCount = (sql.match(/\?/g) ?? []).length;
 
@@ -57,9 +58,14 @@ function interpolateSql(sql: string, args: readonly unknown[]): string {
   }
 
   let nextIndex = 0;
-  return sql.replace(/\?/g, () => sqlLiteral(args[nextIndex++]));
+  return sql.replace(
+    /\?/g,
+    /** Replaces each placeholder with the next escaped bound value. */
+    () => sqlLiteral(args[nextIndex++]),
+  );
 }
 
+/** Executes interpolated SQL through Wrangler and returns its D1 result. */
 async function executeLiteralRemoteSql<T extends D1QueryRow>(input: {
   binding: string;
   sql: string;
@@ -76,7 +82,6 @@ async function executeLiteralRemoteSql<T extends D1QueryRow>(input: {
   // discovery order would pick the jsonc first.
   const configPath = resolveWranglerConfigPath();
   const args = [
-    "wrangler",
     "d1",
     "execute",
     input.binding,
@@ -88,9 +93,10 @@ async function executeLiteralRemoteSql<T extends D1QueryRow>(input: {
     ...(configPath ? ["--config", configPath] : []),
   ];
 
-  const { stdout } = await execFileAsync("npx", args, {
+  const { stdout } = await runWrangler(args, {
     cwd: process.cwd(),
     maxBuffer: 10 * 1024 * 1024,
+    stdio: ["ignore", "pipe", "pipe"],
   });
 
   const parsed = JSON.parse(stdout) as RemoteD1Result<T>[];
@@ -103,6 +109,7 @@ async function executeLiteralRemoteSql<T extends D1QueryRow>(input: {
   return first;
 }
 
+/** Creates a D1 prepared statement executed through Wrangler commands. */
 function createLiteralPreparedStatement(input: {
   binding: string;
   sql: string;
@@ -112,15 +119,18 @@ function createLiteralPreparedStatement(input: {
   const args = input.args ?? [];
 
   return {
+    /** Binds positional values to this Wrangler-backed statement. */
     bind(...values: unknown[]) {
       return createLiteralPreparedStatement({
         ...input,
         args: values,
       });
     },
+    /** Returns SQL with every bound value safely interpolated. */
     toSQL() {
       return interpolateSql(input.sql, args);
     },
+    /** Executes the statement and returns its first result row. */
     async first<T extends D1QueryRow = D1QueryRow>() {
       const result = await executeLiteralRemoteSql<T>({
         binding: input.binding,
@@ -130,6 +140,7 @@ function createLiteralPreparedStatement(input: {
 
       return (result.results?.[0] ?? null) as T | null;
     },
+    /** Executes the statement and returns every result row. */
     async all<T extends D1QueryRow = D1QueryRow>() {
       const result = await executeLiteralRemoteSql<T>({
         binding: input.binding,
@@ -141,6 +152,7 @@ function createLiteralPreparedStatement(input: {
         results: result.results ?? [],
       };
     },
+    /** Executes the statement and returns D1 mutation metadata. */
     async run() {
       return executeLiteralRemoteSql({
         binding: input.binding,
@@ -151,14 +163,17 @@ function createLiteralPreparedStatement(input: {
   };
 }
 
+/** Creates the minimal D1 database interface used by remote tooling. */
 function createLiteralWranglerD1Database(
   binding: string,
   remote: boolean,
 ): RemoteD1DatabaseLike {
   return {
+    /** Prepares SQL for execution through Wrangler D1. */
     prepare(sql: string) {
       return createLiteralPreparedStatement({ binding, sql, remote });
     },
+    /** Executes prepared Wrangler D1 statements sequentially. */
     async batch(statements: D1PreparedStatementLike[]) {
       const results: Array<{ results?: D1QueryRow[] }> = [];
 
@@ -179,13 +194,15 @@ function createLiteralWranglerD1Database(
   };
 }
 
+/** Reports whether an Aria-specific Cloudflare API token is configured. */
 function hasAriaCloudflareApiToken(): boolean {
   return Boolean(
     process.env.ARIA_CLOUDFLARE_API_TOKEN?.trim() ||
-      process.env.ARIA_CF_API_TOKEN?.trim(),
+    process.env.ARIA_CF_API_TOKEN?.trim(),
   );
 }
 
+/** Creates a Wrangler-backed database for local or remote D1 execution. */
 export async function createRemoteD1Database(
   binding = process.env.ARIA_D1_BINDING || "aria_db",
   options: { remote?: boolean } = {},

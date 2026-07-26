@@ -91,6 +91,12 @@ npm install
 npm run dev
 ```
 
+The same commands work unchanged in Windows Command Prompt, PowerShell,
+macOS, and Linux; WSL is not required. Aria's npm scripts set the runtime and
+launch Astro/Wrangler through Node, so do not translate them into shell-specific
+environment-variable syntax. If a required tool cannot be resolved, run
+`npm install` again from the repository root.
+
 Open [http://localhost:4321/admin](http://localhost:4321/admin) and complete
 first-run setup at `/admin/setup`.
 

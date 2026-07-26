@@ -4,9 +4,7 @@
  */
 
 import { createClient } from "@libsql/client";
-import { execFileSync } from "node:child_process";
 import { resolve } from "node:path";
-import { fileURLToPath } from "node:url";
 
 import {
   assertRemoteAuthPushAllowed,
@@ -30,11 +28,9 @@ import {
   type PushValidationIssue,
 } from "../lib/storage/push-validation";
 import { createRemoteD1Database } from "../lib/storage/remote-d1";
-import { reconcileLegacyWranglerD1Migrations } from "../lib/storage/reconcileWranglerD1Migrations";
-import {
-  resolveLocalWranglerD1SqlitePath,
-  resolveWranglerConfigPath,
-} from "../lib/storage/wrangler-config";
+import { resolveLocalWranglerD1SqlitePath } from "../lib/storage/wrangler-config";
+import { applyD1Migrations } from "./apply-d1-migrations";
+import { isMainModule } from "./lib/node-command";
 
 const LOCAL_DB_PATH = resolve(process.cwd(), "aria/storage/aria.db");
 const DATABASE_BINDING = process.env.ARIA_D1_BINDING || "aria_db";
@@ -48,6 +44,7 @@ type CliOptions = {
   conflictPolicy: "newest-wins" | "local-wins" | "remote-wins";
 };
 
+/** Parses content-push command arguments into validated options. */
 function parseCliOptions(argv: string[]): CliOptions {
   let conflictPolicy: CliOptions["conflictPolicy"] = "newest-wins";
   if (argv.includes("--local-wins")) {
@@ -73,6 +70,7 @@ function parseCliOptions(argv: string[]): CliOptions {
   };
 }
 
+/** Converts a planned content change into a sync-history item. */
 function planItemToHistoryItem(
   item: ContentSyncPlanItem,
   jobId: string,
@@ -113,12 +111,14 @@ const NO_STARTER_SEED_OPTIONS = {
   seedStarterSiteSettings: false,
 } as const;
 
+/** Opens the local storage adapter used as the content-push source. */
 async function createLocalSourceAdapter() {
   const { SQLiteStorageAdapter } = await import("../lib/storage/sqlite");
   const client = createClient({ url: `file:${LOCAL_DB_PATH}` });
   return new SQLiteStorageAdapter(client, NO_STARTER_SEED_OPTIONS);
 }
 
+/** Creates the local or remote storage adapter used as the push target. */
 async function createPushTargetAdapter(options: CliOptions) {
   if (options.local) {
     const sqlitePath = resolveLocalWranglerD1SqlitePath();
@@ -143,40 +143,12 @@ async function createPushTargetAdapter(options: CliOptions) {
   });
 }
 
+/** Applies migrations to the selected content-push target. */
 async function applyMigrations(options: CliOptions) {
-  if (options.local) {
-    const sqlitePath = resolveLocalWranglerD1SqlitePath();
-    if (sqlitePath) {
-      const reconciled = await reconcileLegacyWranglerD1Migrations(sqlitePath);
-      if (reconciled === "stale_baseline") {
-        throw new Error(
-          "Local wrangler D1 predates the consolidated baseline. Reset/reprovision it from 0001_baseline_schema.sql; migration repair is intentionally unavailable.",
-        );
-      }
-    }
-  }
-
-  const flag = options.local ? "--local" : "--remote";
-  const configPath = resolveWranglerConfigPath();
-
-  execFileSync(
-    "npx",
-    [
-      "wrangler",
-      "d1",
-      "migrations",
-      "apply",
-      DATABASE_BINDING,
-      flag,
-      ...(configPath ? ["--config", configPath] : []),
-    ],
-    {
-      stdio: "inherit",
-      env: { ...process.env, CI: "true" },
-    },
-  );
+  await applyD1Migrations(options.local ? "local" : "remote");
 }
 
+/** Clears replaceable target data before a full content replacement. */
 async function clearTargetForReplace(options: CliOptions) {
   const statements = buildReplaceClearStatements();
 
@@ -206,6 +178,7 @@ async function clearTargetForReplace(options: CliOptions) {
   }
 }
 
+/** Collects local DSL validation issues before uploading content. */
 async function collectLocalDslValidationIssues(): Promise<
   PushValidationIssue[]
 > {
@@ -269,6 +242,7 @@ async function collectLocalDslValidationIssues(): Promise<
   return issues;
 }
 
+/** Plans and applies the requested content push. */
 async function runContentPush(options: CliOptions): Promise<{
   failed: number;
   conflicted: number;
@@ -398,6 +372,7 @@ async function runContentPush(options: CliOptions): Promise<{
   };
 }
 
+/** Parses CLI options, validates local content, and executes the push. */
 async function main() {
   loadDotenv();
 
@@ -496,11 +471,7 @@ async function main() {
   }
 }
 
-const isMain = process.argv[1]
-  ? resolve(process.argv[1]) === fileURLToPath(import.meta.url)
-  : false;
-
-if (isMain) {
+if (isMainModule(import.meta.url)) {
   main().catch((error) => {
     console.error("\n❌ Push failed");
     console.error(error instanceof Error ? error.message : String(error));

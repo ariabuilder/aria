@@ -7,8 +7,8 @@ import type { RemoteD1DatabaseLike } from "./d1-database-types";
 import {
   parseD1BindingFromWrangler,
   readWranglerToml,
-  resolveCloudflareAccountId,
 } from "./wrangler-config";
+import { resolveCloudflareAccountId } from "../../scripts/lib/cloudflare-account";
 
 type D1HttpQueryRow = Record<string, unknown>;
 
@@ -30,6 +30,7 @@ type D1HttpPreparedStatement = {
   run(): Promise<unknown>;
 };
 
+/** Reads the Cloudflare API token required for D1 HTTP requests. */
 function readApiToken(): string {
   const token =
     process.env.ARIA_CLOUDFLARE_API_TOKEN?.trim() ||
@@ -44,6 +45,7 @@ function readApiToken(): string {
   return token;
 }
 
+/** Executes one SQL statement through the Cloudflare D1 HTTP API. */
 async function executeD1HttpQuery(input: {
   accountId: string;
   databaseId: string;
@@ -73,8 +75,11 @@ async function executeD1HttpQuery(input: {
 
   if (!response.ok || !payload.success) {
     const message =
-      payload.errors?.map((error) => error.message).filter(Boolean).join("; ") ||
-      `D1 HTTP query failed (${response.status})`;
+      payload.errors
+        /** Extracts Cloudflare error messages from a failed D1 response. */
+        ?.map((error) => error.message)
+        .filter(Boolean)
+        .join("; ") || `D1 HTTP query failed (${response.status})`;
     throw new Error(message);
   }
 
@@ -87,6 +92,7 @@ async function executeD1HttpQuery(input: {
   return first;
 }
 
+/** Creates a prepared-statement facade for D1 HTTP queries. */
 function createHttpPreparedStatement(input: {
   accountId: string;
   databaseId: string;
@@ -96,12 +102,14 @@ function createHttpPreparedStatement(input: {
   const args = input.args ?? [];
 
   return {
+    /** Binds positional values to this D1 HTTP statement. */
     bind(...values: unknown[]) {
       return createHttpPreparedStatement({
         ...input,
         args: values,
       });
     },
+    /** Executes the statement and returns its first row. */
     async first<T extends D1HttpQueryRow = D1HttpQueryRow>() {
       const result = await executeD1HttpQuery({
         accountId: input.accountId,
@@ -112,6 +120,7 @@ function createHttpPreparedStatement(input: {
 
       return (result.results?.[0] ?? null) as T | null;
     },
+    /** Executes the statement and returns every result row. */
     async all<T extends D1HttpQueryRow = D1HttpQueryRow>() {
       const result = await executeD1HttpQuery({
         accountId: input.accountId,
@@ -124,6 +133,7 @@ function createHttpPreparedStatement(input: {
         results: (result.results ?? []) as T[],
       };
     },
+    /** Executes the statement and returns the raw D1 result. */
     async run() {
       return executeD1HttpQuery({
         accountId: input.accountId,
@@ -135,17 +145,22 @@ function createHttpPreparedStatement(input: {
   };
 }
 
+/** Creates a remote D1 adapter that sends statements through Cloudflare's API. */
 export async function createD1HttpDatabase(input?: {
   binding?: string;
   accountId?: string;
   databaseId?: string;
 }): Promise<RemoteD1DatabaseLike> {
   const binding = input?.binding ?? process.env.ARIA_D1_BINDING ?? "aria_db";
-  const wranglerConfig = parseD1BindingFromWrangler(readWranglerToml(), binding);
+  const wranglerConfig = parseD1BindingFromWrangler(
+    readWranglerToml(),
+    binding,
+  );
   const accountId = input?.accountId ?? (await resolveCloudflareAccountId());
   const databaseId = input?.databaseId ?? wranglerConfig.databaseId;
 
   return {
+    /** Prepares SQL for execution through the D1 HTTP API. */
     prepare(sql: string) {
       return createHttpPreparedStatement({
         accountId,
@@ -153,6 +168,7 @@ export async function createD1HttpDatabase(input?: {
         sql,
       });
     },
+    /** Executes a group of prepared D1 HTTP statements in order. */
     async batch(statements: D1HttpPreparedStatement[]) {
       const results: Array<{ results?: D1HttpQueryRow[] }> = [];
 

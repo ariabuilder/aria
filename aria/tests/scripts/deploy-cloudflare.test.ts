@@ -55,7 +55,11 @@ function createRunner(options: {
   secretList?: CapturedCommandResult;
   queueConsumers?: Record<string, CapturedCommandResult>;
 }) {
-  const captured: Array<{ args: readonly string[]; command: string }> = [];
+  const captured: Array<{
+    args: readonly string[];
+    command: string;
+    sql?: string;
+  }> = [];
   const inherited: Array<{ args: readonly string[]; command: string }> = [];
   let uploadedSecrets:
     | { contents: Record<string, string>; fileMode: number }
@@ -65,8 +69,19 @@ function createRunner(options: {
   let protectedKeyQueryIndex = 0;
 
   const runner: DeployCommandRunner = {
+    async build() {
+      inherited.push({ command: "aria", args: ["build"] });
+    },
     capture(command, args) {
-      captured.push({ command, args: [...args] });
+      const commandIndex = args.indexOf("--command");
+      captured.push({
+        command,
+        args: [...args],
+        sql:
+          commandIndex >= 0 && args[commandIndex + 1]
+            ? args[commandIndex + 1]
+            : undefined,
+      });
       if (args.includes("deploy")) {
         if (options.deployError) {
           return {
@@ -134,6 +149,9 @@ function createRunner(options: {
           >,
         );
       }
+    },
+    async migrate() {
+      inherited.push({ command: "aria", args: ["migrate"] });
     },
   };
 
@@ -446,13 +464,14 @@ describe("Cloudflare deployment orchestration", () => {
     expect(Buffer.from(uploaded?.contents[KEY_V1] ?? "", "base64")).toEqual(
       Buffer.from(generatedBytes),
     );
-    expect(uploaded?.fileMode).toBe(0o600);
+    if (process.platform !== "win32") {
+      expect(uploaded?.fileMode).toBe(0o600);
+    }
     expect(await readdir(temporaryRoot)).toEqual([]);
     expect(harness.inherited.map(({ args }) => args)).toEqual([
-      ["run", "deploy:migrate"],
-      ["run", "build"],
+      ["migrate"],
+      ["build"],
       [
-        "wrangler",
         "secret",
         "bulk",
         expect.stringContaining("secrets.json"),
@@ -505,9 +524,12 @@ describe("Cloudflare deployment orchestration", () => {
       args.includes("d1"),
     );
     expect(protectedKeyQueries).toHaveLength(6);
-    const protectedKeySql = protectedKeyQueries.map(
-      ({ args }) => args[args.indexOf("--command") + 1],
-    );
+    expect(
+      protectedKeyQueries.every(
+        ({ args }) => args.includes("--command") && !args.includes("--file"),
+      ),
+    ).toBe(true);
+    const protectedKeySql = protectedKeyQueries.map(({ sql }) => sql);
     expect(protectedKeySql).toEqual(
       expect.arrayContaining([
         expect.stringContaining("aria_api_credentials"),
@@ -525,7 +547,6 @@ describe("Cloudflare deployment orchestration", () => {
       args.includes("deploy"),
     );
     expect(deployInvocation?.args).toEqual([
-      "wrangler",
       "deploy",
       "--config",
       "dist/server/wrangler.json",

@@ -24,9 +24,12 @@ const runtimeTarget =
 const useNodeRuntime = runtimeTarget === "node";
 // A private wrangler.toml (gitignored, real account IDs) takes precedence
 // over the committed wrangler.jsonc (OSS placeholder IDs).
-const cloudflareConfigPath =
-  resolveWranglerConfigPath(workspaceRoot) ?? "wrangler.jsonc";
+const resolvedCloudflareConfigPath = resolveWranglerConfigPath(workspaceRoot);
+const cloudflareConfigPath = resolvedCloudflareConfigPath
+  ? path.relative(workspaceRoot, resolvedCloudflareConfigPath)
+  : "wrangler.jsonc";
 
+/** Reads an installed package version for build-time metadata. */
 function readPackageVersion(packageName: string): string {
   const packageJsonPath = path.join(
     workspaceRoot,
@@ -116,6 +119,7 @@ const SSR_OPTIMIZE_DEPS_EXCLUDES = [
 function ariaSsrOptimizeDepsPlugin() {
   return {
     name: "aria:ssr-optimize-deps",
+    /** Configures dependency freshness for Astro SSR environments. */
     configEnvironment(environmentName: string) {
       if (!["ssr", "astro", "prerender"].includes(environmentName)) {
         return;
@@ -232,7 +236,16 @@ export default defineConfig({
                 "aria/lib/cloudflare/workers-shim.ts",
               ),
             }
-          : {}),
+          : {
+              "@libsql/client/node": path.join(
+                workspaceRoot,
+                "aria/lib/cloudflare/libsql-client-shim.ts",
+              ),
+              "@libsql/client": path.join(
+                workspaceRoot,
+                "aria/lib/cloudflare/libsql-client-shim.ts",
+              ),
+            }),
         // LibSQL imports this CommonJS dependency even in the Worker bundle.
         // Point Vite at an ESM-compatible implementation for workerd.
         "promise-limit": path.join(
@@ -295,6 +308,7 @@ export default defineConfig({
     : cloudflare({
         configPath: cloudflareConfigPath,
         imageService: "passthrough",
+        remoteBindings: false,
         sessionKVBindingName: "session",
       }),
   integrations: [
