@@ -82,13 +82,17 @@ export async function fetchWorkersAiCatalog(): Promise<CatalogModel[]> {
     const payload = (await response.json()) as CloudflareModelSearchResponse;
     const models = (payload.result ?? [])
       .map(normalizeWorkersAiModel)
+      /** Removes entries that cannot be normalized into supported models. */
       .filter((model): model is CatalogModel => model !== null);
 
     if (models.length === 0) {
       return [...WORKERS_AI_STATIC_CATALOG];
     }
 
-    return models.sort((a, b) => a.name.localeCompare(b.name));
+    return models.sort(
+      /** Orders Workers AI models by their display names. */
+      (a, b) => a.name.localeCompare(b.name),
+    );
   } catch {
     return [...WORKERS_AI_STATIC_CATALOG];
   }

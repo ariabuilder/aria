@@ -71,7 +71,12 @@ try {
   const packResult = packResults[0];
   assert(packResult, "npm pack did not produce a tarball.");
 
-  const packedPaths = new Set(packResult.files.map((file) => file.path));
+  const packedPaths = new Set(
+    packResult.files.map(
+      /** Selects the archive path for a packed file. */
+      (file) => file.path,
+    ),
+  );
   const forbiddenPrefixes = [
     ".github/",
     "aria/tests/",
@@ -89,7 +94,10 @@ try {
 
   for (const file of packResult.files) {
     assert(
-      !forbiddenPrefixes.some((prefix) => file.path.startsWith(prefix)),
+      !forbiddenPrefixes.some(
+        /** Detects whether a packed path is under a forbidden prefix. */
+        (prefix) => file.path.startsWith(prefix),
+      ),
       `Packed forbidden file: ${file.path}`,
     );
     assert(
@@ -115,6 +123,7 @@ try {
   assert(packedPaths.has("LICENSE"), "Packed tarball is missing LICENSE.");
 
   const cliFile = packResult.files.find(
+    /** Finds the CLI entrypoint for executable-mode validation. */
     (file) => file.path === "dist/cli/main.js",
   );
   assert(cliFile, "Unable to inspect dist/cli/main.js mode.");
@@ -134,6 +143,7 @@ try {
   );
 
   const cliPath = resolvePackageBin("@ariabuilder/aria", "aria", installDir);
+  /** Runs the packed CLI from the isolated installation directory. */
   const runCli = (args: readonly string[]) =>
     runNodeFile(cliPath, args, {
       cwd: installDir,

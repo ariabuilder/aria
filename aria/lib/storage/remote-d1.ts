@@ -58,7 +58,11 @@ function interpolateSql(sql: string, args: readonly unknown[]): string {
   }
 
   let nextIndex = 0;
-  return sql.replace(/\?/g, () => sqlLiteral(args[nextIndex++]));
+  return sql.replace(
+    /\?/g,
+    /** Replaces each placeholder with the next escaped bound value. */
+    () => sqlLiteral(args[nextIndex++]),
+  );
 }
 
 /** Executes interpolated SQL through Wrangler and returns its D1 result. */
@@ -115,15 +119,18 @@ function createLiteralPreparedStatement(input: {
   const args = input.args ?? [];
 
   return {
+    /** Binds positional values to this Wrangler-backed statement. */
     bind(...values: unknown[]) {
       return createLiteralPreparedStatement({
         ...input,
         args: values,
       });
     },
+    /** Returns SQL with every bound value safely interpolated. */
     toSQL() {
       return interpolateSql(input.sql, args);
     },
+    /** Executes the statement and returns its first result row. */
     async first<T extends D1QueryRow = D1QueryRow>() {
       const result = await executeLiteralRemoteSql<T>({
         binding: input.binding,
@@ -133,6 +140,7 @@ function createLiteralPreparedStatement(input: {
 
       return (result.results?.[0] ?? null) as T | null;
     },
+    /** Executes the statement and returns every result row. */
     async all<T extends D1QueryRow = D1QueryRow>() {
       const result = await executeLiteralRemoteSql<T>({
         binding: input.binding,
@@ -144,6 +152,7 @@ function createLiteralPreparedStatement(input: {
         results: result.results ?? [],
       };
     },
+    /** Executes the statement and returns D1 mutation metadata. */
     async run() {
       return executeLiteralRemoteSql({
         binding: input.binding,
@@ -160,9 +169,11 @@ function createLiteralWranglerD1Database(
   remote: boolean,
 ): RemoteD1DatabaseLike {
   return {
+    /** Prepares SQL for execution through Wrangler D1. */
     prepare(sql: string) {
       return createLiteralPreparedStatement({ binding, sql, remote });
     },
+    /** Executes prepared Wrangler D1 statements sequentially. */
     async batch(statements: D1PreparedStatementLike[]) {
       const results: Array<{ results?: D1QueryRow[] }> = [];
 

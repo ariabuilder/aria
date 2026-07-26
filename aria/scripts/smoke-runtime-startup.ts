@@ -130,6 +130,7 @@ async function smokeRuntime(input: {
 
   try {
     await waitForServer({
+      /** Returns the child result once the runtime process has exited. */
       result: () => completed,
       runtime: input.runtime,
       url: `http://${HOST}:${input.port}${STARTUP_PATH}`,

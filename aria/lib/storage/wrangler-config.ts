@@ -147,7 +147,9 @@ export function resolveLocalWranglerD1SqlitePath(
 
   try {
     candidates = readdirSync(d1Dir)
+      /** Keeps D1 database files rather than Wrangler metadata. */
       .filter((name) => name.endsWith(".sqlite") && name !== "metadata.sqlite")
+      /** Resolves each database filename to its full state path. */
       .map((name) => resolve(d1Dir, name));
   } catch {
     return null;
@@ -162,6 +164,7 @@ export function resolveLocalWranglerD1SqlitePath(
   }
 
   candidates.sort(
+    /** Orders local D1 files from newest to oldest. */
     (left, right) => statSync(right).mtimeMs - statSync(left).mtimeMs,
   );
 

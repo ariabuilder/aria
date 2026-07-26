@@ -31,6 +31,7 @@ const remoteDatabase = remote
 try {
   const verifierClient = remote
     ? {
+        /** Executes a verification query through remote Wrangler D1. */
         async execute(sql: string, args: readonly unknown[] = []) {
           const query = await remoteDatabase!
             .prepare(sql)
@@ -40,6 +41,7 @@ try {
         },
       }
     : {
+        /** Executes a verification query through the local LibSQL client. */
         async execute(sql: string, args: readonly unknown[] = []) {
           const query = await localClient!.execute({ sql, args: args as any });
           return { rows: query.rows as Record<string, unknown>[] };

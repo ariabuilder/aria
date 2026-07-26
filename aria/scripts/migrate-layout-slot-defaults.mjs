@@ -44,15 +44,18 @@ const FOOTER_CONTENT = [
 
 /** Adds default content to empty header and footer slots. */
 function withSlotDefaults(slots) {
-  return slots.map((slot) => {
-    if (slot.name === "header" && !slot.defaultContent?.length) {
-      return { ...slot, defaultContent: HEADER_CONTENT };
-    }
-    if (slot.name === "footer" && !slot.defaultContent?.length) {
-      return { ...slot, defaultContent: FOOTER_CONTENT };
-    }
-    return slot;
-  });
+  return slots.map(
+    /** Applies starter content to an empty named layout slot. */
+    (slot) => {
+      if (slot.name === "header" && !slot.defaultContent?.length) {
+        return { ...slot, defaultContent: HEADER_CONTENT };
+      }
+      if (slot.name === "footer" && !slot.defaultContent?.length) {
+        return { ...slot, defaultContent: FOOTER_CONTENT };
+      }
+      return slot;
+    },
+  );
 }
 
 const database = createClient({ url: `file:${dbPath}` });

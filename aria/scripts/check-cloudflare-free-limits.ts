@@ -23,10 +23,13 @@ const MAX_STATIC_ASSET_BYTES = 25 * 1024 * 1024;
 async function listFiles(directory: string): Promise<string[]> {
   const entries = await readdir(directory, { withFileTypes: true });
   const nested = await Promise.all(
-    entries.map(async (entry) => {
-      const entryPath = path.join(directory, entry.name);
-      return entry.isDirectory() ? listFiles(entryPath) : [entryPath];
-    }),
+    entries.map(
+      /** Recursively expands a directory entry into its contained files. */
+      async (entry) => {
+        const entryPath = path.join(directory, entry.name);
+        return entry.isDirectory() ? listFiles(entryPath) : [entryPath];
+      },
+    ),
   );
   return nested.flat();
 }
@@ -60,12 +63,16 @@ async function main(): Promise<void> {
     listFiles(clientAssetsDir),
   ]);
   const assetSizes = await Promise.all(
-    assetFiles.map(async (filePath) => ({
-      filePath,
-      size: (await stat(filePath)).size,
-    })),
+    assetFiles.map(
+      /** Measures a built asset for free-tier validation. */
+      async (filePath) => ({
+        filePath,
+        size: (await stat(filePath)).size,
+      }),
+    ),
   );
   const largestAsset = assetSizes.reduce(
+    /** Retains the largest measured static asset. */
     (largest, asset) => (asset.size > largest.size ? asset : largest),
     { filePath: "", size: 0 },
   );

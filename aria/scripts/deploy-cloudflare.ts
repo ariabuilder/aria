@@ -152,6 +152,7 @@ export function repairDeadLetterQueueRenames(
   // Longest template name first so prefix replacement can never clip a
   // longer queue name that shares a prefix with a shorter one.
   const orderedRenames = [...renames.entries()].sort(
+    /** Orders queue renames by descending source-name length. */
     (left, right) => right[0].length - left[0].length,
   );
   const repairs: DeadLetterQueueRepair[] = [];
@@ -298,6 +299,7 @@ function createCommandRunner(databaseBinding: string): DeployCommandRunner {
   const environment = { ...process.env, CI: "true" };
   return {
     build: buildCloudflare,
+    /** Runs Wrangler and captures its result for parsing. */
     capture(command, args) {
       if (command !== "wrangler") {
         throw new Error(`Unsupported deployment command: ${command}`);
@@ -308,6 +310,7 @@ function createCommandRunner(databaseBinding: string): DeployCommandRunner {
         stdio: ["ignore", "pipe", "pipe"],
       });
     },
+    /** Runs Wrangler with terminal output inherited by the caller. */
     inherit(command, args) {
       if (command !== "wrangler") {
         throw new Error(`Unsupported deployment command: ${command}`);
@@ -317,6 +320,7 @@ function createCommandRunner(databaseBinding: string): DeployCommandRunner {
         stdio: "inherit",
       });
     },
+    /** Applies remote D1 migrations to the resolved database binding. */
     migrate: () => applyD1Migrations("remote", databaseBinding),
   };
 }
@@ -328,12 +332,17 @@ export function parseWorkerSecretNames(json: string): string[] {
     throw new Error("Wrangler secret list returned an invalid response");
   }
 
-  const names = parsed.map((item) => {
-    if (!isRecord(item) || typeof item.name !== "string" || !item.name) {
-      throw new Error("Wrangler secret list returned an invalid secret entry");
-    }
-    return item.name;
-  });
+  const names = parsed.map(
+    /** Validates a Wrangler secret entry and returns its name. */
+    (item) => {
+      if (!isRecord(item) || typeof item.name !== "string" || !item.name) {
+        throw new Error(
+          "Wrangler secret list returned an invalid secret entry",
+        );
+      }
+      return item.name;
+    },
+  );
   return [...new Set(names)].sort();
 }
 
@@ -344,6 +353,7 @@ export function parseCredentialKeyState(json: string): ProtectedKeyState {
   if (
     batches.length === 0 ||
     batches.some(
+      /** Detects malformed protected-key response batches. */
       (batch) =>
         !isRecord(batch) ||
         batch.success !== true ||
@@ -353,22 +363,28 @@ export function parseCredentialKeyState(json: string): ProtectedKeyState {
     throw new Error("Remote protected-key query returned an invalid response");
   }
   const rows = batches.flatMap(
+    /** Collects protected-key rows from validated batches. */
     (batch) => (batch as { results: unknown[] }).results,
   );
 
-  const requiredKeyIds = rows.flatMap((row) => {
-    if (
-      !isRecord(row) ||
-      typeof row.key_id !== "string" ||
-      (row.requires_key !== 0 && row.requires_key !== 1)
-    ) {
-      throw new Error("Remote protected-key query returned an invalid row");
-    }
-    if (!KEY_ID_PATTERN.test(row.key_id)) {
-      throw new Error("Remote protected-key query returned an invalid key ID");
-    }
-    return row.requires_key === 1 ? [row.key_id] : [];
-  });
+  const requiredKeyIds = rows.flatMap(
+    /** Validates a protected-key row and returns any required key ID. */
+    (row) => {
+      if (
+        !isRecord(row) ||
+        typeof row.key_id !== "string" ||
+        (row.requires_key !== 0 && row.requires_key !== 1)
+      ) {
+        throw new Error("Remote protected-key query returned an invalid row");
+      }
+      if (!KEY_ID_PATTERN.test(row.key_id)) {
+        throw new Error(
+          "Remote protected-key query returned an invalid key ID",
+        );
+      }
+      return row.requires_key === 1 ? [row.key_id] : [];
+    },
+  );
   return {
     protectedRecordCount: rows.length,
     requiredKeyIds: [...new Set(requiredKeyIds)].sort(),
@@ -419,27 +435,41 @@ export function parseQueueConsumers(json: string): QueueConsumer[] {
       "Wrangler queue consumer list returned an invalid response",
     );
   }
-  return values.map((value) => {
-    if (!isRecord(value)) {
-      throw new Error("Wrangler queue consumer list returned an invalid entry");
-    }
-    const workerNames = [value.script, value.service, value.script_name].filter(
-      (name): name is string => typeof name === "string" && name.length > 0,
-    );
-    const distinctWorkerNames = [...new Set(workerNames)];
-    if (distinctWorkerNames.length > 1) {
-      throw new Error("Wrangler queue consumer list returned an invalid entry");
-    }
-    const scriptName = distinctWorkerNames[0] ?? null;
-    const deadLetterQueue =
-      typeof value.dead_letter_queue === "string" && value.dead_letter_queue
-        ? value.dead_letter_queue
-        : null;
-    if (!scriptName && value.type !== "http_pull") {
-      throw new Error("Wrangler queue consumer list returned an invalid entry");
-    }
-    return { scriptName, deadLetterQueue };
-  });
+  return values.map(
+    /** Converts a validated Wrangler value into a queue consumer. */
+    (value) => {
+      if (!isRecord(value)) {
+        throw new Error(
+          "Wrangler queue consumer list returned an invalid entry",
+        );
+      }
+      const workerNames = [
+        value.script,
+        value.service,
+        value.script_name,
+      ].filter(
+        /** Keeps non-empty Worker names exposed by Wrangler variants. */
+        (name): name is string => typeof name === "string" && name.length > 0,
+      );
+      const distinctWorkerNames = [...new Set(workerNames)];
+      if (distinctWorkerNames.length > 1) {
+        throw new Error(
+          "Wrangler queue consumer list returned an invalid entry",
+        );
+      }
+      const scriptName = distinctWorkerNames[0] ?? null;
+      const deadLetterQueue =
+        typeof value.dead_letter_queue === "string" && value.dead_letter_queue
+          ? value.dead_letter_queue
+          : null;
+      if (!scriptName && value.type !== "http_pull") {
+        throw new Error(
+          "Wrangler queue consumer list returned an invalid entry",
+        );
+      }
+      return { scriptName, deadLetterQueue };
+    },
+  );
 }
 
 /** Builds the Worker secret name for a numbered key identifier. */
@@ -455,6 +485,7 @@ export function decideApiKeyringDeployment(
   const secrets = new Set(secretNames);
   const hasActiveKeyId = secrets.has(ACTIVE_KEY_ID_SECRET);
   const numberedKeys = [...secrets].filter(
+    /** Keeps numbered secrets while excluding the active ID marker. */
     (name) =>
       name.startsWith(NUMBERED_KEY_PREFIX) && name !== ACTIVE_KEY_ID_SECRET,
   );
@@ -476,6 +507,7 @@ export function decideApiKeyringDeployment(
 
   const missingProtectedKeys = keyState.requiredKeyIds
     .map(numberedKeySecretName)
+    /** Keeps required key secrets that are absent from the Worker. */
     .filter((name) => !secrets.has(name));
   if (missingProtectedKeys.length > 0) {
     throw new Error(
@@ -581,6 +613,7 @@ function assertQueueOwnership(
   expectedDeadLetterQueue?: string,
 ): void {
   const foreign = consumers.filter(
+    /** Keeps consumers owned by another Worker. */
     (consumer) => consumer.scriptName !== workerName,
   );
   if (foreign.length > 0) {
@@ -590,7 +623,10 @@ function assertQueueOwnership(
   }
   if (
     requireExpectedConsumer &&
-    !consumers.some((consumer) => consumer.scriptName === workerName)
+    !consumers.some(
+      /** Detects the expected Worker consumer. */
+      (consumer) => consumer.scriptName === workerName,
+    )
   ) {
     throw new Error(
       `Cloudflare Queue ${queueName} is not connected to Worker ${workerName} after deployment.`,
@@ -598,6 +634,7 @@ function assertQueueOwnership(
   }
   if (requireExpectedConsumer && expectedDeadLetterQueue) {
     const expectedConsumer = consumers.find(
+      /** Finds the deployed Worker's queue consumer configuration. */
       (consumer) => consumer.scriptName === workerName,
     );
     if (expectedConsumer?.deadLetterQueue !== expectedDeadLetterQueue) {

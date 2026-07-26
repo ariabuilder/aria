@@ -42,10 +42,13 @@ type BundleProblem = {
 async function listFiles(directory: string): Promise<string[]> {
   const entries = await readdir(directory, { withFileTypes: true });
   const files = await Promise.all(
-    entries.map((entry) => {
-      const entryPath = path.join(directory, entry.name);
-      return entry.isDirectory() ? listFiles(entryPath) : [entryPath];
-    }),
+    entries.map(
+      /** Recursively expands a bundle directory entry into files. */
+      (entry) => {
+        const entryPath = path.join(directory, entry.name);
+        return entry.isDirectory() ? listFiles(entryPath) : [entryPath];
+      },
+    ),
   );
   return files.flat();
 }
@@ -71,6 +74,7 @@ function collectBindingNames(
 function collectDeclaredIdentifiers(sourceFile: ts.SourceFile): Set<string> {
   const declared = new Set<string>();
 
+  /** Visits syntax nodes and records every declared binding. */
   function visit(node: ts.Node): void {
     if (ts.isImportClause(node) && node.name) {
       declared.add(node.name.text);
@@ -107,6 +111,7 @@ function findUnboundVueInitializers(
 ): Set<string> {
   const unbound = new Set<string>();
 
+  /** Visits call expressions and records missing Vue initializer bindings. */
   function visit(node: ts.Node): void {
     if (
       ts.isCallExpression(node) &&
@@ -139,10 +144,13 @@ async function inspectJavaScriptBundle(
   const declared = collectDeclaredIdentifiers(sourceFile);
   const unbound = findUnboundVueInitializers(sourceFile, declared);
 
-  return [...unbound].map((initializer) => ({
-    file: path.relative(workspaceRoot, filePath),
-    message: `unbound Vue/Rolldown initializer ${initializer}()`,
-  }));
+  return [...unbound].map(
+    /** Converts an unbound initializer into a bundle problem. */
+    (initializer) => ({
+      file: path.relative(workspaceRoot, filePath),
+      message: `unbound Vue/Rolldown initializer ${initializer}()`,
+    }),
+  );
 }
 
 /** Inspects a CSS bundle for invalid or truncated output. */
@@ -224,16 +232,19 @@ async function inspectWorkerEntry(): Promise<BundleProblem[]> {
         ts.isObjectLiteralExpression(declaration.initializer)
       ) {
         defaultWorkerMethods = new Set(
-          declaration.initializer.properties.flatMap((property) => {
-            if (
-              ts.isMethodDeclaration(property) ||
-              ts.isPropertyAssignment(property)
-            ) {
-              const name = propertyNameText(property.name);
-              return name ? [name] : [];
-            }
-            return [];
-          }),
+          declaration.initializer.properties.flatMap(
+            /** Extracts callable names from the default Worker export. */
+            (property) => {
+              if (
+                ts.isMethodDeclaration(property) ||
+                ts.isPropertyAssignment(property)
+              ) {
+                const name = propertyNameText(property.name);
+                return name ? [name] : [];
+              }
+              return [];
+            },
+          ),
         );
       }
     }
@@ -267,10 +278,12 @@ async function inspectWorkerRuntimeFile(
       message: "Node command orchestration reached the Worker bundle",
     },
   ];
-  return forbidden.flatMap(({ pattern, message }) =>
-    pattern.test(source)
-      ? [{ file: path.relative(workspaceRoot, filePath), message }]
-      : [],
+  return forbidden.flatMap(
+    /** Converts each matched forbidden pattern into a bundle problem. */
+    ({ pattern, message }) =>
+      pattern.test(source)
+        ? [{ file: path.relative(workspaceRoot, filePath), message }]
+        : [],
   );
 }
 
@@ -278,7 +291,12 @@ async function inspectWorkerRuntimeFile(
 function bindingNames<T extends { binding: string }>(
   bindings: readonly T[],
 ): Set<string> {
-  return new Set(bindings.map(({ binding }) => binding));
+  return new Set(
+    bindings.map(
+      /** Selects the binding name from a Wrangler resource entry. */
+      ({ binding }) => binding,
+    ),
+  );
 }
 
 /** Checks every generated Wrangler bundle file for integrity problems. */
@@ -331,7 +349,10 @@ async function inspectWranglerBundle(): Promise<BundleProblem[]> {
     r2: bindingNames(config.r2_buckets),
     d1: bindingNames(config.d1_databases),
     durableObject: new Set(
-      config.durable_objects.bindings.map(({ name }) => name),
+      config.durable_objects.bindings.map(
+        /** Selects a Durable Object binding name. */
+        ({ name }) => name,
+      ),
     ),
   } satisfies Record<keyof typeof requiredBindings, Set<string>>;
 
@@ -368,8 +389,9 @@ async function inspectWranglerBundle(): Promise<BundleProblem[]> {
 /** Runs all generated bundle integrity checks and reports any problems. */
 async function main(): Promise<void> {
   const entries = await readdir(clientAssetsDir, { withFileTypes: true });
-  const workerRuntimeFiles = (await listFiles(workerServerDir)).filter((file) =>
-    /\.[cm]?js$/u.test(file),
+  const workerRuntimeFiles = (await listFiles(workerServerDir)).filter(
+    /** Keeps JavaScript modules emitted for the Worker runtime. */
+    (file) => /\.[cm]?js$/u.test(file),
   );
   const problems: BundleProblem[] = [];
 
@@ -392,6 +414,7 @@ async function main(): Promise<void> {
 
   if (problems.length > 0) {
     const details = problems
+      /** Formats one bundle problem for the final error message. */
       .map(({ file, message }) => `- ${file}: ${message}`)
       .join("\n");
     throw new Error(`Vite bundle integrity check failed:\n${details}`);

@@ -69,8 +69,10 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 export function isRemoteDatabaseEmpty(json: string): boolean {
   const parsed: unknown = JSON.parse(json);
   const batches = Array.isArray(parsed) ? parsed : [parsed];
-  const rows = batches.flatMap((batch) =>
-    isRecord(batch) && Array.isArray(batch.results) ? batch.results : [],
+  const rows = batches.flatMap(
+    /** Collects result rows from valid Wrangler response batches. */
+    (batch) =>
+      isRecord(batch) && Array.isArray(batch.results) ? batch.results : [],
   );
 
   if (rows.length !== 1 || !isRecord(rows[0])) {
@@ -115,19 +117,27 @@ function sqlLiteral(value: unknown): string {
 class SqlBuffer {
   private statements: string[] = [];
 
+  /** Interpolates escaped values into a parameterized SQL statement. */
   private interpolate(sql: string, args: readonly unknown[] = []): string {
     let index = 0;
-    return sql.replace(/\?/g, () => sqlLiteral(args[index++]));
+    return sql.replace(
+      /\?/g,
+      /** Replaces each placeholder with its escaped bootstrap value. */
+      () => sqlLiteral(args[index++]),
+    );
   }
 
+  /** Appends a parameterized statement terminated by a semicolon. */
   append(sql: string, args: readonly unknown[] = []): void {
     this.statements.push(`${this.interpolate(sql, args)};`);
   }
 
+  /** Appends literal SQL while ensuring it ends with a semicolon. */
   appendRaw(sql: string): void {
     this.statements.push(sql.endsWith(";") ? sql : `${sql};`);
   }
 
+  /** Joins buffered statements into executable SQL text. */
   toSql(): string {
     return this.statements.join("\n");
   }

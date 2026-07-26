@@ -119,6 +119,7 @@ const SSR_OPTIMIZE_DEPS_EXCLUDES = [
 function ariaSsrOptimizeDepsPlugin() {
   return {
     name: "aria:ssr-optimize-deps",
+    /** Configures dependency freshness for Astro SSR environments. */
     configEnvironment(environmentName: string) {
       if (!["ssr", "astro", "prerender"].includes(environmentName)) {
         return;

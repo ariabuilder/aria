@@ -27,10 +27,12 @@ export function createWranglerCliR2Bucket(input: {
   const configPath = resolveWranglerConfigPath();
   const configArgs = configPath ? ["--config", configPath] : [];
 
+  /** Builds the Wrangler object path for a bucket key. */
   function objectPath(key: string): string {
     return `${objectPrefix}${key}`;
   }
 
+  /** Runs a Wrangler R2 command with the configured location and config. */
   function runWrangler(args: string[]): Buffer {
     const result = runWranglerSync(
       ["r2", "object", ...args, locationFlag, ...configArgs],
@@ -44,6 +46,7 @@ export function createWranglerCliR2Bucket(input: {
   }
 
   return {
+    /** Reads object metadata through a temporary Wrangler download. */
     async head(key) {
       const tempDir = mkdtempSync(join(tmpdir(), "aria-r2-head-"));
       const outfile = join(tempDir, "object.bin");
@@ -62,6 +65,7 @@ export function createWranglerCliR2Bucket(input: {
       }
     },
 
+    /** Returns the empty listing supported by this command adapter. */
     async list() {
       return {
         objects: [],
@@ -69,6 +73,7 @@ export function createWranglerCliR2Bucket(input: {
       };
     },
 
+    /** Uploads an object through a protected temporary file. */
     async put(key, value, options) {
       const tempDir = mkdtempSync(join(tmpdir(), "aria-r2-put-"));
       const infile = join(tempDir, "upload.bin");
@@ -100,6 +105,7 @@ export function createWranglerCliR2Bucket(input: {
       }
     },
 
+    /** Downloads an object through Wrangler into temporary storage. */
     async get(key) {
       const tempDir = mkdtempSync(join(tmpdir(), "aria-r2-get-"));
       const outfile = join(tempDir, "object.bin");
@@ -109,6 +115,7 @@ export function createWranglerCliR2Bucket(input: {
         const data = readFileSync(outfile);
 
         return {
+          /** Returns the downloaded object data as an ArrayBuffer. */
           async arrayBuffer() {
             return data.buffer.slice(
               data.byteOffset,
@@ -123,6 +130,7 @@ export function createWranglerCliR2Bucket(input: {
       }
     },
 
+    /** Deletes an object through Wrangler and tolerates missing keys. */
     async delete(key) {
       try {
         runWrangler(["delete", objectPath(key)]);

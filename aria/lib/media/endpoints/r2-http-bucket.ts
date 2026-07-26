@@ -37,10 +37,13 @@ type R2ApiObject = {
 
 /** Encodes each segment of an R2 object key without losing path separators. */
 function encodeObjectKey(key: string): string {
-  return key
-    .split("/")
-    .map((segment) => encodeURIComponent(segment))
-    .join("/");
+  return (
+    key
+      .split("/")
+      /** Encodes one object-key segment while retaining slash separators. */
+      .map((segment) => encodeURIComponent(segment))
+      .join("/")
+  );
 }
 
 /** Sends an authenticated request to the Cloudflare R2 API. */
@@ -89,6 +92,7 @@ export async function createRemoteR2HttpBucket(input?: {
   void publicUrl;
 
   const _bucket: CloudflareR2Bucket = {
+    /** Reads object metadata without downloading its body. */
     async head(key: string) {
       const response = await r2ApiFetch({
         accountId,
@@ -115,6 +119,7 @@ export async function createRemoteR2HttpBucket(input?: {
       };
     },
 
+    /** Lists objects using the requested prefix, cursor, and limit. */
     async list(opts) {
       const searchParams = new URLSearchParams();
       if (opts?.prefix) {
@@ -143,19 +148,24 @@ export async function createRemoteR2HttpBucket(input?: {
 
       if (!response.ok || !payload.success) {
         const message =
-          payload.errors?.map((error) => error.message).join("; ") ||
-          `R2 list failed (${response.status})`;
+          payload.errors
+            /** Extracts Cloudflare error messages for a readable failure. */
+            ?.map((error) => error.message)
+            .join("; ") || `R2 list failed (${response.status})`;
         throw new Error(message);
       }
 
-      const objects = (payload.result ?? []).map((item) => ({
-        key: item.key ?? "",
-        size: item.size,
-        etag: item.etag,
-        uploaded: item.uploaded ? new Date(item.uploaded) : undefined,
-        httpMetadata: item.httpMetadata,
-        checksums: item.checksums,
-      }));
+      const objects = (payload.result ?? []).map(
+        /** Converts an R2 API item into the bucket adapter's object shape. */
+        (item) => ({
+          key: item.key ?? "",
+          size: item.size,
+          etag: item.etag,
+          uploaded: item.uploaded ? new Date(item.uploaded) : undefined,
+          httpMetadata: item.httpMetadata,
+          checksums: item.checksums,
+        }),
+      );
 
       return {
         objects,
@@ -164,6 +174,7 @@ export async function createRemoteR2HttpBucket(input?: {
       };
     },
 
+    /** Uploads an object and its HTTP metadata to R2. */
     async put(key, value, options) {
       const body =
         value instanceof ArrayBuffer
@@ -197,6 +208,7 @@ export async function createRemoteR2HttpBucket(input?: {
       );
     },
 
+    /** Downloads an object and exposes its body as an ArrayBuffer. */
     async get(key) {
       const response = await r2ApiFetch({
         accountId,
@@ -214,12 +226,14 @@ export async function createRemoteR2HttpBucket(input?: {
       }
 
       return {
+        /** Reads the downloaded response body as an ArrayBuffer. */
         async arrayBuffer() {
           return response.arrayBuffer();
         },
       };
     },
 
+    /** Deletes an object from the remote R2 bucket. */
     async delete(key) {
       const response = await r2ApiFetch({
         accountId,

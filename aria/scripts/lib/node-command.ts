@@ -89,7 +89,10 @@ export function resolveNpmCli(env: NodeJS.ProcessEnv = process.env): string {
     ),
   ].filter((candidate): candidate is string => Boolean(candidate));
 
-  const npmCli = candidates.find((candidate) => existsSync(candidate));
+  const npmCli = candidates.find(
+    /** Selects the first npm CLI path present on this installation. */
+    (candidate) => existsSync(candidate),
+  );
   if (!npmCli) {
     throw new Error(
       "Unable to resolve npm's JavaScript CLI. Run this command through an npm script.",
@@ -166,6 +169,7 @@ export async function runNodeArgs(
   let outputBytes = 0;
   let overflowError: Error | undefined;
 
+  /** Collects a child output chunk while enforcing the shared buffer limit. */
   const collect = (target: Buffer[], chunk: Buffer | string) => {
     const value = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
     outputBytes += value.byteLength;
@@ -178,31 +182,50 @@ export async function runNodeArgs(
     }
     target.push(value);
   };
-  child.stdout?.on("data", (chunk) => collect(stdoutChunks, chunk));
-  child.stderr?.on("data", (chunk) => collect(stderrChunks, chunk));
+  child.stdout?.on(
+    "data",
+    /** Collects a stdout chunk from the child process. */
+    (chunk) => collect(stdoutChunks, chunk),
+  );
+  child.stderr?.on(
+    "data",
+    /** Collects a stderr chunk from the child process. */
+    (chunk) => collect(stderrChunks, chunk),
+  );
   if (options.input !== undefined && child.stdin) {
     child.stdin.end(options.input);
   }
 
-  const commandResult = await new Promise<CommandResult>((resolveResult) => {
-    let spawnError: Error | undefined;
-    child.on("error", (error) => {
-      spawnError = error;
-    });
-    child.on("close", (status, signal) => {
-      resolveResult({
-        status,
-        signal,
-        stdout: Buffer.concat(stdoutChunks).toString(
-          options.encoding ?? "utf8",
-        ),
-        stderr: Buffer.concat(stderrChunks).toString(
-          options.encoding ?? "utf8",
-        ),
-        error: overflowError ?? spawnError,
-      });
-    });
-  });
+  const commandResult = await new Promise<CommandResult>(
+    /** Resolves when the child closes, retaining any spawn failure. */
+    (resolveResult) => {
+      let spawnError: Error | undefined;
+      child.on(
+        "error",
+        /** Records a child-process spawn failure. */
+        (error) => {
+          spawnError = error;
+        },
+      );
+      child.on(
+        "close",
+        /** Builds the final command result after the child exits. */
+        (status, signal) => {
+          resolveResult({
+            status,
+            signal,
+            stdout: Buffer.concat(stdoutChunks).toString(
+              options.encoding ?? "utf8",
+            ),
+            stderr: Buffer.concat(stderrChunks).toString(
+              options.encoding ?? "utf8",
+            ),
+            error: overflowError ?? spawnError,
+          });
+        },
+      );
+    },
+  );
 
   if (!options.allowFailure) {
     if (commandResult.error) throw commandResult.error;

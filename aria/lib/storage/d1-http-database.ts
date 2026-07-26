@@ -76,6 +76,7 @@ async function executeD1HttpQuery(input: {
   if (!response.ok || !payload.success) {
     const message =
       payload.errors
+        /** Extracts Cloudflare error messages from a failed D1 response. */
         ?.map((error) => error.message)
         .filter(Boolean)
         .join("; ") || `D1 HTTP query failed (${response.status})`;
@@ -101,12 +102,14 @@ function createHttpPreparedStatement(input: {
   const args = input.args ?? [];
 
   return {
+    /** Binds positional values to this D1 HTTP statement. */
     bind(...values: unknown[]) {
       return createHttpPreparedStatement({
         ...input,
         args: values,
       });
     },
+    /** Executes the statement and returns its first row. */
     async first<T extends D1HttpQueryRow = D1HttpQueryRow>() {
       const result = await executeD1HttpQuery({
         accountId: input.accountId,
@@ -117,6 +120,7 @@ function createHttpPreparedStatement(input: {
 
       return (result.results?.[0] ?? null) as T | null;
     },
+    /** Executes the statement and returns every result row. */
     async all<T extends D1HttpQueryRow = D1HttpQueryRow>() {
       const result = await executeD1HttpQuery({
         accountId: input.accountId,
@@ -129,6 +133,7 @@ function createHttpPreparedStatement(input: {
         results: (result.results ?? []) as T[],
       };
     },
+    /** Executes the statement and returns the raw D1 result. */
     async run() {
       return executeD1HttpQuery({
         accountId: input.accountId,
@@ -155,6 +160,7 @@ export async function createD1HttpDatabase(input?: {
   const databaseId = input?.databaseId ?? wranglerConfig.databaseId;
 
   return {
+    /** Prepares SQL for execution through the D1 HTTP API. */
     prepare(sql: string) {
       return createHttpPreparedStatement({
         accountId,
@@ -162,6 +168,7 @@ export async function createD1HttpDatabase(input?: {
         sql,
       });
     },
+    /** Executes a group of prepared D1 HTTP statements in order. */
     async batch(statements: D1HttpPreparedStatement[]) {
       const results: Array<{ results?: D1HttpQueryRow[] }> = [];
 
