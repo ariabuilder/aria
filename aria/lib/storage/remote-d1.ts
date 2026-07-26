@@ -1,6 +1,3 @@
-import { execFile } from "node:child_process";
-import { promisify } from "node:util";
-
 import { createD1HttpDatabase } from "./d1-http-database";
 import type {
   D1PreparedStatementLike,
@@ -9,10 +6,12 @@ import type {
 } from "./d1-database-types";
 import { D1_SAFE_INLINE_STATEMENT_BYTES } from "./push-validation";
 import { resolveWranglerConfigPath } from "./wrangler-config";
+import { runWrangler } from "../../scripts/lib/wrangler-command";
 
-export type { D1PreparedStatementLike, RemoteD1DatabaseLike } from "./d1-database-types";
-
-const execFileAsync = promisify(execFile);
+export type {
+  D1PreparedStatementLike,
+  RemoteD1DatabaseLike,
+} from "./d1-database-types";
 
 type RemoteD1Result<T extends D1QueryRow = D1QueryRow> = {
   results?: T[];
@@ -76,7 +75,6 @@ async function executeLiteralRemoteSql<T extends D1QueryRow>(input: {
   // discovery order would pick the jsonc first.
   const configPath = resolveWranglerConfigPath();
   const args = [
-    "wrangler",
     "d1",
     "execute",
     input.binding,
@@ -88,9 +86,10 @@ async function executeLiteralRemoteSql<T extends D1QueryRow>(input: {
     ...(configPath ? ["--config", configPath] : []),
   ];
 
-  const { stdout } = await execFileAsync("npx", args, {
+  const { stdout } = await runWrangler(args, {
     cwd: process.cwd(),
     maxBuffer: 10 * 1024 * 1024,
+    stdio: ["ignore", "pipe", "pipe"],
   });
 
   const parsed = JSON.parse(stdout) as RemoteD1Result<T>[];
@@ -182,7 +181,7 @@ function createLiteralWranglerD1Database(
 function hasAriaCloudflareApiToken(): boolean {
   return Boolean(
     process.env.ARIA_CLOUDFLARE_API_TOKEN?.trim() ||
-      process.env.ARIA_CF_API_TOKEN?.trim(),
+    process.env.ARIA_CF_API_TOKEN?.trim(),
   );
 }
 

@@ -7,8 +7,8 @@ import type { RemoteD1DatabaseLike } from "./d1-database-types";
 import {
   parseD1BindingFromWrangler,
   readWranglerToml,
-  resolveCloudflareAccountId,
 } from "./wrangler-config";
+import { resolveCloudflareAccountId } from "../../scripts/lib/cloudflare-account";
 
 type D1HttpQueryRow = Record<string, unknown>;
 
@@ -73,8 +73,10 @@ async function executeD1HttpQuery(input: {
 
   if (!response.ok || !payload.success) {
     const message =
-      payload.errors?.map((error) => error.message).filter(Boolean).join("; ") ||
-      `D1 HTTP query failed (${response.status})`;
+      payload.errors
+        ?.map((error) => error.message)
+        .filter(Boolean)
+        .join("; ") || `D1 HTTP query failed (${response.status})`;
     throw new Error(message);
   }
 
@@ -141,7 +143,10 @@ export async function createD1HttpDatabase(input?: {
   databaseId?: string;
 }): Promise<RemoteD1DatabaseLike> {
   const binding = input?.binding ?? process.env.ARIA_D1_BINDING ?? "aria_db";
-  const wranglerConfig = parseD1BindingFromWrangler(readWranglerToml(), binding);
+  const wranglerConfig = parseD1BindingFromWrangler(
+    readWranglerToml(),
+    binding,
+  );
   const accountId = input?.accountId ?? (await resolveCloudflareAccountId());
   const databaseId = input?.databaseId ?? wranglerConfig.databaseId;
 

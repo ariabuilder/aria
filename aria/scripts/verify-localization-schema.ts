@@ -1,5 +1,3 @@
-#!/usr/bin/env -S npx tsx
-
 import { createClient } from "@libsql/client";
 import path from "node:path";
 

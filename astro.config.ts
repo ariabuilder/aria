@@ -232,7 +232,16 @@ export default defineConfig({
                 "aria/lib/cloudflare/workers-shim.ts",
               ),
             }
-          : {}),
+          : {
+              "@libsql/client/node": path.join(
+                workspaceRoot,
+                "aria/lib/cloudflare/libsql-client-shim.ts",
+              ),
+              "@libsql/client": path.join(
+                workspaceRoot,
+                "aria/lib/cloudflare/libsql-client-shim.ts",
+              ),
+            }),
         // LibSQL imports this CommonJS dependency even in the Worker bundle.
         // Point Vite at an ESM-compatible implementation for workerd.
         "promise-limit": path.join(

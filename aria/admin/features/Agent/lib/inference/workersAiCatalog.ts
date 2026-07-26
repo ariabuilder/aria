@@ -1,4 +1,4 @@
-import { resolveCloudflareAccountId } from "../../../../../lib/storage/wrangler-config";
+import { readCloudflareAccountIdFromEnvironment } from "../../../../../lib/cloudflare/account";
 import type { CatalogModel } from "../schemas";
 import { WORKERS_AI_STATIC_CATALOG } from "./workersAiStaticCatalog";
 
@@ -21,6 +21,19 @@ function resolveWorkersAiApiToken(): string | undefined {
   );
 }
 
+async function resolveWorkersAiAccountId(): Promise<string | undefined> {
+  const fromEnvironment = readCloudflareAccountIdFromEnvironment();
+  if (fromEnvironment) {
+    return fromEnvironment;
+  }
+  if (import.meta.env.PUBLIC_ARIA_RUNTIME === "node") {
+    const { resolveCloudflareAccountId } =
+      await import("../../../../../scripts/lib/cloudflare-account");
+    return resolveCloudflareAccountId();
+  }
+  return undefined;
+}
+
 function normalizeWorkersAiModel(entry: {
   id?: string;
   name?: string;
@@ -32,9 +45,7 @@ function normalizeWorkersAiModel(entry: {
   }
 
   const name =
-    entry.name?.trim() ||
-    entry.description?.trim() ||
-    id.replace(/^@cf\//, "");
+    entry.name?.trim() || entry.description?.trim() || id.replace(/^@cf\//, "");
 
   return { id, name };
 }
@@ -46,7 +57,10 @@ export async function fetchWorkersAiCatalog(): Promise<CatalogModel[]> {
   }
 
   try {
-    const accountId = await resolveCloudflareAccountId();
+    const accountId = await resolveWorkersAiAccountId();
+    if (!accountId) {
+      return [...WORKERS_AI_STATIC_CATALOG];
+    }
     const response = await fetch(
       `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/models/search?task=text-generation`,
       {

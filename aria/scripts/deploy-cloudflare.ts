@@ -1,22 +1,16 @@
-#!/usr/bin/env -S npx tsx
-
-import { spawnSync } from "node:child_process";
 import { randomBytes } from "node:crypto";
-import {
-  chmod,
-  mkdtemp,
-  readFile,
-  rm,
-  writeFile,
-} from "node:fs/promises";
+import { chmod, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join } from "node:path";
 
 import {
   readWorkerNameFromWranglerConfig,
   resolveWranglerConfigPath,
 } from "../lib/storage/wrangler-config";
+import { applyD1Migrations } from "./apply-d1-migrations";
+import { isMainModule } from "./lib/node-command";
+import { buildCloudflare } from "./project-command";
+import { runWranglerSync } from "./lib/wrangler-command";
 
 const DEPLOY_CONFIG = "dist/server/wrangler.json";
 const DEFAULT_D1_BINDING = "aria_db";
@@ -278,7 +272,9 @@ export type CapturedCommandResult = Readonly<{
 
 export type DeployCommandRunner = Readonly<{
   capture(command: string, args: readonly string[]): CapturedCommandResult;
+  build(): Promise<void>;
   inherit(command: string, args: readonly string[]): void;
+  migrate(): Promise<void>;
 }>;
 
 export type ApiKeyringDeploymentDecision = "bootstrap" | "preserve";
@@ -298,33 +294,27 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 function createCommandRunner(): DeployCommandRunner {
   const environment = { ...process.env, CI: "true" };
   return {
+    build: buildCloudflare,
     capture(command, args) {
-      const result = spawnSync(command, [...args], {
-        cwd: process.cwd(),
-        encoding: "utf8",
+      if (command !== "wrangler") {
+        throw new Error(`Unsupported deployment command: ${command}`);
+      }
+      return runWranglerSync(args, {
+        allowFailure: true,
         env: environment,
         stdio: ["ignore", "pipe", "pipe"],
       });
-      return {
-        status: result.status,
-        stdout: result.stdout ?? "",
-        stderr: result.stderr ?? "",
-        error: result.error,
-      };
     },
     inherit(command, args) {
-      const result = spawnSync(command, [...args], {
-        cwd: process.cwd(),
+      if (command !== "wrangler") {
+        throw new Error(`Unsupported deployment command: ${command}`);
+      }
+      runWranglerSync(args, {
         env: environment,
         stdio: "inherit",
       });
-      if (result.error) throw result.error;
-      if (result.status !== 0) {
-        throw new Error(
-          `Command failed (${result.status ?? "unknown status"}): ${command} ${args.join(" ")}`,
-        );
-      }
     },
+    migrate: () => applyD1Migrations("remote"),
   };
 }
 
@@ -500,8 +490,7 @@ function requireSuccessfulCommand(
 }
 
 function readRemoteSecretNames(runner: DeployCommandRunner): string[] {
-  const result = runner.capture("npx", [
-    "wrangler",
+  const result = runner.capture("wrangler", [
     "secret",
     "list",
     "--config",
@@ -523,8 +512,7 @@ function readProtectedKeyState(
 ): ProtectedKeyState {
   return mergeProtectedKeyStates(
     PROTECTED_KEY_STATE_QUERIES.map(({ source, sql }) => {
-      const result = runner.capture("npx", [
-        "wrangler",
+      const result = runner.capture("wrangler", [
         "d1",
         "execute",
         databaseBinding,
@@ -549,8 +537,7 @@ function readQueueConsumers(
   runner: DeployCommandRunner,
   queueName: string,
 ): QueueConsumer[] | null {
-  const result = runner.capture("npx", [
-    "wrangler",
+  const result = runner.capture("wrangler", [
     "queues",
     "consumer",
     "list",
@@ -614,8 +601,7 @@ function ensureQueues(
     const consumers = readQueueConsumers(runner, queueName);
     if (consumers === null) {
       console.log(`Creating Cloudflare Queue ${queueName}.`);
-      runner.inherit("npx", [
-        "wrangler",
+      runner.inherit("wrangler", [
         "queues",
         "create",
         queueName,
@@ -701,8 +687,7 @@ function deployWorkerAndCapture(
   runner: DeployCommandRunner,
   extraArgs: readonly string[] = [],
 ): string {
-  const result = runner.capture("npx", [
-    "wrangler",
+  const result = runner.capture("wrangler", [
     "deploy",
     "--config",
     DEPLOY_CONFIG,
@@ -720,9 +705,7 @@ function deployWorkerAndCapture(
   if (result.status !== 0) {
     const detail = result.stderr.trim();
     throw new Error(
-      detail
-        ? `Wrangler deploy failed: ${detail}`
-        : "Wrangler deploy failed",
+      detail ? `Wrangler deploy failed: ${detail}` : "Wrangler deploy failed",
     );
   }
   return `${result.stdout}\n${result.stderr}`;
@@ -738,14 +721,15 @@ async function uploadWorkerSecrets(
   );
   const secretsPath = join(temporaryDirectory, "secrets.json");
   try {
-    await chmod(temporaryDirectory, 0o700);
+    if (process.platform !== "win32") {
+      await chmod(temporaryDirectory, 0o700);
+    }
     await writeFile(secretsPath, JSON.stringify(secrets), {
       encoding: "utf8",
       flag: "wx",
-      mode: 0o600,
+      mode: process.platform === "win32" ? undefined : 0o600,
     });
-    runner.inherit("npx", [
-      "wrangler",
+    runner.inherit("wrangler", [
       "secret",
       "bulk",
       secretsPath,
@@ -811,8 +795,8 @@ export async function deployCloudflare(
   const workerName = resolveDeployWorkerName(options.workerName);
   const temporaryRoot = options.temporaryDirectoryRoot ?? tmpdir();
 
-  runner.inherit("npm", ["run", "deploy:migrate"]);
-  runner.inherit("npm", ["run", "build"]);
+  await runner.migrate();
+  await runner.build();
   // The Deploy-button rename misses `dead_letter_queue` references; reapply
   // the rename in the built config before anything reads or deploys it.
   await repairDeployDeadLetterQueues();
@@ -846,7 +830,9 @@ export async function deployCloudflare(
   const secretsPath = join(temporaryDirectory, "secrets.json");
 
   try {
-    await chmod(temporaryDirectory, 0o700);
+    if (process.platform !== "win32") {
+      await chmod(temporaryDirectory, 0o700);
+    }
     const keyBytes = options.randomKeyBytes?.() ?? randomBytes(32);
     if (keyBytes.byteLength !== 32) {
       throw new Error("Generated Site API keyring root must contain 32 bytes");
@@ -858,7 +844,7 @@ export async function deployCloudflare(
     await writeFile(secretsPath, JSON.stringify(secrets), {
       encoding: "utf8",
       flag: "wx",
-      mode: 0o600,
+      mode: process.platform === "win32" ? undefined : 0o600,
     });
 
     // Confirm the file contains only the expected bindings without printing
@@ -887,11 +873,7 @@ export async function deployCloudflare(
   }
 }
 
-const isMain = process.argv[1]
-  ? resolve(process.argv[1]) === fileURLToPath(import.meta.url)
-  : false;
-
-if (isMain) {
+if (isMainModule(import.meta.url)) {
   await deployCloudflare({
     databaseBinding: process.env.ARIA_D1_BINDING || DEFAULT_D1_BINDING,
   });

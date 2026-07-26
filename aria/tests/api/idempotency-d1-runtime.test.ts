@@ -1,7 +1,7 @@
-import { execFileSync } from "node:child_process";
-import { resolve } from "node:path";
 import { Miniflare } from "miniflare";
 import { describe, expect, it } from "vitest";
+
+import { runPackageBinSync } from "../../scripts/lib/node-command";
 
 const runD1 = process.env.ARIA_D1_RUNTIME_TEST === "1";
 
@@ -167,8 +167,9 @@ describe.runIf(runD1)("API mutation D1 runtime", () => {
         }
       };
     `;
-    const script = execFileSync(
-      resolve(process.cwd(), "node_modules/.bin/esbuild"),
+    const script = runPackageBinSync(
+      "esbuild",
+      "esbuild",
       [
         "--bundle",
         "--format=esm",
@@ -177,8 +178,12 @@ describe.runIf(runD1)("API mutation D1 runtime", () => {
         "--loader=ts",
         "--log-level=warning",
       ],
-      { cwd: process.cwd(), input: source, encoding: "utf8" },
-    );
+      {
+        cwd: process.cwd(),
+        input: source,
+        stdio: ["pipe", "pipe", "pipe"],
+      },
+    ).stdout;
     if (!script.trim())
       throw new Error("D1 test Worker bundle was not generated");
     const miniflare = new Miniflare({

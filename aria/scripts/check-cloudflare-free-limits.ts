@@ -1,9 +1,7 @@
-import { execFile } from "node:child_process";
 import { readdir, stat } from "node:fs/promises";
 import path from "node:path";
-import { promisify } from "node:util";
 
-const execFileAsync = promisify(execFile);
+import { runWrangler } from "./lib/wrangler-command";
 const workspaceRoot = process.cwd();
 const workerConfigPath = path.join(
   workspaceRoot,
@@ -33,22 +31,16 @@ async function listFiles(directory: string): Promise<string[]> {
 }
 
 async function inspectWorkerUpload(): Promise<number> {
-  const wranglerPath = path.join(
-    workspaceRoot,
-    "node_modules",
-    ".bin",
-    process.platform === "win32" ? "wrangler.cmd" : "wrangler",
+  const { stdout, stderr } = await runWrangler(
+    ["deploy", "--dry-run", "--config", workerConfigPath],
+    {
+      cwd: workspaceRoot,
+      stdio: ["ignore", "pipe", "pipe"],
+    },
   );
-  const { stdout, stderr } = await execFileAsync(wranglerPath, [
-    "deploy",
-    "--dry-run",
-    "--config",
-    workerConfigPath,
-  ]);
   const output = `${stdout}\n${stderr}`;
-  const match = /Total Upload:\s*[\d.]+\s*KiB\s*\/\s*gzip:\s*([\d.]+)\s*KiB/u.exec(
-    output,
-  );
+  const match =
+    /Total Upload:\s*[\d.]+\s*KiB\s*\/\s*gzip:\s*([\d.]+)\s*KiB/u.exec(output);
 
   if (!match?.[1]) {
     throw new Error(
@@ -93,7 +85,9 @@ async function main(): Promise<void> {
   }
 
   if (problems.length > 0) {
-    throw new Error(`Cloudflare Workers Free limit exceeded:\n- ${problems.join("\n- ")}`);
+    throw new Error(
+      `Cloudflare Workers Free limit exceeded:\n- ${problems.join("\n- ")}`,
+    );
   }
 
   console.log(

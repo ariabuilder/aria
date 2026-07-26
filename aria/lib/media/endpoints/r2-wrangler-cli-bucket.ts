@@ -2,7 +2,6 @@
  * R2 bucket access via wrangler CLI (local or remote persistence).
  */
 
-import { execFileSync } from "node:child_process";
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -13,6 +12,7 @@ import {
   readWranglerToml,
   resolveWranglerConfigPath,
 } from "../../storage/wrangler-config";
+import { runWranglerSync } from "../../../scripts/lib/wrangler-command";
 
 export function createWranglerCliR2Bucket(input: {
   local: boolean;
@@ -31,15 +31,15 @@ export function createWranglerCliR2Bucket(input: {
   }
 
   function runWrangler(args: string[]): Buffer {
-    return execFileSync(
-      "npx",
-      ["wrangler", "r2", "object", ...args, locationFlag, ...configArgs],
+    const result = runWranglerSync(
+      ["r2", "object", ...args, locationFlag, ...configArgs],
       {
         cwd: process.cwd(),
         stdio: ["pipe", "pipe", "pipe"],
         env: { ...process.env, CI: "true" },
       },
     );
+    return Buffer.from(result.stdout);
   }
 
   return {

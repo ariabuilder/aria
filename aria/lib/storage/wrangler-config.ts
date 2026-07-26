@@ -1,9 +1,5 @@
-import { execFile } from "node:child_process";
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
-import { promisify } from "node:util";
 import { resolve } from "node:path";
-
-const execFileAsync = promisify(execFile);
 
 export type WranglerD1BindingConfig = {
   binding: string;
@@ -30,9 +26,7 @@ export const WRANGLER_CONFIG_CANDIDATES = [
   "wrangler.jsonc",
 ] as const;
 
-export function resolveWranglerConfigPath(
-  cwd = process.cwd(),
-): string | null {
+export function resolveWranglerConfigPath(cwd = process.cwd()): string | null {
   for (const filename of WRANGLER_CONFIG_CANDIDATES) {
     const candidate = resolve(cwd, filename);
     if (existsSync(candidate)) {
@@ -57,7 +51,9 @@ export function readWorkerNameFromWranglerConfig(
   return raw.match(/"name"\s*:\s*"([^"]+)"/)?.[1] ?? null;
 }
 
-export function readWranglerToml(configPath = resolve(process.cwd(), "wrangler.toml")): string {
+export function readWranglerToml(
+  configPath = resolve(process.cwd(), "wrangler.toml"),
+): string {
   return readFileSync(configPath, "utf-8");
 }
 
@@ -65,7 +61,9 @@ export function parseD1BindingFromWrangler(
   toml: string,
   bindingName = process.env.ARIA_D1_BINDING || "aria_db",
 ): WranglerD1BindingConfig {
-  const blocks = [...toml.matchAll(/\[\[d1_databases\]\]([\s\S]*?)(?=\n\[\[|\n\[|$)/g)];
+  const blocks = [
+    ...toml.matchAll(/\[\[d1_databases\]\]([\s\S]*?)(?=\n\[\[|\n\[|$)/g),
+  ];
 
   for (const block of blocks) {
     const section = block[1] ?? "";
@@ -93,37 +91,13 @@ export function parseD1BindingFromWrangler(
   throw new Error(`D1 binding "${bindingName}" was not found in wrangler.toml`);
 }
 
-export async function resolveCloudflareAccountId(): Promise<string> {
-  const fromEnv = process.env.ARIA_CLOUDFLARE_ACCOUNT_ID?.trim();
-  if (fromEnv) {
-    return fromEnv;
-  }
-
-  const { stdout } = await execFileAsync(
-    "npx",
-    ["wrangler", "whoami", "--json"],
-    { cwd: process.cwd(), maxBuffer: 1024 * 1024 },
-  );
-
-  const parsed = JSON.parse(stdout) as {
-    accounts?: Array<{ id?: string }>;
-  };
-  const accountId = parsed.accounts?.[0]?.id;
-
-  if (!accountId) {
-    throw new Error(
-      "Could not resolve Cloudflare account id. Set ARIA_CLOUDFLARE_ACCOUNT_ID or run `wrangler login`.",
-    );
-  }
-
-  return accountId;
-}
-
 export function parseR2BindingFromWrangler(
   toml: string,
   bindingName = process.env.ARIA_R2_BINDING || "aria_r2",
 ): WranglerR2BindingConfig {
-  const blocks = [...toml.matchAll(/\[\[r2_buckets\]\]([\s\S]*?)(?=\n\[\[|\n\[|$)/g)];
+  const blocks = [
+    ...toml.matchAll(/\[\[r2_buckets\]\]([\s\S]*?)(?=\n\[\[|\n\[|$)/g),
+  ];
 
   for (const block of blocks) {
     const section = block[1] ?? "";
@@ -149,9 +123,7 @@ export function parseR2BindingFromWrangler(
   throw new Error(`R2 binding "${bindingName}" was not found in wrangler.toml`);
 }
 
-export function readR2PublicUrlFromWrangler(
-  toml: string,
-): string | undefined {
+export function readR2PublicUrlFromWrangler(toml: string): string | undefined {
   const match = toml.match(/^\s*R2_PUBLIC_URL\s*=\s*"([^"]+)"/m);
   return match?.[1];
 }
@@ -159,7 +131,10 @@ export function readR2PublicUrlFromWrangler(
 export function resolveLocalWranglerD1SqlitePath(
   cwd = process.cwd(),
 ): string | null {
-  const d1Dir = resolve(cwd, ".wrangler/state/v3/d1/miniflare-D1DatabaseObject");
+  const d1Dir = resolve(
+    cwd,
+    ".wrangler/state/v3/d1/miniflare-D1DatabaseObject",
+  );
 
   let candidates: string[] = [];
 

@@ -5,6 +5,7 @@ import { z } from "zod";
 
 const workspaceRoot = process.cwd();
 const clientAssetsDir = path.join(workspaceRoot, "dist", "client", "_astro");
+const workerServerDir = path.join(workspaceRoot, "dist", "server");
 const workerEntryPath = path.join(workspaceRoot, "dist", "server", "entry.mjs");
 const wranglerConfigPath = path.join(
   workspaceRoot,
@@ -37,7 +38,21 @@ type BundleProblem = {
   message: string;
 };
 
-function collectBindingNames(name: ts.BindingName, bindings: Set<string>): void {
+async function listFiles(directory: string): Promise<string[]> {
+  const entries = await readdir(directory, { withFileTypes: true });
+  const files = await Promise.all(
+    entries.map((entry) => {
+      const entryPath = path.join(directory, entry.name);
+      return entry.isDirectory() ? listFiles(entryPath) : [entryPath];
+    }),
+  );
+  return files.flat();
+}
+
+function collectBindingNames(
+  name: ts.BindingName,
+  bindings: Set<string>,
+): void {
   if (ts.isIdentifier(name)) {
     bindings.add(name.text);
     return;
@@ -228,6 +243,28 @@ async function inspectWorkerEntry(): Promise<BundleProblem[]> {
   return problems;
 }
 
+async function inspectWorkerRuntimeFile(
+  filePath: string,
+): Promise<BundleProblem[]> {
+  const source = await readFile(filePath, "utf8");
+  const forbidden = [
+    {
+      pattern: /(?:node:)?child_process/u,
+      message: "Node subprocess support reached the Worker bundle",
+    },
+    {
+      pattern:
+        /Unable to resolve npm's JavaScript CLI|aria-wrangler-sql-|Unsupported deployment command/u,
+      message: "Node command orchestration reached the Worker bundle",
+    },
+  ];
+  return forbidden.flatMap(({ pattern, message }) =>
+    pattern.test(source)
+      ? [{ file: path.relative(workspaceRoot, filePath), message }]
+      : [],
+  );
+}
+
 function bindingNames<T extends { binding: string }>(
   bindings: readonly T[],
 ): Set<string> {
@@ -305,7 +342,10 @@ async function inspectWranglerBundle(): Promise<BundleProblem[]> {
     problems.push({ file: relativePath, message: "missing ai binding" });
   }
   if (config.assets.binding !== "aria_assets") {
-    problems.push({ file: relativePath, message: "missing aria_assets binding" });
+    problems.push({
+      file: relativePath,
+      message: "missing aria_assets binding",
+    });
   }
   if (config.queues.consumers.length === 0) {
     problems.push({ file: relativePath, message: "missing queue consumers" });
@@ -316,6 +356,9 @@ async function inspectWranglerBundle(): Promise<BundleProblem[]> {
 
 async function main(): Promise<void> {
   const entries = await readdir(clientAssetsDir, { withFileTypes: true });
+  const workerRuntimeFiles = (await listFiles(workerServerDir)).filter((file) =>
+    /\.[cm]?js$/u.test(file),
+  );
   const problems: BundleProblem[] = [];
 
   for (const entry of entries) {
@@ -329,6 +372,9 @@ async function main(): Promise<void> {
     }
   }
 
+  for (const filePath of workerRuntimeFiles) {
+    problems.push(...(await inspectWorkerRuntimeFile(filePath)));
+  }
   problems.push(...(await inspectWorkerEntry()));
   problems.push(...(await inspectWranglerBundle()));
 
@@ -340,7 +386,7 @@ async function main(): Promise<void> {
   }
 
   console.log(
-    `Vite/Cloudflare bundle integrity check passed (${entries.length} client assets inspected).`,
+    `Vite/Cloudflare bundle integrity check passed (${entries.length} client assets and ${workerRuntimeFiles.length} Worker modules inspected).`,
   );
 }
 

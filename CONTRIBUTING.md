@@ -25,6 +25,10 @@ npm install
 npm run dev
 ```
 
+These commands are supported directly in Windows Command Prompt and
+PowerShell as well as macOS and Linux. WSL and shell-specific environment
+assignment syntax are not required.
+
 Open `http://localhost:4321/admin` and create the first admin at
 `/admin/setup`.
 
@@ -50,6 +54,8 @@ npm run build
 ```
 
 Use focused tests while you work. Run the broader checks before you open a PR.
+CI runs the complete test, check, Cloudflare build, runtime-startup, and package
+smoke sequence on both Ubuntu and Windows.
 
 ## Project boundaries
 

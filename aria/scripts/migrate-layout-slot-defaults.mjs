@@ -3,7 +3,7 @@
  * One-off: add header/footer defaultContent to legacy layout DSL in aria.db.
  */
 
-import { execSync } from "node:child_process";
+import { createClient } from "@libsql/client";
 import { existsSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
@@ -14,12 +14,6 @@ const dbPath = join(__dirname, "../storage/aria.db");
 if (!existsSync(dbPath)) {
   console.error(`No database at ${dbPath}`);
   process.exit(0);
-}
-
-function sqlite(query) {
-  return execSync(`sqlite3 ${JSON.stringify(dbPath)} ${JSON.stringify(query)}`, {
-    encoding: "utf8",
-  }).trim();
 }
 
 const HEADER_CONTENT = [
@@ -60,67 +54,81 @@ function withSlotDefaults(slots) {
   });
 }
 
-const layoutRows = sqlite(
-  "SELECT id || '|' || current_version FROM aria_layout_meta;",
-)
-  .split("\n")
-  .filter(Boolean);
-
+const database = createClient({ url: `file:${dbPath}` });
 let updated = 0;
 
-for (const row of layoutRows) {
-  const [id, version] = row.split("|");
-  const dslJson = sqlite(
-    `SELECT dsl_json FROM aria_layout_versions WHERE id='${id}' AND version='${version}';`,
+try {
+  const layoutRows = await database.execute(
+    "SELECT id, current_version FROM aria_layout_meta",
   );
-  if (!dslJson) continue;
+  for (const row of layoutRows.rows) {
+    const id = typeof row.id === "string" ? row.id : "";
+    const version =
+      typeof row.current_version === "string" ? row.current_version : "";
+    if (!id || !version) continue;
+    const versionRows = await database.execute({
+      sql: "SELECT dsl_json FROM aria_layout_versions WHERE id = ? AND version = ?",
+      args: [id, version],
+    });
+    const dslJson = versionRows.rows[0]?.dsl_json;
+    if (typeof dslJson !== "string" || !dslJson) continue;
 
-  const dsl = JSON.parse(dslJson);
-  if (!Array.isArray(dsl.slots)) continue;
+    const dsl = JSON.parse(dslJson);
+    if (!Array.isArray(dsl.slots)) continue;
 
-  const nextSlots = withSlotDefaults(dsl.slots);
-  if (JSON.stringify(nextSlots) === JSON.stringify(dsl.slots)) {
-    console.log(`Skip ${id} (already has slot defaultContent)`);
-    continue;
-  }
+    const nextSlots = withSlotDefaults(dsl.slots);
+    if (JSON.stringify(nextSlots) === JSON.stringify(dsl.slots)) {
+      console.log(`Skip ${id} (already has slot defaultContent)`);
+      continue;
+    }
 
-  const nextVersion = String(Date.now());
-  const nextDsl = {
-    ...dsl,
-    slots: nextSlots,
-    regions: {
-      ...(dsl.regions ?? {}),
-      headerComponent: "header-01",
-      footerComponent: "footer",
-    },
-    metadata: {
-      ...(dsl.metadata ?? {}),
+    const nextVersion = String(Date.now());
+    const nextDsl = {
+      ...dsl,
+      slots: nextSlots,
       regions: {
+        ...(dsl.regions ?? {}),
         headerComponent: "header-01",
         footerComponent: "footer",
       },
-    },
-    version: nextVersion,
-    updatedAt: new Date().toISOString(),
-  };
+      metadata: {
+        ...(dsl.metadata ?? {}),
+        regions: {
+          headerComponent: "header-01",
+          footerComponent: "footer",
+        },
+      },
+      version: nextVersion,
+      updatedAt: new Date().toISOString(),
+    };
 
-  const escaped = JSON.stringify(nextDsl).replace(/'/g, "''");
-  const name = (nextDsl.name ?? id).replace(/'/g, "''");
+    await database.batch([
+      {
+        sql: "INSERT INTO aria_layout_versions (id, version, name, status, dsl_json, content_hash, created_at) VALUES (?, ?, ?, 'published', ?, NULL, ?)",
+        args: [
+          id,
+          nextVersion,
+          String(nextDsl.name ?? id),
+          JSON.stringify(nextDsl),
+          nextDsl.updatedAt,
+        ],
+      },
+      {
+        sql: "UPDATE aria_layout_meta SET current_version = ?, updated_at = ? WHERE id = ?",
+        args: [nextVersion, nextDsl.updatedAt, id],
+      },
+    ]);
 
-  sqlite(
-    `INSERT INTO aria_layout_versions (id, version, name, status, dsl_json, content_hash, created_at) VALUES ('${id}', '${nextVersion}', '${name}', 'published', '${escaped}', NULL, '${nextDsl.updatedAt}');`,
-  );
-  sqlite(
-    `UPDATE aria_layout_meta SET current_version='${nextVersion}', updated_at='${nextDsl.updatedAt}' WHERE id='${id}';`,
-  );
+    const dslFile = join(__dirname, `../storage/dsl/layouts/${id}.json`);
+    if (existsSync(dslFile)) {
+      writeFileSync(dslFile, `${JSON.stringify(nextDsl, null, 2)}\n`);
+    }
 
-  const dslFile = join(__dirname, `../storage/dsl/layouts/${id}.json`);
-  if (existsSync(dslFile)) {
-    writeFileSync(dslFile, `${JSON.stringify(nextDsl, null, 2)}\n`);
+    console.log(`Updated layout ${id} → ${nextVersion}`);
+    updated += 1;
   }
-
-  console.log(`Updated layout ${id} → ${nextVersion}`);
-  updated += 1;
+} finally {
+  database.close();
 }
 
 console.log(`Done. ${updated} layout(s) updated.`);

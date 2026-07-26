@@ -8,8 +8,8 @@ import {
   parseR2BindingFromWrangler,
   readR2PublicUrlFromWrangler,
   readWranglerToml,
-  resolveCloudflareAccountId,
 } from "../../storage/wrangler-config";
+import { resolveCloudflareAccountId } from "../../../scripts/lib/cloudflare-account";
 
 function readApiToken(): string {
   const token =

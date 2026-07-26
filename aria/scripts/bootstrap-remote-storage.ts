@@ -1,15 +1,15 @@
-#!/usr/bin/env -S npx tsx
 /**
  * Explicit starter-content bootstrap for a fresh remote (Cloudflare D1) site.
  * First-launch onboarding is the normal way to choose a blank.
  */
 
-import { execFileSync } from "child_process";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
 import { resolve } from "path";
-import { fileURLToPath } from "url";
 
-import { loadStarterLayouts, type StarterLayoutSeed } from "../lib/storage/starterLayouts";
+import {
+  loadStarterLayouts,
+  type StarterLayoutSeed,
+} from "../lib/storage/starterLayouts";
 import { loadStarterPage } from "../lib/storage/starterPages";
 import {
   AUTHORS_COLLECTION_NAME,
@@ -23,12 +23,8 @@ import {
   buildStarterDesignSystem,
   buildStarterSiteSettings,
 } from "../lib/storage/starterContent";
-import {
-  buildStarterMainNavCollectionDefinition,
-} from "../lib/storage/starterMainNav";
-import {
-  buildStarterCmsEntryRecords,
-} from "../lib/storage/starterCmsEntries";
+import { buildStarterMainNavCollectionDefinition } from "../lib/storage/starterMainNav";
+import { buildStarterCmsEntryRecords } from "../lib/storage/starterCmsEntries";
 import { serializeDslForStorage } from "../lib/storage/helpers";
 import { serializeStoredDesignSystemRows } from "../lib/storage/designSystemRows";
 import {
@@ -42,10 +38,15 @@ import {
   serializeCompilerMetadata,
 } from "../lib/system/metadata";
 import type { AriaEntryRecord } from "../lib/cms/schemas";
-import type { StoredPageAccessMode, StoredPageSystemRole } from "../lib/storage/adapter";
+import type {
+  StoredPageAccessMode,
+  StoredPageSystemRole,
+} from "../lib/storage/adapter";
 import { resolveWranglerConfigPath } from "../lib/storage/wrangler-config";
 import type { PageDSL } from "../lib/types/nodes";
 import type { AriaCollection } from "../lib/cms/schemas";
+import { isMainModule } from "./lib/node-command";
+import { runWranglerSync } from "./lib/wrangler-command";
 
 const GENERATED_SQL_DIR = resolve(process.cwd(), "aria/storage/generated");
 const OUTPUT_SQL = resolve(GENERATED_SQL_DIR, "seed-remote-bootstrap.sql");
@@ -83,7 +84,9 @@ export function isRemoteDatabaseEmpty(json: string): boolean {
     return false;
   }
 
-  throw new Error("Remote D1 storage emptiness check returned an invalid value");
+  throw new Error(
+    "Remote D1 storage emptiness check returned an invalid value",
+  );
 }
 
 function sqlLiteral(value: unknown): string {
@@ -133,7 +136,10 @@ function collectionIdByNameSql(collectionName: string): string {
   return `(SELECT id FROM aria_collections WHERE name = ${sqlLiteral(collectionName)} LIMIT 1)`;
 }
 
-function appendCollectionInsert(buffer: SqlBuffer, collection: AriaCollection): void {
+function appendCollectionInsert(
+  buffer: SqlBuffer,
+  collection: AriaCollection,
+): void {
   const row = collectionToRow(collection);
   buffer.append(
     `INSERT INTO aria_collections (
@@ -168,17 +174,34 @@ function appendCollectionInsert(buffer: SqlBuffer, collection: AriaCollection): 
   );
 }
 
-function appendStarterLayouts(buffer: SqlBuffer, layouts: StarterLayoutSeed[]): void {
+function appendStarterLayouts(
+  buffer: SqlBuffer,
+  layouts: StarterLayoutSeed[],
+): void {
   for (const layout of layouts) {
     buffer.append(
       `INSERT OR IGNORE INTO aria_layout_versions (id, version, name, status, dsl_json, created_at)
        VALUES (?, ?, ?, ?, ?, ?)`,
-      [layout.id, layout.version, layout.name, "published", serializeDslForStorage(layout.dsl), layout.updatedAt],
+      [
+        layout.id,
+        layout.version,
+        layout.name,
+        "published",
+        serializeDslForStorage(layout.dsl),
+        layout.updatedAt,
+      ],
     );
     buffer.append(
       `INSERT OR IGNORE INTO aria_layout_meta (id, name, description, status, current_version, updated_at)
        VALUES (?, ?, ?, ?, ?, ?)`,
-      [layout.id, layout.name, layout.description, "published", layout.version, layout.updatedAt],
+      [
+        layout.id,
+        layout.name,
+        layout.description,
+        "published",
+        layout.version,
+        layout.updatedAt,
+      ],
     );
   }
 }
@@ -186,7 +209,10 @@ function appendStarterLayouts(buffer: SqlBuffer, layouts: StarterLayoutSeed[]): 
 function appendSystemPage(
   buffer: SqlBuffer,
   page: PageDSL,
-  options: { systemRole: StoredPageSystemRole; accessMode: StoredPageAccessMode },
+  options: {
+    systemRole: StoredPageSystemRole;
+    accessMode: StoredPageAccessMode;
+  },
   now: string,
 ): void {
   const version = "v1";
@@ -269,7 +295,10 @@ function appendStarterMainNavCollection(buffer: SqlBuffer, now: string): void {
   appendCollectionInsert(buffer, mainNavCollection);
 }
 
-function appendStarterCmsEntryRecord(buffer: SqlBuffer, record: AriaEntryRecord): void {
+function appendStarterCmsEntryRecord(
+  buffer: SqlBuffer,
+  record: AriaEntryRecord,
+): void {
   const entryRow = entryToRow(record.entry);
   const collectionName = record.entry.collectionId;
   const collectionIdSql = collectionIdByNameSql(collectionName);
@@ -315,7 +344,9 @@ function appendStarterCmsEntryInserts(buffer: SqlBuffer, now: string): void {
 }
 
 function appendStarterCms(buffer: SqlBuffer, now: string): void {
-  const { tags, authors } = buildStarterCollectionDefinitions({ collectionIdByName: {} });
+  const { tags, authors } = buildStarterCollectionDefinitions({
+    collectionIdByName: {},
+  });
   const tagsCollection = buildAriaCollection(tags, now);
   const authorsCollection = buildAriaCollection(authors, now);
   appendCollectionInsert(buffer, tagsCollection);
@@ -333,19 +364,33 @@ function appendStarterCms(buffer: SqlBuffer, now: string): void {
   appendStarterMainNavCollection(buffer, now);
   appendStarterCmsEntryInserts(buffer, now);
 
-  appendSystemPage(buffer, buildBlogListPage(), { systemRole: "cms-collection", accessMode: "public" }, now);
-  appendSystemPage(buffer, buildBlogEntryTemplatePage(), { systemRole: "cms-entry", accessMode: "public" }, now);
-  appendSystemPage(buffer, buildTagArchiveTemplatePage(), { systemRole: "cms-entry", accessMode: "public" }, now);
+  appendSystemPage(
+    buffer,
+    buildBlogListPage(),
+    { systemRole: "cms-collection", accessMode: "public" },
+    now,
+  );
+  appendSystemPage(
+    buffer,
+    buildBlogEntryTemplatePage(),
+    { systemRole: "cms-entry", accessMode: "public" },
+    now,
+  );
+  appendSystemPage(
+    buffer,
+    buildTagArchiveTemplatePage(),
+    { systemRole: "cms-entry", accessMode: "public" },
+    now,
+  );
 }
 
 function appendStarterDesign(buffer: SqlBuffer, now: string): void {
   const rows = serializeStoredDesignSystemRows(buildStarterDesignSystem(), now);
   for (const row of rows) {
-    buffer.append(`INSERT OR IGNORE INTO aria_styles (id, styles_json, updated_at) VALUES (?, ?, ?)`, [
-      row.id,
-      row.stylesJson,
-      row.updatedAt,
-    ]);
+    buffer.append(
+      `INSERT OR IGNORE INTO aria_styles (id, styles_json, updated_at) VALUES (?, ?, ?)`,
+      [row.id, row.stylesJson, row.updatedAt],
+    );
   }
 }
 
@@ -356,8 +401,13 @@ function appendStarterSiteSettings(buffer: SqlBuffer, now: string): void {
   );
 }
 
-function extractVarValueFromWranglerToml(contents: string, key: string): string | null {
-  const varsSectionMatch = contents.match(/(^|\n)\[vars\]\n([\s\S]*?)(\n\[[^\]]+\]|$)/);
+function extractVarValueFromWranglerToml(
+  contents: string,
+  key: string,
+): string | null {
+  const varsSectionMatch = contents.match(
+    /(^|\n)\[vars\]\n([\s\S]*?)(\n\[[^\]]+\]|$)/,
+  );
   if (!varsSectionMatch) {
     return null;
   }
@@ -458,7 +508,12 @@ export async function buildBootstrapSql(): Promise<string> {
 
   appendStarterLayouts(buffer, await loadStarterLayouts());
   await appendHomePage(buffer);
-  appendSystemPage(buffer, buildNotFoundPage(), { systemRole: "not-found", accessMode: "public" }, now);
+  appendSystemPage(
+    buffer,
+    buildNotFoundPage(),
+    { systemRole: "not-found", accessMode: "public" },
+    now,
+  );
   appendStarterCms(buffer, now);
   appendStarterDesign(buffer, now);
   appendStarterSiteSettings(buffer, now);
@@ -496,10 +551,8 @@ async function main() {
   const claimUrl = resolveSiteUrl();
   const configPath = resolveWranglerConfigPath();
   const configArgs = configPath ? ["--config", configPath] : [];
-  const seedCheck = execFileSync(
-    "npx",
+  const seedCheck = runWranglerSync(
     [
-      "wrangler",
       "d1",
       "execute",
       databaseBinding,
@@ -509,11 +562,16 @@ async function main() {
       "--json",
       ...configArgs,
     ],
-    { encoding: "utf-8" },
-  );
+    {
+      encoding: "utf-8",
+      stdio: ["ignore", "pipe", "pipe"],
+    },
+  ).stdout;
 
   if (!isRemoteDatabaseEmpty(seedCheck)) {
-    console.log("ℹ Remote D1 already contains site data; starter seed skipped.");
+    console.log(
+      "ℹ Remote D1 already contains site data; starter seed skipped.",
+    );
     return;
   }
 
@@ -521,14 +579,16 @@ async function main() {
   const sql = await buildBootstrapSql();
   writeFileSync(OUTPUT_SQL, sql, "utf-8");
 
-  console.log(`🔄 Bootstrapping ${local ? "local" : "remote"} Aria storage...\n`);
-  console.log("✓ Starter layouts, home/404 pages, blog/authors/tags collections, and color palette prepared");
+  console.log(
+    `🔄 Bootstrapping ${local ? "local" : "remote"} Aria storage...\n`,
+  );
+  console.log(
+    "✓ Starter layouts, home/404 pages, blog/authors/tags collections, and color palette prepared",
+  );
   console.log(`📝 Written to: ${OUTPUT_SQL}\n`);
 
-  execFileSync(
-    "npx",
+  runWranglerSync(
     [
-      "wrangler",
       "d1",
       "execute",
       databaseBinding,
@@ -539,16 +599,18 @@ async function main() {
     { stdio: "inherit" },
   );
 
-  console.log(`\n✅ ${local ? "Local" : "Remote"} Aria bootstrap applied successfully!`);
+  console.log(
+    `\n✅ ${local ? "Local" : "Remote"} Aria bootstrap applied successfully!`,
+  );
   if (claimUrl) {
     console.log(`🔐 Claim the first admin account at: ${claimUrl}`);
   } else {
-    console.log("🔐 Claim the first admin account by visiting /admin/setup on the deployed site.");
+    console.log(
+      "🔐 Claim the first admin account by visiting /admin/setup on the deployed site.",
+    );
   }
 }
 
-const isMain = process.argv[1] ? resolve(process.argv[1]) === fileURLToPath(import.meta.url) : false;
-
-if (isMain) {
+if (isMainModule(import.meta.url)) {
   await main();
 }

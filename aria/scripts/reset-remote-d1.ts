@@ -1,16 +1,18 @@
-#!/usr/bin/env -S npx tsx
 /**
  * Destructively reset the configured remote D1 database in
  * place. The database resource and binding stay unchanged.
  */
 
-import { execFileSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { mkdirSync } from "node:fs";
 import { dirname, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
 
 import { resolveWranglerConfigPath } from "../lib/storage/wrangler-config";
+import { applyD1Migrations } from "./apply-d1-migrations";
+import { isMainModule } from "./lib/node-command";
+import {
+  runWranglerSync,
+  withTemporarySqlFileSync,
+} from "./lib/wrangler-command";
 
 type RemoteResetOptions = {
   binding: string;
@@ -236,24 +238,16 @@ export function parseResetVerification(json: string): {
 }
 
 function runWranglerJson(args: readonly string[]): string {
-  return execFileSync("npx", ["wrangler", ...args, ...WRANGLER_CONFIG_ARGS], {
+  return runWranglerSync([...args, ...WRANGLER_CONFIG_ARGS], {
     cwd: process.cwd(),
     encoding: "utf8",
     env: { ...process.env, CI: "true" },
-    stdio: ["ignore", "pipe", "inherit"],
-  });
+    stdio: ["ignore", "pipe", "pipe"],
+  }).stdout;
 }
 
-function run(
-  command: string,
-  args: readonly string[],
-  extraEnv: Record<string, string> = {},
-): void {
-  execFileSync(command, [...args], {
-    cwd: process.cwd(),
-    env: { ...process.env, ...extraEnv, CI: "true" },
-    stdio: "inherit",
-  });
+function runWranglerSqlJson(args: readonly string[], sql: string): string {
+  return runWranglerJson([...args, "--command", sql]);
 }
 
 function backupPath(databaseName: string): string {
@@ -295,14 +289,10 @@ async function main(): Promise<void> {
     runWranglerJson(["d1", "info", options.binding, "--json"]),
   );
   const schemaObjects = parseD1SchemaObjects(
-    runWranglerJson([
-      "d1",
-      "execute",
-      options.binding,
-      "--remote",
-      `--command=${SCHEMA_QUERY}`,
-      "--json",
-    ]),
+    runWranglerSqlJson(
+      ["d1", "execute", options.binding, "--remote", "--json"],
+      SCHEMA_QUERY,
+    ),
   );
 
   console.log(`Remote D1 target: ${database.name} (${database.id})`);
@@ -325,8 +315,7 @@ async function main(): Promise<void> {
   const outputPath = backupPath(database.name);
   mkdirSync(dirname(outputPath), { recursive: true });
   console.warn(`\nExporting mandatory recovery backup to ${outputPath}`);
-  run("npx", [
-    "wrangler",
+  runWranglerSync([
     "d1",
     "export",
     options.binding,
@@ -336,41 +325,30 @@ async function main(): Promise<void> {
     ...WRANGLER_CONFIG_ARGS,
   ]);
 
-  const tempDirectory = mkdtempSync(resolve(tmpdir(), "aria-d1-reset-"));
-  const resetSqlPath = resolve(tempDirectory, "reset.sql");
-
-  try {
-    writeFileSync(resetSqlPath, buildRemoteD1ResetSql(schemaObjects), "utf8");
-    console.warn(
-      `\nResetting ${database.name}. Requests using this database may fail until migrations finish.`,
-    );
-    run("npx", [
-      "wrangler",
-      "d1",
-      "execute",
-      options.binding,
-      "--remote",
-      `--file=${resetSqlPath}`,
-      "--yes",
-      ...WRANGLER_CONFIG_ARGS,
-    ]);
-
-    run("npx", ["tsx", "aria/scripts/apply-d1-migrations.ts", "--remote"], {
-      ARIA_D1_BINDING: options.binding,
-    });
-  } finally {
-    rmSync(tempDirectory, { recursive: true, force: true });
-  }
+  withTemporarySqlFileSync(
+    buildRemoteD1ResetSql(schemaObjects),
+    (resetSqlPath) => {
+      console.warn(
+        `\nResetting ${database.name}. Requests using this database may fail until migrations finish.`,
+      );
+      runWranglerSync([
+        "d1",
+        "execute",
+        options.binding,
+        "--remote",
+        `--file=${resetSqlPath}`,
+        "--yes",
+        ...WRANGLER_CONFIG_ARGS,
+      ]);
+    },
+  );
+  await applyD1Migrations("remote", options.binding);
 
   const verification = parseResetVerification(
-    runWranglerJson([
-      "d1",
-      "execute",
-      options.binding,
-      "--remote",
-      `--command=${VERIFY_QUERY}`,
-      "--json",
-    ]),
+    runWranglerSqlJson(
+      ["d1", "execute", options.binding, "--remote", "--json"],
+      VERIFY_QUERY,
+    ),
   );
 
   console.log(`\nRemote D1 reset complete: ${database.name}`);
@@ -381,11 +359,7 @@ async function main(): Promise<void> {
   console.log("KV, R2, Queues, and Durable Object state were not changed.");
 }
 
-const isMain = process.argv[1]
-  ? resolve(process.argv[1]) === fileURLToPath(import.meta.url)
-  : false;
-
-if (isMain) {
+if (isMainModule(import.meta.url)) {
   main().catch((error) => {
     console.error("\nRemote D1 reset failed.");
     console.error(error instanceof Error ? error.message : String(error));

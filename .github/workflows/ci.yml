@@ -8,7 +8,12 @@ on:
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    name: Test (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
 
@@ -23,6 +28,7 @@ jobs:
       - env:
           NODE_OPTIONS: --max-old-space-size=8192
         run: npm run check
+      - run: npm run smoke:runtime
       - env:
           NODE_OPTIONS: --max-old-space-size=8192
         run: npm run build

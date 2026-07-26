@@ -1,5 +1,3 @@
-#!/usr/bin/env -S npx tsx
-
 import { getApiSqlDatabase } from "../lib/api/database";
 import { readApiKeyring } from "../lib/api/crypto";
 import { runNodeIntegrationWorker } from "../lib/integrations/nodeWorker";
