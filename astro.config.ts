@@ -24,8 +24,10 @@ const runtimeTarget =
 const useNodeRuntime = runtimeTarget === "node";
 // A private wrangler.toml (gitignored, real account IDs) takes precedence
 // over the committed wrangler.jsonc (OSS placeholder IDs).
-const cloudflareConfigPath =
-  resolveWranglerConfigPath(workspaceRoot) ?? "wrangler.jsonc";
+const resolvedCloudflareConfigPath = resolveWranglerConfigPath(workspaceRoot);
+const cloudflareConfigPath = resolvedCloudflareConfigPath
+  ? path.relative(workspaceRoot, resolvedCloudflareConfigPath)
+  : "wrangler.jsonc";
 
 /** Reads an installed package version for build-time metadata. */
 function readPackageVersion(packageName: string): string {
