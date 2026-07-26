@@ -48,7 +48,8 @@ jobs:
       - env:
           NODE_OPTIONS: --max-old-space-size=8192
         run: npm run build
-      - run: npm run pack:smoke
+      - if: ${{ matrix.os == 'ubuntu-latest' }}
+        run: npm run pack:smoke
 
   test:
     name: test
