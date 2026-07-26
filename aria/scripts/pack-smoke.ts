@@ -18,6 +18,7 @@ type PackResult = {
   files: PackedFile[];
 };
 
+/** Formats a byte count for readable smoke-test output. */
 function formatBytes(bytes: number): string {
   if (bytes < 1024) {
     return `${bytes} B`;
@@ -48,6 +49,7 @@ async function runNpm(
   });
 }
 
+/** Throws when a package smoke-test invariant is not satisfied. */
 function assert(condition: unknown, message: string): asserts condition {
   if (!condition) {
     throw new Error(message);

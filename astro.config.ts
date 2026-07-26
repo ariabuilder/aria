@@ -27,6 +27,7 @@ const useNodeRuntime = runtimeTarget === "node";
 const cloudflareConfigPath =
   resolveWranglerConfigPath(workspaceRoot) ?? "wrangler.jsonc";
 
+/** Reads an installed package version for build-time metadata. */
 function readPackageVersion(packageName: string): string {
   const packageJsonPath = path.join(
     workspaceRoot,

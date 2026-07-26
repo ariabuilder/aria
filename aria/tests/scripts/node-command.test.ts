@@ -14,6 +14,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import {
   isMainModule,
   resolvePackageBin,
+  runNodeArgs,
   runPackageBin,
 } from "../../scripts/lib/node-command";
 import { withTemporarySqlFile } from "../../scripts/lib/wrangler-command";
@@ -104,6 +105,18 @@ describe("Payload-style Node command runner", () => {
     expect(() =>
       resolvePackageBin("definitely-not-an-aria-package", "missing"),
     ).toThrow("Run `npm install`");
+  });
+
+  it("pipes provided input while leaving output inherited by default", async () => {
+    const result = await runNodeArgs(
+      [
+        "-e",
+        "process.stdin.setEncoding('utf8'); let value = ''; process.stdin.on('data', chunk => value += chunk); process.stdin.on('end', () => process.exit(value === 'hello' ? 0 : 1));",
+      ],
+      { input: "hello" },
+    );
+
+    expect(result.status).toBe(0);
   });
 
   it("normalizes Windows casing when detecting a main module", () => {

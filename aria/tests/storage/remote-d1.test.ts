@@ -51,4 +51,23 @@ describe("Wrangler-backed D1 statements", () => {
     expect(args).not.toContain("--file");
     expect(args[args.indexOf("--command") + 1]).toBe("SELECT 1 AS value");
   });
+
+  it("escapes quotes and preserves backslashes in bound string values", async () => {
+    vi.mocked(runWrangler).mockResolvedValue({
+      status: 0,
+      signal: null,
+      stdout: JSON.stringify([{ results: [], success: true }]),
+      stderr: "",
+    });
+    const database = await createRemoteD1Database("aria_db", {
+      remote: false,
+    });
+
+    await database.prepare("SELECT ? AS value").bind("it's\\safe").all();
+
+    const [args] = vi.mocked(runWrangler).mock.calls[0]!;
+    expect(args[args.indexOf("--command") + 1]).toBe(
+      "SELECT 'it''s\\safe' AS value",
+    );
+  });
 });

@@ -26,6 +26,7 @@ type RemotePreparedStatement = D1PreparedStatementLike & {
   toSQL(): string;
 };
 
+/** Serializes a bound value as a safe SQL literal for Wrangler. */
 function sqlLiteral(value: unknown): string {
   if (value === null || value === undefined) {
     return "NULL";
@@ -46,6 +47,7 @@ function sqlLiteral(value: unknown): string {
   return `'${String(value).replace(/'/g, "''")}'`;
 }
 
+/** Replaces positional SQL placeholders with escaped literal values. */
 function interpolateSql(sql: string, args: readonly unknown[]): string {
   const placeholderCount = (sql.match(/\?/g) ?? []).length;
 
@@ -103,6 +105,7 @@ async function executeLiteralRemoteSql<T extends D1QueryRow>(input: {
   return first;
 }
 
+/** Creates a D1 prepared statement executed through Wrangler commands. */
 function createLiteralPreparedStatement(input: {
   binding: string;
   sql: string;
@@ -151,6 +154,7 @@ function createLiteralPreparedStatement(input: {
   };
 }
 
+/** Creates the minimal D1 database interface used by remote tooling. */
 function createLiteralWranglerD1Database(
   binding: string,
   remote: boolean,
@@ -187,6 +191,7 @@ function hasAriaCloudflareApiToken(): boolean {
   );
 }
 
+/** Creates a Wrangler-backed database for local or remote D1 execution. */
 export async function createRemoteD1Database(
   binding = process.env.ARIA_D1_BINDING || "aria_db",
   options: { remote?: boolean } = {},

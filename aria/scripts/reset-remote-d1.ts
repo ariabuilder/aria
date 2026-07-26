@@ -54,10 +54,12 @@ const VERIFY_QUERY = `
   SELECT COUNT(*) AS migration_count FROM d1_migrations;
 `;
 
+/** Returns whether a parsed value is a non-null JSON record. */
 function isRecord(value: unknown): value is JsonRecord {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
+/** Reads an inline string value from a named CLI flag. */
 function stringFlagValue(argument: string, flag: string): string | undefined {
   const prefix = `${flag}=`;
   return argument.startsWith(prefix)
@@ -65,6 +67,7 @@ function stringFlagValue(argument: string, flag: string): string | undefined {
     : undefined;
 }
 
+/** Parses and validates remote D1 reset command arguments. */
 export function parseRemoteResetArgs(
   argv: readonly string[],
   defaultBinding = "aria_db",
@@ -108,6 +111,7 @@ export function parseRemoteResetArgs(
   return { binding, confirm, dryRun, help };
 }
 
+/** Parses database identity information from Wrangler JSON output. */
 export function parseD1DatabaseInfo(json: string): D1DatabaseInfo {
   const parsed: unknown = JSON.parse(json);
   if (!isRecord(parsed)) {
@@ -123,6 +127,7 @@ export function parseD1DatabaseInfo(json: string): D1DatabaseInfo {
   return { id, name };
 }
 
+/** Rejects a remote reset unless the required confirmation matches. */
 export function assertRemoteResetConfirmed(
   confirmation: string | undefined,
   database: D1DatabaseInfo,
@@ -137,6 +142,7 @@ export function assertRemoteResetConfirmed(
   );
 }
 
+/** Parses row groups returned by Wrangler D1 commands. */
 export function parseWranglerRows(json: string): JsonRecord[][] {
   const parsed: unknown = JSON.parse(json);
   const batches = Array.isArray(parsed) ? parsed : [parsed];
@@ -160,6 +166,7 @@ export function parseWranglerRows(json: string): JsonRecord[][] {
   });
 }
 
+/** Parses schema objects returned by a D1 metadata query. */
 export function parseD1SchemaObjects(json: string): D1SchemaObject[] {
   const rows = parseWranglerRows(json).flat();
   const objects: D1SchemaObject[] = [];
@@ -185,10 +192,12 @@ export function parseD1SchemaObjects(json: string): D1SchemaObject[] {
   return objects;
 }
 
+/** Quotes a SQLite identifier for use in generated reset statements. */
 export function quoteSqlIdentifier(identifier: string): string {
   return `"${identifier.replaceAll('"', '""')}"`;
 }
 
+/** Builds SQL that removes all resettable objects from a remote D1 database. */
 export function buildRemoteD1ResetSql(
   schemaObjects: readonly D1SchemaObject[],
 ): string {
@@ -253,6 +262,7 @@ function runWranglerSqlJson(args: readonly string[], sql: string): string {
   return runWranglerJson([...args, "--command", sql]);
 }
 
+/** Builds a timestamped path for a D1 backup file. */
 function backupPath(databaseName: string): string {
   const timestamp = new Date().toISOString().replaceAll(":", "-");
   const safeName = databaseName.replace(/[^a-zA-Z0-9._-]/g, "-");
@@ -263,6 +273,7 @@ function backupPath(databaseName: string): string {
   );
 }
 
+/** Prints usage instructions for the remote D1 reset command. */
 function printUsage(): void {
   console.log(`Usage:
   npm run storage:reset-remote -- --dry-run

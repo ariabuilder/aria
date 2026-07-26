@@ -44,6 +44,7 @@ type CliOptions = {
   conflictPolicy: "newest-wins" | "local-wins" | "remote-wins";
 };
 
+/** Parses content-push command arguments into validated options. */
 function parseCliOptions(argv: string[]): CliOptions {
   let conflictPolicy: CliOptions["conflictPolicy"] = "newest-wins";
   if (argv.includes("--local-wins")) {
@@ -69,6 +70,7 @@ function parseCliOptions(argv: string[]): CliOptions {
   };
 }
 
+/** Converts a planned content change into a sync-history item. */
 function planItemToHistoryItem(
   item: ContentSyncPlanItem,
   jobId: string,
@@ -109,6 +111,7 @@ const NO_STARTER_SEED_OPTIONS = {
   seedStarterSiteSettings: false,
 } as const;
 
+/** Opens the local storage adapter used as the content-push source. */
 async function createLocalSourceAdapter() {
   const { SQLiteStorageAdapter } = await import("../lib/storage/sqlite");
   const client = createClient({ url: `file:${LOCAL_DB_PATH}` });
@@ -140,10 +143,12 @@ async function createPushTargetAdapter(options: CliOptions) {
   });
 }
 
+/** Applies migrations to the selected content-push target. */
 async function applyMigrations(options: CliOptions) {
   await applyD1Migrations(options.local ? "local" : "remote");
 }
 
+/** Clears replaceable target data before a full content replacement. */
 async function clearTargetForReplace(options: CliOptions) {
   const statements = buildReplaceClearStatements();
 
@@ -173,6 +178,7 @@ async function clearTargetForReplace(options: CliOptions) {
   }
 }
 
+/** Collects local DSL validation issues before uploading content. */
 async function collectLocalDslValidationIssues(): Promise<
   PushValidationIssue[]
 > {

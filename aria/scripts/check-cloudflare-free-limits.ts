@@ -31,6 +31,7 @@ async function listFiles(directory: string): Promise<string[]> {
   return nested.flat();
 }
 
+/** Builds the Worker and returns its uploaded bundle size in bytes. */
 async function inspectWorkerUpload(): Promise<number> {
   const { stdout, stderr } = await runWrangler(
     ["deploy", "--dry-run", "--config", workerConfigPath],

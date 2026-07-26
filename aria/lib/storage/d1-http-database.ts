@@ -30,6 +30,7 @@ type D1HttpPreparedStatement = {
   run(): Promise<unknown>;
 };
 
+/** Reads the Cloudflare API token required for D1 HTTP requests. */
 function readApiToken(): string {
   const token =
     process.env.ARIA_CLOUDFLARE_API_TOKEN?.trim() ||
@@ -90,6 +91,7 @@ async function executeD1HttpQuery(input: {
   return first;
 }
 
+/** Creates a prepared-statement facade for D1 HTTP queries. */
 function createHttpPreparedStatement(input: {
   accountId: string;
   databaseId: string;

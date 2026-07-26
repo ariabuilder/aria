@@ -60,6 +60,7 @@ export const INITIAL_SEED_CHECK_SQL = `
   THEN 0 ELSE 1 END AS is_empty
 `;
 
+/** Returns whether a parsed value is a non-null object record. */
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
@@ -89,6 +90,7 @@ export function isRemoteDatabaseEmpty(json: string): boolean {
   );
 }
 
+/** Serializes a bootstrap value as an escaped SQL literal. */
 function sqlLiteral(value: unknown): string {
   if (value === null || value === undefined) {
     return "NULL";
@@ -257,6 +259,7 @@ function appendSystemPage(
   );
 }
 
+/** Appends the starter home page statements to the bootstrap buffer. */
 async function appendHomePage(buffer: SqlBuffer): Promise<void> {
   const starterPage = await loadStarterPage();
   buffer.append(
@@ -292,6 +295,7 @@ async function appendHomePage(buffer: SqlBuffer): Promise<void> {
   );
 }
 
+/** Appends the starter navigation collection to the bootstrap buffer. */
 function appendStarterMainNavCollection(buffer: SqlBuffer, now: string): void {
   const mainNavDefinition = buildStarterMainNavCollectionDefinition();
   const mainNavCollection = buildAriaCollection(mainNavDefinition, now);
@@ -427,6 +431,7 @@ function extractVarValueFromWranglerToml(
   return match?.[1] ?? null;
 }
 
+/** Builds the site claim URL when a valid site URL is available. */
 export function buildClaimUrl(siteUrl: unknown): string | null {
   if (typeof siteUrl !== "string") {
     return null;
@@ -448,6 +453,7 @@ export function buildClaimUrl(siteUrl: unknown): string | null {
   }
 }
 
+/** Reads an optional site URL from the bootstrap command arguments. */
 function getCliSiteUrl(argv: string[] = process.argv.slice(2)): string | null {
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
@@ -463,6 +469,7 @@ function getCliSiteUrl(argv: string[] = process.argv.slice(2)): string | null {
   return null;
 }
 
+/** Resolves the site URL from CLI, environment, and Wrangler configuration. */
 export function resolveSiteUrl(
   options: {
     argv?: string[];
@@ -541,6 +548,7 @@ export async function buildBootstrapSql(): Promise<string> {
   ].join("\n");
 }
 
+/** Builds SQL that inserts starter CMS entries without other bootstrap data. */
 export async function buildStarterCmsEntriesOnlySql(): Promise<string> {
   const now = new Date().toISOString();
   const buffer = new SqlBuffer();

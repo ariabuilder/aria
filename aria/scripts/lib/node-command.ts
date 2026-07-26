@@ -143,7 +143,16 @@ export async function runNodeArgs(
   args: readonly string[],
   options: CommandOptions = {},
 ): Promise<CommandResult> {
-  const stdio = options.stdio ?? "inherit";
+  const configuredStdio = options.stdio ?? "inherit";
+  let stdio: StdioOptions = configuredStdio;
+  if (options.input !== undefined) {
+    if (Array.isArray(configuredStdio)) {
+      stdio = [...configuredStdio];
+      stdio[0] = "pipe";
+    } else if (configuredStdio !== "pipe") {
+      stdio = ["pipe", configuredStdio, configuredStdio];
+    }
+  }
   const child = spawn(process.execPath, [...args], {
     cwd: options.cwd ?? process.cwd(),
     env: commandEnvironment(options.env),

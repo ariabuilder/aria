@@ -11,6 +11,7 @@ import {
 } from "../../storage/wrangler-config";
 import { resolveCloudflareAccountId } from "../../../scripts/lib/cloudflare-account";
 
+/** Reads the Cloudflare API token required for R2 HTTP requests. */
 function readApiToken(): string {
   const token =
     process.env.ARIA_CLOUDFLARE_API_TOKEN?.trim() ||
@@ -34,6 +35,7 @@ type R2ApiObject = {
   checksums?: { sha256?: string };
 };
 
+/** Encodes each segment of an R2 object key without losing path separators. */
 function encodeObjectKey(key: string): string {
   return key
     .split("/")
@@ -41,6 +43,7 @@ function encodeObjectKey(key: string): string {
     .join("/");
 }
 
+/** Sends an authenticated request to the Cloudflare R2 API. */
 async function r2ApiFetch(input: {
   accountId: string;
   bucketName: string;
@@ -73,6 +76,7 @@ async function r2ApiFetch(input: {
   });
 }
 
+/** Creates an R2 bucket adapter backed by Cloudflare's HTTP API. */
 export async function createRemoteR2HttpBucket(input?: {
   bucketName?: string;
 }): Promise<CloudflareR2Bucket> {

@@ -180,6 +180,7 @@ export function repairDeadLetterQueueRenames(
   return { configJson: JSON.stringify(parsed), repairs };
 }
 
+/** Reads queue names expected by the generated deployment configuration. */
 async function readDeployQueueExpectations(): Promise<
   QueueExpectation[] | null
 > {
@@ -287,12 +288,13 @@ export type QueueConsumer = Readonly<{
   deadLetterQueue: string | null;
 }>;
 
+/** Returns whether a parsed value is a non-null object record. */
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
 
 /** Creates the production command runner used by the deployment workflow. */
-function createCommandRunner(): DeployCommandRunner {
+function createCommandRunner(databaseBinding: string): DeployCommandRunner {
   const environment = { ...process.env, CI: "true" };
   return {
     build: buildCloudflare,
@@ -315,10 +317,11 @@ function createCommandRunner(): DeployCommandRunner {
         stdio: "inherit",
       });
     },
-    migrate: () => applyD1Migrations("remote"),
+    migrate: () => applyD1Migrations("remote", databaseBinding),
   };
 }
 
+/** Parses secret names from Wrangler's JSON response. */
 export function parseWorkerSecretNames(json: string): string[] {
   const parsed: unknown = JSON.parse(json);
   if (!Array.isArray(parsed)) {
@@ -334,6 +337,7 @@ export function parseWorkerSecretNames(json: string): string[] {
   return [...new Set(names)].sort();
 }
 
+/** Parses protected credential-key state returned from D1. */
 export function parseCredentialKeyState(json: string): ProtectedKeyState {
   const parsed: unknown = JSON.parse(json);
   const batches = Array.isArray(parsed) ? parsed : [parsed];
@@ -371,6 +375,7 @@ export function parseCredentialKeyState(json: string): ProtectedKeyState {
   };
 }
 
+/** Merges protected key-state results from multiple D1 queries. */
 export function mergeProtectedKeyStates(
   states: readonly ProtectedKeyState[],
 ): ProtectedKeyState {
@@ -386,6 +391,7 @@ export function mergeProtectedKeyStates(
   };
 }
 
+/** Detects Wrangler errors produced when a Worker does not exist. */
 export function isWranglerWorkerNotFound(stderr: string): boolean {
   return (
     /Worker "[^"\r\n]+"(?: \(env: [^)]+\))? not found\./u.test(stderr) &&
@@ -393,12 +399,14 @@ export function isWranglerWorkerNotFound(stderr: string): boolean {
   );
 }
 
+/** Detects Wrangler errors produced when a queue does not exist. */
 export function isWranglerQueueNotFound(stderr: string): boolean {
   return /queue[^\r\n]*(?:not found|does not exist|could not be found)/iu.test(
     stderr,
   );
 }
 
+/** Parses queue-consumer configuration from Wrangler JSON output. */
 export function parseQueueConsumers(json: string): QueueConsumer[] {
   const parsed: unknown = JSON.parse(json);
   const values = Array.isArray(parsed)
@@ -434,10 +442,12 @@ export function parseQueueConsumers(json: string): QueueConsumer[] {
   });
 }
 
+/** Builds the Worker secret name for a numbered key identifier. */
 function numberedKeySecretName(keyId: string): string {
   return `${NUMBERED_KEY_PREFIX}${keyId.toUpperCase()}`;
 }
 
+/** Decides whether deployment should bootstrap or preserve API key secrets. */
 export function decideApiKeyringDeployment(
   secretNames: readonly string[],
   keyState: ProtectedKeyState,
@@ -491,6 +501,7 @@ function requireSuccessfulCommand(
   return result.stdout;
 }
 
+/** Reads the names of secrets already stored for the remote Worker. */
 function readRemoteSecretNames(runner: DeployCommandRunner): string[] {
   const result = runner.capture("wrangler", [
     "secret",
@@ -561,6 +572,7 @@ function readQueueConsumers(
   );
 }
 
+/** Ensures an existing queue belongs to the Worker being deployed. */
 function assertQueueOwnership(
   consumers: readonly QueueConsumer[],
   queueName: string,
@@ -621,6 +633,7 @@ function ensureQueues(
   }
 }
 
+/** Verifies that deployed queues have the expected Worker consumers. */
 function verifyQueueConsumers(
   runner: DeployCommandRunner,
   workerName: string,
@@ -651,6 +664,7 @@ function verifyQueueConsumers(
   }
 }
 
+/** Resolves the Worker name used for Cloudflare deployment. */
 export function resolveDeployWorkerName(explicit?: string): string {
   if (explicit?.trim()) {
     return explicit.trim();
@@ -671,6 +685,7 @@ export function resolveDeployWorkerName(explicit?: string): string {
   return DEFAULT_WORKER_NAME;
 }
 
+/** Extracts the published Worker origin from Wrangler deploy output. */
 export function parseDeployedWorkerOrigin(output: string): string | null {
   const match = /https:\/\/[a-z0-9][a-z0-9.-]*\.workers\.dev/iu.exec(output);
   if (!match) {
@@ -797,8 +812,8 @@ export type DeployCloudflareOptions = Readonly<{
 export async function deployCloudflare(
   options: DeployCloudflareOptions = {},
 ): Promise<ApiKeyringDeploymentDecision> {
-  const runner = options.runner ?? createCommandRunner();
   const databaseBinding = options.databaseBinding ?? DEFAULT_D1_BINDING;
+  const runner = options.runner ?? createCommandRunner(databaseBinding);
   const workerName = resolveDeployWorkerName(options.workerName);
   const temporaryRoot = options.temporaryDirectoryRoot ?? tmpdir();
 

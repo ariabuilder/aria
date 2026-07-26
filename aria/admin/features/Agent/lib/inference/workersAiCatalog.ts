@@ -13,6 +13,7 @@ type CloudflareModelSearchResponse = {
   success?: boolean;
 };
 
+/** Reads the first configured Workers AI API token. */
 function resolveWorkersAiApiToken(): string | undefined {
   return (
     process.env.ARIA_CLOUDFLARE_API_TOKEN?.trim() ||
@@ -35,6 +36,7 @@ async function resolveWorkersAiAccountId(): Promise<string | undefined> {
   return undefined;
 }
 
+/** Converts a Workers AI catalog entry into Aria's model shape. */
 function normalizeWorkersAiModel(entry: {
   id?: string;
   name?: string;

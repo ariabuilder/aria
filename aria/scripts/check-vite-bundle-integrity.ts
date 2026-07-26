@@ -67,6 +67,7 @@ function collectBindingNames(
   }
 }
 
+/** Collects identifiers declared in a generated JavaScript bundle. */
 function collectDeclaredIdentifiers(sourceFile: ts.SourceFile): Set<string> {
   const declared = new Set<string>();
 
@@ -99,6 +100,7 @@ function collectDeclaredIdentifiers(sourceFile: ts.SourceFile): Set<string> {
   return declared;
 }
 
+/** Finds Vue initializer calls whose imported helper is not declared. */
 function findUnboundVueInitializers(
   sourceFile: ts.SourceFile,
   declared: ReadonlySet<string>,
@@ -122,6 +124,7 @@ function findUnboundVueInitializers(
   return unbound;
 }
 
+/** Inspects a JavaScript bundle for generated-code integrity problems. */
 async function inspectJavaScriptBundle(
   filePath: string,
 ): Promise<BundleProblem[]> {
@@ -142,6 +145,7 @@ async function inspectJavaScriptBundle(
   }));
 }
 
+/** Inspects a CSS bundle for invalid or truncated output. */
 async function inspectCssBundle(filePath: string): Promise<BundleProblem[]> {
   const source = await readFile(filePath, "utf8");
   if (!/(?:^|[;}])\s*@unocss\s*;/.test(source)) {
@@ -156,6 +160,7 @@ async function inspectCssBundle(filePath: string): Promise<BundleProblem[]> {
   ];
 }
 
+/** Returns the static text represented by a TypeScript property name. */
 function propertyNameText(name: ts.PropertyName): string | undefined {
   if (ts.isIdentifier(name) || ts.isStringLiteral(name)) {
     return name.text;
@@ -269,6 +274,7 @@ async function inspectWorkerRuntimeFile(
   );
 }
 
+/** Extracts binding names from parsed Wrangler resource definitions. */
 function bindingNames<T extends { binding: string }>(
   bindings: readonly T[],
 ): Set<string> {
