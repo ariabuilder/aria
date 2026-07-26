@@ -304,6 +304,7 @@ export default defineConfig({
     : cloudflare({
         configPath: cloudflareConfigPath,
         imageService: "passthrough",
+        remoteBindings: false,
         sessionKVBindingName: "session",
       }),
   integrations: [
