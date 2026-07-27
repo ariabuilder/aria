@@ -38,51 +38,14 @@ Deploy Aria to Cloudflare in one click, or run it locally with Node and SQLite.
 #### Deploy to Cloudflare
 
 1. Click the **Deploy to Cloudflare** button above.
-2. Accept the generated Worker, D1, KV, R2, Queue, Durable Object, and optional Workers AI resources. Give the two KV namespaces **distinct** titles (e.g. `aria-cache` and `aria-session`) — the form cannot prefill them.
-3. Open `/admin/setup` on the live site, create the first administrator, and complete first-launch setup.
+2. Accept the generated resources. Give the two KV namespaces **distinct** titles (e.g. `aria-cache` and `aria-session`) - the automatic deployment cannot prefill those.
+3. Open `/admin` on the live site, create your first administrator, and complete first-launch.
 
-One-click runs the deploy script: migrate D1, build the Worker, bootstrap the
-secrets Aria needs to boot (Site API keyring + OAuth), and ship it. You land on
-a blank site — finish at `/admin/setup`. Redeploys keep your content and won't
-rotate keys that are already live. Optional pieces (email encryption, Turnstile,
-custom-domain analytics, webhooks) are deliberately configured after deployment
-and never block first boot. See the
-[Cloudflare deployment guide](https://ariabuilder.io/docs/deployment/cloudflare/)
-for prerequisites and manual deploy.
-
-The deployment template also declares a few bindings and triggers the Deploy button does
-not list as generated resources — Cloudflare Images (media transforms degrade
-gracefully without an entitlement), the Cache API, and a 5-minute cron
-trigger. None of them block first boot.
-
-**Workers Builds settings:** the Deploy flow auto-detects `build` and `deploy`
-scripts from `package.json` and pre-fills both fields — keep the deploy
-command as `npm run deploy` (it migrates D1, then builds). You can clear the
-build command to skip a redundant second build; leaving it pre-filled is safe,
-just slower. The default non-production deploy (`wrangler versions upload`)
-skips migrations and secret bootstrap, so preview deploys can lag behind on
-schema and secrets.
-
-#### Optional Studio traffic metrics
-
-The Deploy button cannot create a least-privileged Cloudflare API token or
-choose a DNS zone for you. A new `workers.dev` URL does not belong to one of
-your account's zones, so finish this setup after connecting a Cloudflare-managed
-custom domain:
-
-1. [Create a dedicated Zone Analytics token](https://dash.cloudflare.com/profile/api-tokens?permissionGroupKeys=%5B%7B%22key%22%3A%22analytics%22%2C%22type%22%3A%22read%22%7D%5D&accountId=%2A&zoneId=all&name=Aria%20Zone%20Analytics), restrict it to the site's zone, and grant **Zone → Analytics → Read**. **Zone → Zone → Read** is optional and only lets Aria verify that the configured zone matches the site domain.
-2. Copy the domain's [Zone ID](https://developers.cloudflare.com/fundamentals/account/find-account-and-zone-ids/).
-3. In **Workers & Pages → your Aria Worker → Settings → Variables and Secrets**, add `ARIA_CLOUDFLARE_ANALYTICS_TOKEN` as an encrypted secret and `ARIA_CLOUDFLARE_ZONE_ID` as a plain-text variable, then deploy the new Worker version.
-4. Set Aria's **Site URL** to the custom-domain URL and enable **Show Cloudflare metrics in Aria Builder** under Analytics settings.
-
-Existing deployments that use `ARIA_CLOUDFLARE_API_TOKEN` remain compatible,
-but the dedicated analytics token is preferred because it can be limited to
-read-only analytics access. Sites that stay on `workers.dev` can use
-Cloudflare's Worker metrics dashboard instead.
+Details, prerequisites, and manual deploy: [Cloudflare deployment guide](https://ariabuilder.io/docs/deployment/cloudflare/).
 
 #### Run locally
 
-**Requirements:** Node.js `>= 22.18.0` and npm.
+Requires Node.js `>= 22.18.0` and npm.
 
 ```bash
 git clone https://github.com/ariabuilder/aria.git
@@ -91,20 +54,12 @@ npm install
 npm run dev
 ```
 
-The same commands work unchanged in Windows Command Prompt, PowerShell,
-macOS, and Linux; WSL is not required. Aria's npm scripts set the runtime and
-launch Astro/Wrangler through Node, so do not translate them into shell-specific
-environment-variable syntax. If a required tool cannot be resolved, run
-`npm install` again from the repository root.
+For Cloudflare bindings locally, use `npm run dev:edge`.
 
-Open [http://localhost:4321/admin](http://localhost:4321/admin) and complete
-first-run setup at `/admin/setup`.
+Open [http://localhost:4321/admin](http://localhost:4321/admin) and finish setup at `/admin`.
 
-For Cloudflare binding parity (D1, KV, R2, and Workers), run:
-
-```bash
-npm run dev:edge
-```
+#### Optional Cloudflare Analytics
+After you attach a Cloudflare-managed custom domain, you can show zone traffic inside Aria. Setup: [Cloudflare deployment guide](https://ariabuilder.io/docs/deployment/cloudflare/).
 
 [Local setup](https://ariabuilder.io/docs/getting-started/local-setup/) ·
 [Edge development](https://ariabuilder.io/docs/getting-started/edge-dev/)
@@ -308,7 +263,7 @@ Documentation will be expanded on as we progress with development. Expect full s
 
 ### ✦ Contributing and support
 
-Contributions are welcome, especially around Composer UX, blocks, and tests.
+Contributions are welcome.
 Read [CONTRIBUTING.md](CONTRIBUTING.md), review the
 [contributor documentation](https://ariabuilder.io/docs/contributors/), and
 open an issue before substantial architectural changes. Support expectations
