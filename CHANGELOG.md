@@ -18,8 +18,7 @@ The format follows a simple human-readable structure:
 
 ### Added
 
-- Initial open source community docs.
-- Security policy for pre-launch and pre-v1 vulnerability reporting.
+- Nothing yet.
 
 ### Changed
 
@@ -32,6 +31,33 @@ The format follows a simple human-readable structure:
 ### Security
 
 - Nothing yet.
+
+## 0.5.9
+
+### Added
+
+- Initial open source community docs.
+- Security policy for pre-launch and pre-v1 vulnerability reporting.
+- Discord announcements for published GitHub Releases, including the release name
+  and link.
+
+### Changed
+
+- Refined Aria's admin controls, design settings, typography copy, and variable
+  table layout for a more consistent editing experience.
+- Improved the Stage markup preview with independent visibility, smooth
+  transitions, and copy-confirmation feedback.
+
+### Fixed
+
+- Ensured release announcements post once to avoid duplicate Discord messages.
+- Corrected Composer options-menu template syntax and related control sizing.
+- Improved destructive-action text contrast and aligned French font-upload
+  terminology.
+
+### Security
+
+- Disabled Discord mention parsing in release announcements.
 
 ## 0.5.8
 
