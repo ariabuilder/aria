@@ -745,7 +745,7 @@ export const FR_DESIGN_MESSAGES = {
   "design.description.breakpoints": "Gérez les points de rupture de votre site",
   "design.description.colors": "Palettes, nuances et jetons semantiques",
   "design.description.typography":
-    "Importez, activez et gérez les polices",
+    "Téléversez, activez et gérez les polices",
   "design.description.globalStyles": "Style par défaut pour l'ensemble du site",
   "design.description.icons": "Activez les packs d'icones pour votre site",
   "design.description.classManager":

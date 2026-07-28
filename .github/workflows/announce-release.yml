@@ -22,7 +22,6 @@ jobs:
             '{username: "GitHub Releases", content: ("🚀 **New release:** " + $name + "\n" + $url), allowed_mentions: {parse: []}}')
 
           curl --fail-with-body --show-error --silent \
-            --retry 3 --retry-all-errors \
             -H "Content-Type: application/json" \
             --data "$payload" \
             "$WEBHOOK_URL"
