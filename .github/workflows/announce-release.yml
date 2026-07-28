@@ -19,7 +19,7 @@ jobs:
           payload=$(jq -n \
             --arg name "$RELEASE_NAME" \
             --arg url "$RELEASE_URL" \
-            '{username: "GitHub Releases", content: ("🚀 **New release:** " + $name + "\n" + $url)}')
+            '{username: "GitHub Releases", content: ("🚀 **New release:** " + $name + "\n" + $url), allowed_mentions: {parse: []}}')
 
           curl --fail-with-body --show-error --silent \
             --retry 3 --retry-all-errors \
