@@ -5,6 +5,7 @@ import {
   ref,
   toValue,
   type MaybeRefOrGetter,
+  type Ref,
 } from "vue";
 import { useElementBounding } from "@vueuse/core";
 import { toast } from "vue-sonner";
@@ -29,11 +30,18 @@ const {
 
 const anchor = computed(() => toValue(props.anchorEl) ?? null);
 const { top, left, width, height } = useElementBounding(anchor);
-const isMarkupCopied = ref(false);
-const isStylesheetCopied = ref(false);
 const COPY_CONFIRMATION_DURATION_MS = 1_500;
-let markupCopyConfirmationTimer: ReturnType<typeof setTimeout> | null = null;
-let stylesheetCopyConfirmationTimer: ReturnType<typeof setTimeout> | null = null;
+type PreviewKind = "markup" | "stylesheet";
+
+interface CopyConfirmationState {
+  copied: Ref<boolean>;
+  timer: ReturnType<typeof setTimeout> | null;
+}
+
+const copyConfirmations: Record<PreviewKind, CopyConfirmationState> = {
+  markup: { copied: ref(false), timer: null },
+  stylesheet: { copied: ref(false), timer: null },
+};
 
 const panelStyle = computed(() => ({
   top: `${top.value}px`,
@@ -43,33 +51,17 @@ const panelStyle = computed(() => ({
   zIndex: Z_INDEX.canvas.markupPreview,
 }));
 
-function showCopyConfirmation(
-  copied: typeof isMarkupCopied,
-  timer: "markup" | "stylesheet",
-): void {
-  const existingTimer =
-    timer === "markup"
-      ? markupCopyConfirmationTimer
-      : stylesheetCopyConfirmationTimer;
-  if (existingTimer) {
-    clearTimeout(existingTimer);
+function showCopyConfirmation(kind: PreviewKind): void {
+  const confirmation = copyConfirmations[kind];
+  if (confirmation.timer) {
+    clearTimeout(confirmation.timer);
   }
 
-  copied.value = true;
-  const confirmationTimer = setTimeout(() => {
-    copied.value = false;
-    if (timer === "markup") {
-      markupCopyConfirmationTimer = null;
-    } else {
-      stylesheetCopyConfirmationTimer = null;
-    }
+  confirmation.copied.value = true;
+  confirmation.timer = setTimeout(() => {
+    confirmation.copied.value = false;
+    confirmation.timer = null;
   }, COPY_CONFIRMATION_DURATION_MS);
-
-  if (timer === "markup") {
-    markupCopyConfirmationTimer = confirmationTimer;
-  } else {
-    stylesheetCopyConfirmationTimer = confirmationTimer;
-  }
 }
 
 async function copyMarkup(): Promise<void> {
@@ -80,7 +72,7 @@ async function copyMarkup(): Promise<void> {
 
   try {
     await navigator.clipboard.writeText(markup);
-    showCopyConfirmation(isMarkupCopied, "markup");
+    showCopyConfirmation("markup");
     toast.success("Markup copied");
   } catch (error) {
     toast.error(
@@ -97,7 +89,7 @@ async function copyStylesheet(): Promise<void> {
 
   try {
     await navigator.clipboard.writeText(stylesheet);
-    showCopyConfirmation(isStylesheetCopied, "stylesheet");
+    showCopyConfirmation("stylesheet");
     toast.success("Stylesheet copied");
   } catch (error) {
     toast.error(
@@ -107,11 +99,10 @@ async function copyStylesheet(): Promise<void> {
 }
 
 onBeforeUnmount(() => {
-  if (markupCopyConfirmationTimer) {
-    clearTimeout(markupCopyConfirmationTimer);
-  }
-  if (stylesheetCopyConfirmationTimer) {
-    clearTimeout(stylesheetCopyConfirmationTimer);
+  for (const confirmation of Object.values(copyConfirmations)) {
+    if (confirmation.timer) {
+      clearTimeout(confirmation.timer);
+    }
   }
 });
 </script>
@@ -157,13 +148,13 @@ onBeforeUnmount(() => {
                   variant="ghost"
                   size="icon-sm"
                   class="size-6 shrink-0 text-muted-foreground hover:text-foreground"
-                  :aria-label="isMarkupCopied ? 'Markup copied' : 'Copy markup'"
+                  :aria-label="copyConfirmations.markup.copied.value ? 'Markup copied' : 'Copy markup'"
                   @click.stop="void copyMarkup()"
                   @pointerdown.stop
                 >
                   <span
                     class="icon-swap"
-                    :data-state="isMarkupCopied ? 'copied' : 'copy'"
+                    :data-state="copyConfirmations.markup.copied.value ? 'copied' : 'copy'"
                     aria-hidden="true"
                   >
                     <span
@@ -195,13 +186,13 @@ onBeforeUnmount(() => {
                   variant="ghost"
                   size="icon-sm"
                   class="size-6 shrink-0 text-muted-foreground hover:text-foreground"
-                  :aria-label="isStylesheetCopied ? 'Stylesheet copied' : 'Copy stylesheet'"
+                  :aria-label="copyConfirmations.stylesheet.copied.value ? 'Stylesheet copied' : 'Copy stylesheet'"
                   @click.stop="void copyStylesheet()"
                   @pointerdown.stop
                 >
                   <span
                     class="icon-swap"
-                    :data-state="isStylesheetCopied ? 'copied' : 'copy'"
+                    :data-state="copyConfirmations.stylesheet.copied.value ? 'copied' : 'copy'"
                     aria-hidden="true"
                   >
                     <span

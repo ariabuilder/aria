@@ -126,7 +126,7 @@ const cmsPreviewEntryContext = inject<CmsPreviewEntryContext | null>(
               <Button
                 type="button"
                 variant="ghost"
-                size="icon-xs"
+                size="icon-sm"
                 class="shrink-0"
                 :disabled="!canUndo"
                 :aria-label="t('composer.canvas.undo')"

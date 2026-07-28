@@ -128,9 +128,9 @@ onBeforeUnmount(() => {
 
     <PopoverContent align="end" class="w-60 p-0" :side-offset="5">
       <Command>
+        <!-- Canvas Display -->
         <CommandList style="max-height: none !important;"
           class="py-1! space-y-3!"
-          <!-- Canvas Display -->
           <CommandGroup :heading="t('composer.options.canvas')">
             <CommandItem
               value="show-outlines"
