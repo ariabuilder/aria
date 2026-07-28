@@ -163,7 +163,7 @@ function handleSearchKeydown(event: KeyboardEvent) {
             ]"
             title="Custom class pseudo states"
           >
-            <div :class="[studioIcons.pseudoState, 'size-4.5']" />
+            <div :class="[studioIcons.pseudoState, 'size-4 shrink-0']" />
           </Button>
         </span>
       </TooltipTrigger>
@@ -190,7 +190,7 @@ function handleSearchKeydown(event: KeyboardEvent) {
           <div
             :class="[
               studioIcons.pseudoState,
-              'size-4.5',
+              'size-4 shrink-0',
               animating ? 'animate-pseudo-spin' : '',
             ]"
           />

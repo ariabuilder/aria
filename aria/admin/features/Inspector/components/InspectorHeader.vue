@@ -89,7 +89,7 @@ function handlePseudoChange(value: InspectorPseudoState) {
         aria-hidden="true"
         :class="[
           icon,
-          'size-4.5 shrink-0',
+          'size-4 shrink-0',
           isLocked ? 'text-primary' : 'text-muted-foreground',
         ]"
       />

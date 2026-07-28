@@ -121,7 +121,7 @@ defineExpose({ open, close });
     <PopoverTrigger as-child>
       <button
         type="button"
-        class="flex min-w-0 flex-1 py-1 items-center gap-2 rounded-md px-1 -mx-1 text-left transition-colors hover:bg-card/50 disabled:cursor-default cursor-pointer disabled:hover:bg-transparent"
+        class="flex min-w-0 flex-1 py-1.5 items-center gap-1.5 rounded-sm! px-1 -mx-1 text-left transition-colors hover:bg-card disabled:cursor-default cursor-pointer disabled:hover:bg-transparent focus:outline-none focus:ring-0 hover:border-dashed hover:border-border hover:border-solid border border-transparent data-[state=open]:border-border data-[state=open]:bg-card/80 data-[state=open]:border-dashed data-[state=open]:hover:border-dashed"
         :disabled="!hasOptions"
       >
         <div
@@ -130,18 +130,18 @@ defineExpose({ open, close });
           <div :class="[editingIcon, 'w-4 h-4 text-muted-foreground']" />
         </div>
         <span
-          class="text-xs font-serif text-muted-foreground capitalize truncate min-w-0 tracking-wide flex-1"
+          class="text-xs font-medium text-muted-foreground capitalize truncate min-w-0 tracking-wide flex-1"
           >{{ editingLabel }}</span
         >
         <span
           v-if="hasOptions"
-          :class="[studioIcons.chevronDown, 'size-3 shrink-0 text-muted-foreground/70']"
+          :class="[studioIcons.chevronDown, 'size-3.5 shrink-0 text-muted-foreground/70']"
         />
       </button>
     </PopoverTrigger>
-    <PopoverContent align="start" class="w-80 p-0" :side-offset="9">
+    <PopoverContent align="start" class="w-60 p-0" :side-offset="8">
       <Command>
-        <CommandInput v-model="searchQuery" auto-focus :placeholder="placeholder" />
+        <CommandInput v-model="searchQuery" auto-focus :placeholder="placeholder"/>
         <CommandList>
           <CommandEmpty>
             {{
@@ -154,13 +154,14 @@ defineExpose({ open, close });
             v-for="group in groups"
             :key="group.label"
             :heading="group.label"
+            class="py-1.5!"
           >
             <CommandItem
               v-for="option in group.options"
               :key="`${option.itemType}:${option.value}`"
               :value="`${option.itemType}:${option.value}`"
               :force-visible="option.itemType === 'cms-entry'"
-              class="flex items-center gap-2"
+              class="flex items-center gap-2 cursor-pointer"
               @select="selectOption(option)"
             >
               <div

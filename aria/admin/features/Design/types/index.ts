@@ -62,7 +62,7 @@ export const DESIGN_SECTION_CONFIG: Record<DesignSection, DesignSectionConfig> =
       id: "typography",
       group: "foundation",
       label: "Fonts",
-      description: "Upload, enable, and manage site font families",
+      description: "Upload, enable, and manage fonts",
       icon: "i-hugeicons:text",
     },
     "global-styles": {

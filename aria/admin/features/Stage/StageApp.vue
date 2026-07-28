@@ -5,7 +5,6 @@ import AppInspectorShell from "../Core/components/AppInspectorShell.vue";
 import ComposerPanel from "../Composer/components/ComposerPanel.vue";
 import ComposerCanvasControlBar from "../Composer/components/ComposerCanvasControlBar.vue";
 import StageMarkupPreviewPanel from "./components/StageMarkupPreviewPanel.vue";
-import { useStageMarkupPreview } from "./composables/useStageMarkupPreview";
 import type { StageAppEmits, StageAppProps } from "./types";
 
 const props = defineProps<StageAppProps>();
@@ -14,7 +13,6 @@ const emit = defineEmits<StageAppEmits>();
 
 const canvasShellRef = ref<InstanceType<typeof AppCanvasShell> | null>(null);
 const canvasAreaRef = ref<HTMLElement | null>(null);
-const { isMarkupPreviewOpen } = useStageMarkupPreview();
 
 const stageIframeRef = computed(() => {
   return canvasShellRef.value?.stageIframeRef || null;
@@ -46,7 +44,7 @@ defineExpose({
         class="relative flex min-h-0 flex-1 flex-col overflow-hidden"
       >
         <StageMarkupPreviewPanel
-          v-if="isMarkupPreviewOpen && !props.isPreview"
+          v-if="!props.isPreview"
           :anchor-el="canvasAreaRef"
         />
         <AppCanvasShell

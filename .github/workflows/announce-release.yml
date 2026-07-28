@@ -1,0 +1,27 @@
+name: Announce release to Discord
+
+on:
+  release:
+    types: [published]
+
+permissions: {}
+
+jobs:
+  announce:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Post release announcement
+        env:
+          WEBHOOK_URL: ${{ secrets.DISCORD_RELEASE_WEBHOOK }}
+          RELEASE_NAME: ${{ github.event.release.name || github.event.release.tag_name }}
+          RELEASE_URL: ${{ github.event.release.html_url }}
+        run: |
+          payload=$(jq -n \
+            --arg name "$RELEASE_NAME" \
+            --arg url "$RELEASE_URL" \
+            '{username: "GitHub Releases", content: ("🚀 **New release:** " + $name + "\n" + $url), allowed_mentions: {parse: []}}')
+
+          curl --fail-with-body --show-error --silent \
+            -H "Content-Type: application/json" \
+            --data "$payload" \
+            "$WEBHOOK_URL"

@@ -2,7 +2,7 @@
   "name": "@ariabuilder/aria",
   "description": "The Astro-native visual builder for the Cloudflare era.",
   "type": "module",
-  "version": "0.5.8",
+  "version": "0.5.9",
   "license": "Apache-2.0",
   "homepage": "https://ariabuilder.io",
   "repository": {

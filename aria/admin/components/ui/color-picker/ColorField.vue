@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import { colord } from "colord";
+import { Button } from "@/components/ui/button";
 
 import {
   colorInputPlaceholder,
@@ -85,7 +86,7 @@ const displayValue = computed(() => {
   >
     <span
       v-if="label"
-      class="text-3xs font-semibold uppercase tracking-widest text-muted-foreground"
+      class="text-3xs font-medium uppercase tracking-widest text-muted-foreground"
     >
       {{ label }}
     </span>
@@ -113,11 +114,16 @@ const displayValue = computed(() => {
       @commit="emit('commit', $event)"
     >
       <template #default="{ previewColor }">
-        <button
+        <Button
           v-if="isToolbar"
           type="button"
-          class="relative size-5 shrink-0 overflow-hidden rounded-sm border border-border/50 border-solid transition-[color,box-shadow] hover:bg-sidebar/80 hover:border-border/50 cursor-pointer"
-          :style="{ background: CHECKERBOARD_STYLE }"
+          variant="headerAction"
+          size="icon"
+          class="relative size-5! shrink-0 overflow-hidden rounded-sm!"
+          :style="{
+            background: CHECKERBOARD_STYLE,
+            border: '1px solid var(--border)',
+          }"
           :disabled="disabled"
           @click.stop
         >
@@ -125,7 +131,7 @@ const displayValue = computed(() => {
             class="absolute inset-0 block size-full"
             :style="{ backgroundColor: previewColor || 'transparent' }"
           />
-        </button>
+        </Button>
 
         <button
           v-else

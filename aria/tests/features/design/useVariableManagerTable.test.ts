@@ -95,6 +95,17 @@ describe("useVariableManagerTable", () => {
     ).toEqual(["primary"]);
   });
 
+  it("keeps a wider key column while letting the value column fill spare space", () => {
+    const tableState = createTableHarness();
+    const keyColumn = tableState.table.getColumn("key");
+    const valueColumn = tableState.table.getColumn("value");
+
+    expect(keyColumn?.getSize()).toBe(300);
+    expect(valueColumn?.columnDef.meta).toMatchObject({
+      studioTableWidthMode: "flex",
+    });
+  });
+
   it("filters by segment through TanStack column filters", () => {
     const tableState = createTableHarness();
 

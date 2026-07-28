@@ -57,7 +57,10 @@ import { useStudioI18n } from "@/i18n";
 import { studioIcons } from "@/lib/icons";
 import DesignHeaderTeleport from "../components/DesignHeaderTeleport.vue";
 import type { VariableManagerSegment } from "../lib/variableManagerTable";
-import { toStudioTableHeaderTable } from "@/features/Studio/core/lib/studioTableHeader";
+import {
+  getStudioTableColWidthStyle,
+  toStudioTableHeaderTable,
+} from "@/features/Studio/core/lib/studioTableHeader";
 
 const isImportDialogOpen = ref(false);
 const isClearConfirmOpen = ref(false);
@@ -544,7 +547,7 @@ void loadVariableManagerBootstrap(undefined, { silent: true });
               <TableCell
                 v-for="cell in row.getVisibleCells()"
                 :key="cell.id"
-                :style="{ width: `${cell.column.getSize()}px` }"
+                :style="getStudioTableColWidthStyle(cell.column)"
                 :class="getBodyCellClass(cell.column.id)"
               >
                 <FlexRender

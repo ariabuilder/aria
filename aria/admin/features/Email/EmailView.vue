@@ -476,7 +476,6 @@ onMounted(() => {
       >
         <SelectTrigger
           hide-icon
-          class="h-9! w-auto! min-w-0 shrink-0 border border-dashed border-border bg-input px-3 text-xs text-muted-foreground hover:border-border/50! hover:bg-background! hover:text-foreground!"
         >
           <SelectValue :placeholder="`+ ${t('email.addConnection')}`" />
         </SelectTrigger>

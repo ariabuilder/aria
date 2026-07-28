@@ -116,7 +116,7 @@ onBeforeUnmount(() => {
         type="button"
         variant="ghost"
         size="icon-sm"
-        class="shrink-0"
+        class="shrink-0 hover:bg-transparent"
         :aria-label="t('composer.options.label')"
       >
         <span
@@ -126,14 +126,17 @@ onBeforeUnmount(() => {
       </Button>
     </PopoverTrigger>
 
-    <PopoverContent align="end" class="w-60 p-0" :side-offset="9">
+    <PopoverContent align="end" class="w-60 p-0" :side-offset="5">
       <Command>
-        <CommandList style="max-height: none !important;"
-          <!-- Canvas Display -->
+        <!-- Canvas Display -->
+        <CommandList
+          style="max-height: none !important;"
+          class="py-1! space-y-3!"
+        >
           <CommandGroup :heading="t('composer.options.canvas')">
             <CommandItem
               value="show-outlines"
-              class="flex items-center gap-2"
+              class="flex cursor-pointer items-center gap-2"
               @select="toggleShowOutlines"
             >
               <span
@@ -156,7 +159,7 @@ onBeforeUnmount(() => {
 
             <CommandItem
               value="wireframe-mode"
-              class="flex items-center gap-2"
+              class="flex cursor-pointer items-center gap-2"
               @select="toggleWireframeMode"
             >
               <span
@@ -182,7 +185,7 @@ onBeforeUnmount(() => {
           <CommandGroup :heading="t('composer.options.layers')">
             <CommandItem
               value="show-slot-groups"
-              class="flex items-center gap-2"
+              class="flex cursor-pointer items-center gap-2"
               @select="emit('update:show-slot-groups', !props.showSlotGroups)"
             >
               <span
@@ -208,7 +211,7 @@ onBeforeUnmount(() => {
           <CommandGroup :heading="t('composer.options.appearance')">
             <CommandItem
               value="toggle-theme"
-              class="flex items-center gap-2"
+              class="flex cursor-pointer items-center gap-2"
               @select="toggleTheme"
             >
               <span
@@ -224,7 +227,7 @@ onBeforeUnmount(() => {
 
             <CommandItem
               value="toggle-fullscreen"
-              class="flex items-center gap-2"
+              class="flex cursor-pointer items-center gap-2"
               @select="() => void toggleFullscreen()"
             >
               <span
@@ -250,7 +253,7 @@ onBeforeUnmount(() => {
             <CommandItem
               v-if="props.isPublished"
               value="set-to-draft"
-              class="flex items-center gap-2"
+              class="flex cursor-pointer items-center gap-2"
               @select="emit('unpublish')"
             >
               <span
@@ -267,7 +270,7 @@ onBeforeUnmount(() => {
             <CommandItem
               v-if="props.livePageHref"
               value="view-live-page"
-              class="flex items-center gap-2"
+              class="flex cursor-pointer items-center gap-2 last:border-b-0"
               @select="openLivePage"
             >
               <span

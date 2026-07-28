@@ -100,7 +100,7 @@ async function onFilterKeydownCapture(event: KeyboardEvent): Promise<void> {
       data-slot="command-input"
       :class="
         cn(
-          'placeholder:text-muted-foreground/60 border-none flex h-9 w-full rounded-none bg-transparent py-2 text-sm text-foreground outline-none ring-0 focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 disabled:cursor-not-allowed disabled:opacity-50 caret-primary selection:bg-primary/10 selection:text-primary-foreground group-hover:text-primary-foreground',
+          'placeholder:text-muted-foreground/60 border-none flex h-8 w-full rounded-none bg-transparent py-1 text-xs text-foreground outline-none ring-0 focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 disabled:cursor-not-allowed disabled:opacity-50 caret-primary selection:bg-primary/10 selection:text-primary-foreground group-hover:text-primary-foreground',
           props.class,
         )
       "

@@ -310,11 +310,11 @@ const nodeTypeLabel = computed(() => {
     <Teleport to="body">
       <div
         v-if="overlays.selection.visible"
-        class="selection-toolbar fixed pointer-events-auto flex h-10 max-w-[calc(100vw-16px)] select-none items-center whitespace-nowrap rounded-sm border border-dashed border-border/75 bg-input/95 px-1.5 text-xs text-foreground shadow-[0_10px_30px_rgb(0_0_0/0.26),inset_0_1px_0_rgb(255_255_255/0.05)] backdrop-blur-md"
+        class="selection-toolbar fixed pointer-events-auto flex h-9 max-w-[calc(100vw-16px)] select-none items-center whitespace-nowrap rounded border-solid border-border bg-background px-1 text-xs text-foreground"
         :style="toolbarStyle"
         data-overlay="toolbar"
       >
-        <div class="flex min-w-0 items-center gap-1 px-0.5">
+        <div class="flex min-w-0 items-center gap-1 px-1">
           <Button
             v-if="showSelectParent"
             variant="sidebar-action"
@@ -324,10 +324,10 @@ const nodeTypeLabel = computed(() => {
             :title="t('composer.toolbar.selectParent')"
             @click.stop.prevent="handleToolbarAction('select-parent')"
           >
-            <span :class="[TOOLBAR_ICONS['select-parent'], 'size-4']" />
+            <span :class="[TOOLBAR_ICONS['select-parent'], 'size-3.5 shrink-0']" />
           </Button>
           <span
-            class="max-w-28 truncate px-1 text-xs font-semibold tracking-tight text-foreground capitalize"
+            class="max-w-28 truncate px-1 text-xs font-medium text-muted-foreground capitalize"
           >
             {{ nodeTypeLabel }}
           </span>
@@ -335,11 +335,11 @@ const nodeTypeLabel = computed(() => {
 
         <template v-if="showNodeTypeControls">
           <div
-            class="mx-1.5 h-6 shrink-0 border-l border-dashed border-border/50"
+            class="mx-1.5 h-3 shrink-0 border-l border-solid border-border/70"
             aria-hidden="true"
           />
 
-          <div class="flex items-center gap-1 px-0.5" @click.stop>
+          <div class="flex items-center gap-1 px-2" @click.stop>
             <ColorField
               v-if="isTextNode"
               :model-value="toolbarTextColor"
@@ -363,14 +363,14 @@ const nodeTypeLabel = computed(() => {
             <Button
               v-if="isImageNode"
               type="button"
-              variant="sidebar-action"
+              variant="headerAction"
               size="icon-sm"
               class="shrink-0"
               :title="t('inspector.media.chooseImage')"
               @click.stop.prevent="handleToolbarAction('open-media-picker')"
             >
               <span
-                :class="[TOOLBAR_ICONS['open-media-picker'], 'size-4']"
+                :class="[TOOLBAR_ICONS['open-media-picker'], 'size-3.5 shrink-0']"
               />
             </Button>
           </div>
@@ -380,9 +380,8 @@ const nodeTypeLabel = computed(() => {
         <SelectionToolbarMotionControl />
 
         <div
-          class="mx-1.5 h-6 shrink-0 border-l border-dashed border-border/50"
-          aria-hidden="true"
-        />
+            class="mx-1.5 h-3 shrink-0 border-l border-solid border-border/70"
+            aria-hidden="true" />
 
         <div class="flex items-center gap-0.5 px-0.5">
           <Button

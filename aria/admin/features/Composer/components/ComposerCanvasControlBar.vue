@@ -120,7 +120,7 @@ const cmsPreviewEntryContext = inject<CmsPreviewEntryContext | null>(
         class="grid w-full min-w-0 grid-cols-[1fr_auto_1fr] items-center gap-2"
       >
         <!-- Left: undo/redo, markup preview -->
-        <div class="flex min-w-0 items-center gap-0.5 justify-self-start">
+        <div class="flex min-w-0 items-center gap-1 justify-self-start">
           <Tooltip>
             <TooltipTrigger as-child>
               <Button
@@ -132,7 +132,7 @@ const cmsPreviewEntryContext = inject<CmsPreviewEntryContext | null>(
                 :aria-label="t('composer.canvas.undo')"
                 @click="emit('undo')"
               >
-                <span :class="[studioIcons.undo, 'size-4 shrink-0']" aria-hidden="true" />
+                <span :class="[studioIcons.undo, 'size-3.5 shrink-0']" aria-hidden="true" />
               </Button>
             </TooltipTrigger>
             <TooltipContent side="bottom">{{ t("composer.canvas.undoShortcut") }}</TooltipContent>
@@ -149,7 +149,7 @@ const cmsPreviewEntryContext = inject<CmsPreviewEntryContext | null>(
                 :aria-label="t('composer.canvas.redo')"
                 @click="emit('redo')"
               >
-                <span :class="[studioIcons.redo, 'size-4 shrink-0']" aria-hidden="true" />
+                <span :class="[studioIcons.redo, 'size-3.5 shrink-0']" aria-hidden="true" />
               </Button>
             </TooltipTrigger>
             <TooltipContent side="bottom">{{ t("composer.canvas.redoShortcut") }}</TooltipContent>
@@ -197,7 +197,7 @@ const cmsPreviewEntryContext = inject<CmsPreviewEntryContext | null>(
               <TooltipTrigger as-child>
                 <Button
                   type="button"
-                  variant="sidebar-action"
+                  variant="headerAction"
                   size="icon-sm"
                   class="shrink-0"
                   :class="
@@ -209,7 +209,7 @@ const cmsPreviewEntryContext = inject<CmsPreviewEntryContext | null>(
                   :aria-label="option.tooltip"
                   @click="setViewport(option.id)"
                 >
-                  <span :class="[option.icon, 'size-4 shrink-0']" aria-hidden="true" />
+                  <span :class="[option.icon, 'size-3.5 shrink-0']" aria-hidden="true" />
                 </Button>
               </TooltipTrigger>
               <TooltipContent side="bottom">{{ option.tooltip }}</TooltipContent>
@@ -217,7 +217,7 @@ const cmsPreviewEntryContext = inject<CmsPreviewEntryContext | null>(
           </div>
 
           <div
-            class="mx-1 hidden h-6 w-0 shrink-0 border-l border-dashed border-border/50 sm:block"
+            class="mx-1 hidden h-4 w-0 shrink-0 border-l border-solid border-border sm:block"
             aria-hidden="true"
           />
 
@@ -228,7 +228,7 @@ const cmsPreviewEntryContext = inject<CmsPreviewEntryContext | null>(
                   type="button"
                   variant="ghost"
                   size="icon-sm"
-                  class="shrink-0 bg-card text-primary"
+                  class="shrink-0"
                   :aria-label="scaleModeTooltipLabel"
                   @click="toggleScaleMode"
                 >
@@ -245,7 +245,7 @@ const cmsPreviewEntryContext = inject<CmsPreviewEntryContext | null>(
             </Tooltip>
 
             <div
-              class="flex items-center gap-0 rounded-sm border border-dashed border-border/50 px-0.5 h-6.5"
+              class="flex items-center gap-0"
             >
               <Tooltip>
                 <TooltipTrigger as-child>
