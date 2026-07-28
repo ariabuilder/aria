@@ -271,7 +271,7 @@ export function useVariableManagerTable(
       ),
       columnHelper.accessor((row) => row.key, {
         id: "key",
-        size: 220,
+        size: 300,
         header: t("design.variables.column.key"),
         cell: ({ row }) => {
           const prefix = h(
@@ -367,7 +367,9 @@ export function useVariableManagerTable(
       }),
       columnHelper.accessor((row) => row.valueText, {
         id: "value",
-        size: 180,
+        // Let long CSS values use all remaining row width while keeping the
+        // right-hand action column available when it appears on hover.
+        meta: { studioTableWidthMode: "flex" },
         header: t("design.variables.column.value"),
         cell: ({ row }) => {
           if (row.original.kind === "custom") {

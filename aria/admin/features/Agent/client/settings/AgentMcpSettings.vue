@@ -233,7 +233,7 @@ onMounted(() => {
           :class="
             cn(
               buttonVariants({ variant: 'default', size: 'sm' }),
-              'w-auto! min-w-0 shrink-0 gap-1.5 placeholder:text-primary-foreground/90 data-[state=open]:border-primary data-[state=open]:bg-primary/90 data-[state=open]:text-primary-foreground',
+              'w-auto! min-w-0 shrink-0 gap-1.5 placeholder:text-muted-foreground data-[state=open]:border-primary data-[state=open]:bg-primary/90 data-[state=open]:text-foreground',
             )
           "
         >
