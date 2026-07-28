@@ -2445,7 +2445,7 @@ function syncExternalSelectionOverlays(options?: { force?: boolean }): void {
       (
         target,
       ): target is {
-        element: Element;
+        element: HTMLElement;
         nodeId: string;
         nodeType: string;
       } => target !== null,

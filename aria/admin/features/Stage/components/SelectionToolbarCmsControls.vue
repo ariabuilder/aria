@@ -22,12 +22,12 @@ const { t } = useStudioI18n();
   <template
     v-if="showLoopButton || showLinkButton || showImageButton || showTextButton"
   >
-    <div
-      class="mx-1.5 h-6 shrink-0 border-l border-dashed border-border/50"
-      aria-hidden="true"
-    />
+  <div
+            class="mx-1.5 h-3 shrink-0 border-l border-solid border-border/70"
+            aria-hidden="true" />
 
-    <div class="flex items-center gap-1 px-0.5" @click.stop>
+
+    <div class="flex items-center gap-0 px-0" @click.stop>
       <CmsQuickPicker
         v-if="showLoopButton"
         mode="loop"
@@ -37,7 +37,7 @@ const { t } = useStudioI18n();
         data-action="activate-loop"
       />
 
-      <div v-if="showTextButton" class="flex items-center gap-0.5">
+      <div v-if="showTextButton" class="flex items-center gap-0">
         <CmsQuickPicker
           mode="field"
           kind="text"
@@ -47,7 +47,7 @@ const { t } = useStudioI18n();
         />
       </div>
 
-      <div v-if="showImageButton" class="flex items-center gap-0.5">
+      <div v-if="showImageButton" class="flex items-center gap-0">
         <CmsQuickPicker
           mode="field"
           kind="image"
@@ -57,7 +57,7 @@ const { t } = useStudioI18n();
         />
       </div>
 
-      <div v-if="showLinkButton" class="flex items-center gap-0.5">
+      <div v-if="showLinkButton" class="flex items-center gap-0">
         <CmsQuickPicker
           mode="field"
           kind="link"

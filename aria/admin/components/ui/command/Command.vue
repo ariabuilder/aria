@@ -93,7 +93,7 @@ provideCommandContext({
     @highlight="onHighlight"
     :class="
       cn(
-        'bg-background text-foreground flex h-full w-full flex-col overflow-hidden rounded-sm border border-border/50 p-0 shadow-xs',
+        'bg-background text-foreground flex h-full w-full flex-col overflow-hidden rounded-sm border-solid! border-border p-0 shadow-none',
         props.class,
       )
     "

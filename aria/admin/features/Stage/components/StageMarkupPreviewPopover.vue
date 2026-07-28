@@ -32,7 +32,7 @@ function handleTriggerClick(): void {
 const triggerButtonClass = computed(() => {
   if (props.variant === "toolbar") {
     return [
-      "rounded-sm text-muted-foreground hover:text-foreground disabled:cursor-not-allowed disabled:opacity-45",
+      "ml-0.5 rounded-sm text-muted-foreground hover:text-foreground disabled:cursor-not-allowed disabled:opacity-45",
       isMarkupPreviewOpen.value ? "bg-card text-primary" : "",
     ];
   }
@@ -45,7 +45,7 @@ const triggerButtonClass = computed(() => {
   <Button
     type="button"
     variant="ghost"
-    :size="props.variant === 'toolbar' ? 'icon-sm' : 'icon'"
+    :size="props.variant === 'toolbar' ? 'icon-xs' : 'icon'"
     :class="triggerButtonClass"
     :disabled="isMarkupPreviewDisabled"
     :aria-label="isMarkupPreviewOpen ? 'Close markup preview' : 'Open markup preview'"

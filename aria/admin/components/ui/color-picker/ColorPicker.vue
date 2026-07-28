@@ -4,6 +4,7 @@
 <script setup lang="ts">
 import { computed, ref, toRef, watch } from "vue";
 import { colord } from "colord";
+import { Button } from "@/components/ui/button";
 
 import {
   Popover,
@@ -579,11 +580,16 @@ defineExpose({
             :preview-color="state.previewColor.value"
             :value-mode="state.valueMode.value"
           >
-            <button
+            <Button
               type="button"
+              variant="headerAction"
+              size="icon-sm"
               :disabled="disabled"
-              class="group relative h-9 w-9 shrink-0 cursor-pointer overflow-hidden rounded-sm border border-border/50 border-solid bg-sidebar/40 transition-[color,box-shadow] hover:bg-sidebar/80 hover:border-border/50 focus-visible:border-border focus-visible:ring-border/50 focus-visible:ring-[1px] disabled:cursor-not-allowed disabled:opacity-50"
-              :style="{ background: CHECKERBOARD_STYLE }"
+              class="group relative shrink-0 overflow-hidden"
+              :style="{
+                background: CHECKERBOARD_STYLE,
+                borderStyle: 'solid',
+              }"
             >
               <div
                 class="absolute inset-0"
@@ -591,7 +597,7 @@ defineExpose({
                   backgroundColor: state.previewColor.value || 'transparent',
                 }"
               />
-            </button>
+            </Button>
           </slot>
         </PopoverTrigger>
 

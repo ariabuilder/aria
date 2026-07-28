@@ -452,6 +452,7 @@ onMounted(() => {
     <Button
       v-if="tab === 'webhooks'"
       size="sm"
+      variant="secondary"
       class="border border-border/50 border-solid bg-sidebar/40 px-4 py-1 text-sm placeholder:text-muted-foreground shadow-none transition-[color,box-shadow] outline-none focus:outline-none focus:ring-0 hover:bg-sidebar/80 hover:border-border/50 hover:border-solid focus-visible:border-border focus-visible:bg-sidebar/80 focus-visible:ring-border/50 focus-visible:ring-[1px] focus-visible:border-solid focus-visible:shadow-none focus-active:border-primary/80 focus-active:bg-sidebar data-[state=open]:border-border data-[state=open]:bg-sidebar/80 data-[state=open]:ring-border/50 data-[state=open]:ring-[1px] aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 aria-invalid:border-destructive disabled:cursor-not-allowed disabled:opacity-50 [&>span]:truncate text-start rounded-sm cursor-pointer"
 "
       :disabled="loading || !readiness?.ready"

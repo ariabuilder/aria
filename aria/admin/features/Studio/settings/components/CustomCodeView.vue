@@ -128,7 +128,7 @@ useSettingsTabReset({
         v-model="customHeadCode"
         aria-describedby="custom-head-code-description"
         :placeholder="t('settings.customCode.placeholder')"
-        class="w-full font-mono resize-none h-36 hover:bg-background! bg-input! border-border/50"
+        class="w-full h-36 bg-background! border-border border-dashed! text-xs caret-primary"
         :disabled="isLoading || isSaving"
         @blur="onHeadBlur"
       />
@@ -145,7 +145,7 @@ useSettingsTabReset({
         v-model="customBodyCode"
         aria-describedby="custom-body-code-description"
         :placeholder="t('settings.customCode.placeholder')"
-        class="w-full font-mono resize-none h-36 hover:bg-background! bg-input! border-border/50"
+        class="w-full h-36 bg-background! border-border border-dashed! text-xs caret-primary"
         :disabled="isLoading || isSaving"
         @blur="onBodyBlur"
       />
@@ -162,7 +162,7 @@ useSettingsTabReset({
         v-model="customFooterCode"
         aria-describedby="custom-footer-code-description"
         :placeholder="t('settings.customCode.placeholder')"
-        class="w-full font-mono resize-none h-36 hover:bg-background! bg-input! border-border/50"
+        class="w-full h-36 bg-background! border-border border-dashed! text-xs caret-primary"
         :disabled="isLoading || isSaving"
         @blur="onFooterBlur"
       />

@@ -260,6 +260,7 @@ onMounted(() => {
   <Teleport defer to="#settings-tab-actions">
     <Button
       @click="showCreateDialog = true"
+      variant="secondary"
       class="gap-2 shrink-0 w-full sm:w-auto"
     >
       {{ t("users.add") }}

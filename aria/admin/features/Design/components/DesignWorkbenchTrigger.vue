@@ -36,6 +36,7 @@ function openWorkbench(): void {
           variant="ghost"
           size="icon-xs"
           aria-label="Classes and variables"
+          class="mr-1.5!"
           :disabled="props.disabled"
           @click="openWorkbench"
         >
