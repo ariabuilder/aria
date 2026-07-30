@@ -108,6 +108,20 @@ const SSR_OPTIMIZE_DEPS_EXCLUDES = [
   "@oxc-parser/binding-wasm32-wasi",
 ];
 
+const SSR_ENVIRONMENT_OPTIMIZE_DEPS_EXCLUDES = [
+  // Loaded during save-triggered preview CSS compilation. Keeping this preset
+  // out of deps_ssr prevents workerd from retaining a discarded hashed URL
+  // after Vite refreshes its dependency cache.
+  "@unocss/preset-typography",
+] as const;
+
+const SSR_ENVIRONMENT_OPTIMIZE_DEPS_INCLUDES = [
+  // Imported by Astro's route cache after the server has started. If Vite
+  // discovers it on the first request, it replaces deps_ssr while workerd still
+  // references the previous generated route-cache chunk.
+  "fast-xml-parser",
+] as const;
+
 /**
  * Under @cloudflare/vite-plugin, SSR is its own Vite environment.
  * Top-level `vite.ssr.optimizeDeps` does not reliably reach it — use
@@ -126,6 +140,8 @@ function ariaSsrOptimizeDepsPlugin() {
       }
       return {
         optimizeDeps: {
+          exclude: [...SSR_ENVIRONMENT_OPTIMIZE_DEPS_EXCLUDES],
+          include: [...SSR_ENVIRONMENT_OPTIMIZE_DEPS_INCLUDES],
           ignoreOutdatedRequests: true,
         },
       };
@@ -263,19 +279,24 @@ export default defineConfig({
       external: SSR_EXTERNALS,
       ...(useNodeRuntime ? {} : { noExternal: [...UNOCSS_SSR_BUNDLE] }),
       optimizeDeps: {
-        exclude: useNodeRuntime
-          ? SSR_OPTIMIZE_DEPS_EXCLUDES
-          : SSR_OPTIMIZE_DEPS_EXCLUDES.filter(
-              (dep) =>
-                !UNOCSS_SSR_BUNDLE.includes(
-                  dep as (typeof UNOCSS_SSR_BUNDLE)[number],
-                ),
-            ),
+        exclude: [
+          ...(useNodeRuntime
+            ? SSR_OPTIMIZE_DEPS_EXCLUDES
+            : SSR_OPTIMIZE_DEPS_EXCLUDES.filter(
+                (dep) =>
+                  !UNOCSS_SSR_BUNDLE.includes(
+                    dep as (typeof UNOCSS_SSR_BUNDLE)[number],
+                  ),
+              )),
+          ...SSR_ENVIRONMENT_OPTIMIZE_DEPS_EXCLUDES,
+        ],
+        include: [...SSR_ENVIRONMENT_OPTIMIZE_DEPS_INCLUDES],
       },
     },
     optimizeDeps: {
       exclude: [
         ...SSR_OPTIMIZE_DEPS_EXCLUDES,
+        ...SSR_ENVIRONMENT_OPTIMIZE_DEPS_EXCLUDES,
         // EditorContent must share the Studio's Vue renderer. Pre-bundling this
         // Vue component can detach its template ref owner during route changes.
         "@tiptap/vue-3",
@@ -289,6 +310,7 @@ export default defineConfig({
       include: [
         "html-to-image",
         "isomorphic-dompurify",
+        ...SSR_ENVIRONMENT_OPTIMIZE_DEPS_INCLUDES,
         ...VUE_OPTIMIZE_DEPS,
         ...TIPTAP_OPTIMIZE_DEPS,
       ],
