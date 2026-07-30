@@ -16,6 +16,7 @@ const {
   mockHandleSlotChange,
   mockHandleChildrenUpdate,
   mockRunInitialExpansion,
+  mockTreeActionsHarness,
 } = vi.hoisted(() => ({
   mockFocusNode: vi.fn(),
   mockClearSelection: vi.fn(),
@@ -26,6 +27,9 @@ const {
   mockHandleSlotChange: vi.fn(),
   mockHandleChildrenUpdate: vi.fn(),
   mockRunInitialExpansion: vi.fn(),
+  mockTreeActionsHarness: {
+    onTreeStructureChanged: null as null | (() => void),
+  },
 }));
 
 vi.mock("../../../admin/features/Beacon", () => ({
@@ -66,9 +70,13 @@ vi.mock("../../../admin/features/Layers/composables/useLayerExpansion", () => ({
     expandedNodes: ref(new Set<string>()),
     collapseState: ref(new Map<string, string>()),
     isAllExpanded: { __v_isRef: true, value: false },
+    isLayerTreeBusy: ref(false),
+    layerTreeOperation: ref(null),
     isExpanded: () => true,
+    isExpanding: () => false,
     getCollapseState: () => "expanded",
     toggleExpand: vi.fn(),
+    requestToggleExpand: vi.fn(),
     toggleAll: vi.fn(),
     expandAncestors: vi.fn(),
     runInitialExpansion: mockRunInitialExpansion,
@@ -90,14 +98,19 @@ vi.mock("../../../admin/features/Layers/composables/useLayerUiActions", () => ({
 vi.mock(
   "../../../admin/features/Layers/composables/useLayerTreeActions",
   () => ({
-    useLayerTreeActions: () => ({
-      getNodesInSlot: vi.fn(() => []),
-      handleDragStart: mockHandleDragStart,
-      handleDragEnd: mockHandleDragEnd,
-      handleDropOnNode: mockHandleDropOnNode,
-      handleSlotChange: mockHandleSlotChange,
-      handleChildrenUpdate: mockHandleChildrenUpdate,
-    }),
+    useLayerTreeActions: (options: { onTreeStructureChanged?: () => void }) => {
+      mockTreeActionsHarness.onTreeStructureChanged =
+        options.onTreeStructureChanged ?? null;
+
+      return {
+        getNodesInSlot: vi.fn(() => []),
+        handleDragStart: mockHandleDragStart,
+        handleDragEnd: mockHandleDragEnd,
+        handleDropOnNode: mockHandleDropOnNode,
+        handleSlotChange: mockHandleSlotChange,
+        handleChildrenUpdate: mockHandleChildrenUpdate,
+      };
+    },
   }),
 );
 
@@ -177,6 +190,14 @@ const LayerSlotsViewStub = defineComponent({
     activeDragListId: {
       type: String,
       default: null,
+    },
+    draggableKey: {
+      type: Number,
+      default: 0,
+    },
+    treeRevision: {
+      type: Number,
+      default: 0,
     },
     renderCacheKey: {
       type: [String, Number],
@@ -328,6 +349,7 @@ describe("LayerPanel", () => {
     const wrapper = mountLayerPanel([targetNode]);
 
     const layerSlotsView = wrapper.getComponent(LayerSlotsViewStub);
+    const initialDraggableKey = layerSlotsView.props("draggableKey");
 
     expect(layerSlotsView.props("isDragging")).toBe(false);
 
@@ -349,6 +371,44 @@ describe("LayerPanel", () => {
 
     expect(layerSlotsView.props("isDragging")).toBe(false);
     expect(layerSlotsView.props("activeDragListId")).toBeNull();
+    expect(layerSlotsView.props("draggableKey")).toBe(initialDraggableKey);
+  });
+
+  it("refreshes cached layer order when editor blocks commit", async () => {
+    const targetNode = createNode("node-1", "Text");
+    const nextNode = createNode("node-2", "Text");
+    const wrapper = mountLayerPanel([targetNode]);
+    const layerSlotsView = wrapper.getComponent(LayerSlotsViewStub);
+    const initialDraggableKey = layerSlotsView.props("draggableKey");
+    const initialTreeRevision = layerSlotsView.props("treeRevision") as number;
+
+    await wrapper.setProps({ blocks: [nextNode, targetNode] });
+
+    expect(layerSlotsView.props("treeRevision")).toBe(initialTreeRevision + 1);
+    expect(layerSlotsView.props("draggableKey")).toBe(initialDraggableKey);
+  });
+
+  it("refreshes drag lists only when a cross-tree move requests it", async () => {
+    const targetNode = createNode("node-1", "Text");
+    const wrapper = mountLayerPanel([targetNode]);
+    const layerSlotsView = wrapper.getComponent(LayerSlotsViewStub);
+    const initialDraggableKey = layerSlotsView.props("draggableKey") as number;
+    const initialTreeRevision = layerSlotsView.props("treeRevision") as number;
+
+    callIndicatorHandler(
+      layerSlotsView.props("onDragStart") as
+        | ((payload: unknown) => void)
+        | undefined,
+      {
+        item: { __draggable_context: { element: targetNode, index: 0 } },
+      },
+    );
+    mockTreeActionsHarness.onTreeStructureChanged?.();
+    (layerSlotsView.props("onDragEnd") as () => void)();
+    await wrapper.vm.$nextTick();
+
+    expect(layerSlotsView.props("draggableKey")).toBe(initialDraggableKey + 1);
+    expect(layerSlotsView.props("treeRevision")).toBe(initialTreeRevision);
   });
 
   it("tracks the active drag list from the dragged row element", async () => {
@@ -382,7 +442,7 @@ describe("LayerPanel", () => {
     document.body.removeChild(slotGroup);
   });
 
-  it("changes slot render cache keys only for structural tree changes", async () => {
+  it("keeps slot render cache keys stable across tree reorders", async () => {
     const targetNode = createNode("node-1", "Text");
     const wrapper = mountLayerPanel([targetNode]);
     const layerSlotsView = wrapper.getComponent(LayerSlotsViewStub);
@@ -415,9 +475,15 @@ describe("LayerPanel", () => {
       blocks: [targetNode, nextNode],
     });
 
-    expect(getSlotRenderCacheKey("PAGE_CONTENT", [targetNode, nextNode])).not.toBe(
+    expect(getSlotRenderCacheKey("PAGE_CONTENT", [targetNode, nextNode])).toBe(
       initialKey,
     );
+
+    await wrapper.setProps({ currentItemSlug: "about" });
+
+    expect(
+      getSlotRenderCacheKey("PAGE_CONTENT", [targetNode, nextNode]),
+    ).not.toBe(initialKey);
   });
 
   it("filters by visible layer labels and reports an empty result", async () => {

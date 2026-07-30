@@ -1,13 +1,7 @@
-import { computed, type Ref } from "vue";
-import { z } from "zod";
-import { cloneDeep } from "../../Core";
+import { computed, getCurrentScope, onScopeDispose, type Ref } from "vue";
 import { log } from "@/lib/utils/logger";
 import type { BuilderNode, LayoutDSL } from "../../../../lib/types/nodes";
-import { BuilderNodeSchema } from "../../../../lib/schemas/nodes";
-import {
-  restoreLayoutSlotsFromSnapshot,
-  snapshotLayoutSlots,
-} from "../../../../lib/layouts/slotEditing";
+import { restoreLayoutSlotsFromSnapshot } from "../../../../lib/layouts/slotEditing";
 import { useLayerReorderHistory } from "./useLayerReorderHistory";
 
 interface UseLayerHistoryOptions {
@@ -17,11 +11,6 @@ interface UseLayerHistoryOptions {
   currentItemSlug: Ref<string | undefined>;
   emitUpdateBlocks: (blocks: BuilderNode[]) => void;
 }
-
-const ReorderHistoryInputSchema = z.object({
-  newBlocks: z.array(BuilderNodeSchema),
-  description: z.string().min(1),
-});
 
 export interface LayerStateChangeRecord {
   previousBlocks: BuilderNode[];
@@ -45,76 +34,117 @@ export function useLayerHistory(options: UseLayerHistoryOptions) {
     return `layers-reorder:${currentItemType.value || "unknown"}:${currentItemSlug.value || "unknown"}`;
   });
 
-  const recordStateChange = (input: LayerStateChangeRecord): void => {
-    void recordLayerReorder({
-      previousBlocks: cloneDeep(input.previousBlocks),
-      nextBlocks: cloneDeep(input.nextBlocks),
-      description: input.description,
-      itemType: currentItemType.value,
-      itemSlug: currentItemSlug.value,
-      previousLayoutSnapshot: input.previousLayoutSnapshot,
-      nextLayoutSnapshot: input.nextLayoutSnapshot,
-      applyBlocks: (updatedBlocks) => {
-        emitUpdateBlocks(updatedBlocks);
-      },
-      applyLayoutSnapshot:
-        currentLayout && input.previousLayoutSnapshot
-          ? (snapshot) => {
-              if (!currentLayout.value) {
-                return;
-              }
-              currentLayout.value = restoreLayoutSlotsFromSnapshot(
-                currentLayout.value,
-                snapshot,
-              ) as LayoutDSL;
-            }
-          : undefined,
-    }).then((result) => {
-      if (!result.success) {
-        log("error", "[LayerPanel] Failed to execute reorder history", {
-          groupKey: historyGroupKey.value,
-          error: result.error,
+  const queuedStateChanges: LayerStateChangeRecord[] = [];
+  let historyFrameId: number | null = null;
+  let historyTimerId: ReturnType<typeof setTimeout> | null = null;
+  let historyChain = Promise.resolve();
+
+  const flushQueuedStateChanges = (): void => {
+    historyTimerId = null;
+    const queued = queuedStateChanges.splice(0);
+
+    for (const input of queued) {
+      historyChain = historyChain
+        .then(async () => {
+          const result = await recordLayerReorder({
+            previousBlocks: input.previousBlocks,
+            nextBlocks: input.nextBlocks,
+            description: input.description,
+            itemType: currentItemType.value,
+            itemSlug: currentItemSlug.value,
+            alreadyApplied: true,
+            previousLayoutSnapshot: input.previousLayoutSnapshot,
+            nextLayoutSnapshot: input.nextLayoutSnapshot,
+            applyBlocks: (updatedBlocks) => {
+              emitUpdateBlocks(updatedBlocks);
+            },
+            applyLayoutSnapshot:
+              currentLayout && input.previousLayoutSnapshot
+                ? (snapshot) => {
+                    if (!currentLayout.value) {
+                      return;
+                    }
+                    currentLayout.value = restoreLayoutSlotsFromSnapshot(
+                      currentLayout.value,
+                      snapshot,
+                    ) as LayoutDSL;
+                  }
+                : undefined,
+          });
+
+          if (!result.success) {
+            log("error", "[LayerPanel] Failed to execute reorder history", {
+              groupKey: historyGroupKey.value,
+              error: result.error,
+            });
+          }
+        })
+        .catch((error: unknown) => {
+          log("error", "[LayerPanel] Failed to record reorder history", {
+            groupKey: historyGroupKey.value,
+            error: error instanceof Error ? error.message : String(error),
+          });
         });
-      }
-    });
+    }
+  };
+
+  const scheduleHistoryFlush = (): void => {
+    if (historyFrameId !== null || historyTimerId !== null) {
+      return;
+    }
+
+    if (typeof requestAnimationFrame === "function") {
+      historyFrameId = requestAnimationFrame(() => {
+        historyFrameId = null;
+        historyTimerId = setTimeout(flushQueuedStateChanges, 0);
+      });
+      return;
+    }
+
+    historyTimerId = setTimeout(flushQueuedStateChanges, 0);
+  };
+
+  const recordStateChange = (input: LayerStateChangeRecord): void => {
+    queuedStateChanges.push(input);
+    scheduleHistoryFlush();
   };
 
   const updateBlocksWithHistory = (
     newBlocks: BuilderNode[],
     description: string,
   ): void => {
-    const validation = ReorderHistoryInputSchema.safeParse({
-      newBlocks,
-      description,
-    });
-
-    if (!validation.success) {
+    if (!Array.isArray(newBlocks) || !description.trim()) {
       log("error", "[LayerPanel] Invalid reorder history payload", {
-        issues: validation.error.issues,
+        description,
       });
       return;
     }
 
-    const previousBlocks = cloneDeep(blocks.value || []);
-    const nextBlocks = cloneDeep(validation.data.newBlocks);
-    const previousLayoutSnapshot = currentLayout?.value
-      ? snapshotLayoutSlots(currentLayout.value)
-      : undefined;
-
-    emitUpdateBlocks(nextBlocks);
-
-    const nextLayoutSnapshot = currentLayout?.value
-      ? snapshotLayoutSlots(currentLayout.value)
-      : undefined;
+    const previousBlocks = blocks.value || [];
+    emitUpdateBlocks(newBlocks);
 
     recordStateChange({
       previousBlocks,
-      nextBlocks,
-      description: validation.data.description,
-      previousLayoutSnapshot,
-      nextLayoutSnapshot,
+      nextBlocks: newBlocks,
+      description,
     });
   };
+
+  if (getCurrentScope()) {
+    onScopeDispose(() => {
+      if (historyFrameId !== null) {
+        if (typeof cancelAnimationFrame === "function") {
+          cancelAnimationFrame(historyFrameId);
+        } else {
+          clearTimeout(historyFrameId);
+        }
+      }
+      if (historyTimerId !== null) {
+        clearTimeout(historyTimerId);
+      }
+      queuedStateChanges.length = 0;
+    });
+  }
 
   return {
     updateBlocksWithHistory,

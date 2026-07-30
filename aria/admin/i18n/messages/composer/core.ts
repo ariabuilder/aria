@@ -43,6 +43,8 @@ export const EN_COMPOSER_MESSAGES = {
   "composer.sidebar.searchLayers": "Search layers...",
   "composer.sidebar.collapseAll": "Collapse all",
   "composer.sidebar.expandAll": "Expand all",
+  "composer.sidebar.expandingAll": "Expanding all layers",
+  "composer.sidebar.collapsingAll": "Collapsing all layers",
   "composer.switcher.placeholder":
     "Switch page, layout, component, or CMS entry...",
   "composer.switcher.untitledPage": "Untitled page",
@@ -173,6 +175,8 @@ export const FR_COMPOSER_MESSAGES = {
   "composer.sidebar.searchLayers": "Rechercher des calques...",
   "composer.sidebar.collapseAll": "Réduire tout",
   "composer.sidebar.expandAll": "Développer tout",
+  "composer.sidebar.expandingAll": "Développement de tous les calques",
+  "composer.sidebar.collapsingAll": "Réduction de tous les calques",
   "composer.switcher.placeholder":
     "Changer de page, de mise en page, de composant ou d’entrée CMS...",
   "composer.switcher.untitledPage": "Page sans titre",

@@ -1,6 +1,6 @@
 <!-- Layer tree panel: slots, drag-drop, and canvas selection sync. -->
 <script setup lang="ts">
-import { ref, computed, onMounted, inject, nextTick, watch } from "vue";
+import { ref, computed, onMounted, inject, watch } from "vue";
 import { APP_INJECTION_KEYS } from "../../Core/types/injectionKeys";
 import { getLayoutDefaultSlotName } from "../../../../lib/layouts/resolveNodeSlot";
 import { syncLayoutSlotOnNodeSelect } from "../../Core";
@@ -64,6 +64,8 @@ const props = defineProps<{
 const emit = defineEmits<{
   "update:blocks": [blocks: BuilderNode[]];
   "update:allLayersExpanded": [expanded: boolean];
+  "update:layersBusy": [busy: boolean];
+  "update:layersOperation": [operation: "expanding" | "collapsing" | null];
   updateLayout: [layoutSlug: string];
   openPicker: [slotName: string];
   "edit-component": [masterId: string];
@@ -126,11 +128,16 @@ const hoveredNodeId = ref<string | null>(null);
 
 // Force draggable re-render on block updates
 const draggableKey = ref(0);
-const layerTreeVersion = ref(0);
+const layerTreeRevision = ref(0);
 const isLayerDragging = ref(false);
 const activeDragListId = ref<string | null>(null);
+let shouldRefreshDraggableAfterDrag = false;
 // Only one node can be in edit mode at a time
 const editingNodeId = ref<string | null>(null);
+
+watch([editorBlocks, editorLayoutForRead], () => {
+  layerTreeRevision.value += 1;
+});
 
 const { updateBlocksWithHistory, recordStateChange } = useLayerHistory({
   blocks: editorBlocks,
@@ -170,41 +177,6 @@ const contentSlotName = computed(() => {
   return currentVirtualSlot.value;
 });
 
-const buildNodeStructureSignature = (
-  nodes: readonly BuilderNode[] | undefined,
-): string => {
-  if (!nodes?.length) {
-    return "";
-  }
-
-  return nodes
-    .map((node) => {
-      const children = buildNodeStructureSignature(node.children);
-      return children ? `${node.id}(${children})` : node.id;
-    })
-    .join(",");
-};
-
-const layerStructureSignature = computed(() => {
-  const blocksSignature = buildNodeStructureSignature(editorBlocks.value ?? []);
-  const layoutSignature =
-    editorLayoutForRead.value?.slots
-      ?.map((slot) => {
-        const defaultContentSignature = buildNodeStructureSignature(
-          slot.defaultContent,
-        );
-        return `${slot.name}:${defaultContentSignature}`;
-      })
-      .join("|") ?? "";
-
-  return [
-    props.currentItemType ?? "",
-    props.currentItemSlug ?? "",
-    layoutSignature,
-    blocksSignature,
-  ].join("::");
-});
-
 const itemRenderCacheKey = computed(
   () =>
     `${props.currentItemType ?? ""}:${props.currentItemSlug ?? ""}:${
@@ -214,30 +186,20 @@ const itemRenderCacheKey = computed(
 
 const getSlotRenderCacheKey = (
   slotName: string,
-  nodes: readonly BuilderNode[],
-): string =>
-  [
-    itemRenderCacheKey.value,
-    slotName,
-    buildNodeStructureSignature(nodes),
-  ].join("::");
-
-watch(
-  layerStructureSignature,
-  (_next, previous) => {
-    if (previous !== undefined) {
-      layerTreeVersion.value += 1;
-    }
-  },
-);
+  _nodes: readonly BuilderNode[],
+): string => [itemRenderCacheKey.value, slotName].join("::");
 
 const {
   expandedNodes,
   collapseState,
   isAllExpanded,
+  isLayerTreeBusy,
+  layerTreeOperation,
   isExpanded,
+  isExpanding,
   getCollapseState,
   toggleExpand,
+  requestToggleExpand,
   toggleAll,
   expandAncestors,
   runInitialExpansion,
@@ -278,8 +240,8 @@ const {
     // Dirty state is derived from layout snapshot watch in useAppInitialization.
   },
   onTreeStructureChanged: () => {
-    layerTreeVersion.value += 1;
     if (isLayerDragging.value) {
+      shouldRefreshDraggableAfterDrag = true;
       return;
     }
     draggableKey.value += 1;
@@ -330,9 +292,10 @@ const searchVisibleNodeIds = computed<ReadonlySet<string> | null>(() => {
 
   const visibleIds = new Set<string>();
   const roots = effectiveShowSlots.value
-    ? (editorLayoutForRead.value?.slots ?? []).flatMap((slot) =>
-        editorNodeRegistry?.getDisplayNodesForSlot(slot.name) ??
-        getNodesInSlot(slot.name),
+    ? (editorLayoutForRead.value?.slots ?? []).flatMap(
+        (slot) =>
+          editorNodeRegistry?.getDisplayNodesForSlot(slot.name) ??
+          getNodesInSlot(slot.name),
       )
     : contentNodes.value;
 
@@ -351,8 +314,7 @@ const searchVisibleNodeIds = computed<ReadonlySet<string> | null>(() => {
 
 const hasSearchResults = computed(
   () =>
-    searchVisibleNodeIds.value === null ||
-    searchVisibleNodeIds.value.size > 0,
+    searchVisibleNodeIds.value === null || searchVisibleNodeIds.value.size > 0,
 );
 
 let searchExpansionSnapshot: Set<string> | null = null;
@@ -372,10 +334,7 @@ watch(
       searchExpansionSnapshot = new Set(expandedNodes.value);
     }
 
-    expandedNodes.value = new Set([
-      ...expandedNodes.value,
-      ...visibleNodeIds,
-    ]);
+    expandedNodes.value = new Set([...expandedNodes.value, ...visibleNodeIds]);
   },
   { immediate: true },
 );
@@ -407,7 +366,8 @@ const getVisibleNodeIds = (): string[] => {
 
   const slotNames = editorLayoutForRead.value?.slots?.map((s) => s.name) ?? [];
   for (const slotName of slotNames) {
-    const slotRoots = editorNodeRegistry?.getDisplayNodesForSlot(slotName) ?? [];
+    const slotRoots =
+      editorNodeRegistry?.getDisplayNodesForSlot(slotName) ?? [];
     walk(slotRoots);
   }
 
@@ -430,7 +390,7 @@ const {
   editingNodeId,
   expandedNodes,
   hasChildren,
-  toggleExpand,
+  toggleExpand: requestToggleExpand,
   blocks: editorBlocks,
   updateBlocksWithHistory,
   emitOpenPicker: (slotName) => emit("openPicker", slotName),
@@ -478,6 +438,7 @@ const {
 
 const handleLayerDragStart = (event: LayerDragEvent): void => {
   isLayerDragging.value = true;
+  shouldRefreshDraggableAfterDrag = false;
   activeDragListId.value = resolveDragListId(event);
   clearDropTarget();
   handleDragStart(event);
@@ -488,9 +449,11 @@ const handleLayerDragEnd = (): void => {
   clearDropTarget();
   handleDragEnd();
   isLayerDragging.value = false;
-  nextTick(() => {
+
+  if (shouldRefreshDraggableAfterDrag) {
+    shouldRefreshDraggableAfterDrag = false;
     draggableKey.value += 1;
-  });
+  }
 };
 
 const handleDropTargetChange = (payload: {
@@ -573,7 +536,8 @@ const selectedNodePath = computed<readonly string[]>(() => {
   const slotNames =
     editorLayoutForRead.value?.slots?.map((slot) => slot.name) ?? [];
   for (const slotName of slotNames) {
-    const slotRoots = editorNodeRegistry?.getDisplayNodesForSlot(slotName) ?? [];
+    const slotRoots =
+      editorNodeRegistry?.getDisplayNodesForSlot(slotName) ?? [];
     const pathInSlot = getNodePath(slotRoots, nodeId);
     if (pathInSlot.length > 0) {
       return pathInSlot;
@@ -618,10 +582,27 @@ watch(
   { immediate: true },
 );
 
+watch(
+  isLayerTreeBusy,
+  (busy) => {
+    emit("update:layersBusy", busy);
+  },
+  { immediate: true },
+);
+
+watch(
+  layerTreeOperation,
+  (operation) => {
+    emit("update:layersOperation", operation);
+  },
+  { immediate: true },
+);
+
 defineExpose({
   toggleAll,
   expandAncestors,
   isAllExpanded,
+  isLayerTreeBusy,
 });
 
 useLayerCanvasSignals({
@@ -685,6 +666,7 @@ useLayerCanvasSignals({
           :hovered-node-id="hoveredNodeId || undefined"
           :editing-node-id="editingNodeId"
           :draggable-key="draggableKey"
+          :tree-revision="layerTreeRevision"
           :is-dragging="isLayerDragging"
           :active-drag-list-id="activeDragListId"
           :drop-target-id="dropTargetId"
@@ -692,6 +674,7 @@ useLayerCanvasSignals({
           :node-actions="nodeEventHandlers"
           :get-nodes-in-slot="getNodesInSlot"
           :is-expanded="isExpanded"
+          :is-expanding="isExpanding"
           :has-children="hasChildren"
           :can-accept-children="canAcceptChildren"
           :get-collapse-state="getCollapseState"
@@ -702,7 +685,7 @@ useLayerCanvasSignals({
           :on-activate-slot="handleActivateSlot"
           :on-expand-slot-on-drag="handleExpandSlotOnDrag"
           :visible-node-ids="searchVisibleNodeIds"
-          :on-toggle-expand="toggleExpand"
+          :on-toggle-expand="requestToggleExpand"
           :on-open-picker="handleOpenPicker"
           :on-drag-start="handleLayerDragStart"
           :on-drag-end="handleLayerDragEnd"
@@ -728,7 +711,9 @@ useLayerCanvasSignals({
         v-else
         class="flex h-full flex-col items-center justify-center px-5 text-center"
       >
-        <span :class="[studioIcons.search, 'mb-2 size-4 text-muted-foreground']" />
+        <span
+          :class="[studioIcons.search, 'mb-2 size-4 text-muted-foreground']"
+        />
         <p class="text-xs font-medium text-foreground">No matching layers</p>
         <p class="mt-1 text-xs text-muted-foreground">
           Search layer names or element types.

@@ -39,9 +39,11 @@ describe("useLayerHistory", () => {
   it("restores layout slots through a writable currentLayout ref", async () => {
     mockRecordLayerReorder.mockReset();
     mockRecordLayerReorder.mockImplementation(async (input) => {
-      await input.applyBlocks(input.nextBlocks ?? []);
-      if (input.applyLayoutSnapshot && input.nextLayoutSnapshot) {
-        await input.applyLayoutSnapshot(input.nextLayoutSnapshot);
+      if (!input.alreadyApplied) {
+        await input.applyBlocks(input.nextBlocks ?? []);
+        if (input.applyLayoutSnapshot && input.nextLayoutSnapshot) {
+          await input.applyLayoutSnapshot(input.nextLayoutSnapshot);
+        }
       }
       return { success: true };
     });
@@ -72,9 +74,7 @@ describe("useLayerHistory", () => {
     currentLayout.value = {
       ...currentLayout.value!,
       slots: currentLayout.value!.slots?.map((slot) =>
-        slot.name === "footer"
-          ? { ...slot, defaultContent: [node] }
-          : slot,
+        slot.name === "footer" ? { ...slot, defaultContent: [node] } : slot,
       ),
     } as LayoutDSL;
     pageBlocks.value = [];
@@ -95,6 +95,8 @@ describe("useLayerHistory", () => {
 
     const input = mockRecordLayerReorder.mock.calls[0]?.[0];
     expect(input?.applyLayoutSnapshot).toBeTypeOf("function");
+    expect(input?.alreadyApplied).toBe(true);
+    expect(emittedBlocks).toEqual([]);
 
     const beforeRedo = snapshotLayoutSlots(currentLayout.value!);
     await input?.applyLayoutSnapshot?.(previousLayoutSnapshot);
@@ -104,6 +106,44 @@ describe("useLayerHistory", () => {
 
     await input?.applyLayoutSnapshot?.(nextLayoutSnapshot);
     expect(snapshotLayoutSlots(currentLayout.value!)).toBe(beforeRedo);
+
+    await input?.applyBlocks?.([]);
     expect(emittedBlocks.at(-1)).toEqual([]);
+  });
+
+  it("applies a reorder once before deferring its history record", async () => {
+    mockRecordLayerReorder.mockReset();
+    mockRecordLayerReorder.mockResolvedValue({ success: true });
+    const first = createNode("first", "Text");
+    const second = createNode("second", "Text");
+    const pageBlocks = nodeListRef([first, second]);
+    const emittedBlocks: BuilderNode[][] = [];
+    const { updateBlocksWithHistory } = useLayerHistory({
+      blocks: pageBlocks,
+      currentLayout: layoutRef(null),
+      currentItemType: ref("page"),
+      currentItemSlug: ref("index"),
+      emitUpdateBlocks: (blocks) => {
+        emittedBlocks.push(blocks);
+      },
+    });
+
+    updateBlocksWithHistory([second, first], "Reordered layer");
+
+    expect(emittedBlocks).toEqual([[second, first]]);
+    expect(mockRecordLayerReorder).not.toHaveBeenCalled();
+
+    await vi.waitFor(() => {
+      expect(mockRecordLayerReorder).toHaveBeenCalledTimes(1);
+    });
+
+    expect(mockRecordLayerReorder.mock.calls[0]?.[0]).toEqual(
+      expect.objectContaining({
+        previousBlocks: [first, second],
+        nextBlocks: [second, first],
+        alreadyApplied: true,
+      }),
+    );
+    expect(emittedBlocks).toHaveLength(1);
   });
 });

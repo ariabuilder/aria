@@ -1,7 +1,13 @@
-import { nextTick, ref, watch, type Ref } from "vue";
+import {
+  nextTick,
+  getCurrentScope,
+  onScopeDispose,
+  ref,
+  watch,
+  type Ref,
+} from "vue";
 import type { BuilderNode } from "../../../../lib/types/nodes";
 import type { CollapseState } from "../types";
-import { collectAllNodeIds } from "../utils/nodeHelpers";
 
 export interface LayerExpansionLayoutInfo {
   slots?: Array<{ name: string }>;
@@ -24,7 +30,9 @@ export interface UseLayerExpansionOptions {
   resolveSlotRoots?: (slotName: string) => BuilderNode[];
 }
 
-const EXPAND_ALL_BATCH_SIZE = 250;
+const EXPAND_ALL_BATCH_SIZE = 8;
+const COLLAPSE_ALL_BATCH_SIZE = 8;
+const EXPANSION_BUSY_MIN_MS = 240;
 
 const scheduleNextFrame = (callback: () => void): void => {
   if (typeof requestAnimationFrame === "function") {
@@ -33,6 +41,41 @@ const scheduleNextFrame = (callback: () => void): void => {
   }
 
   setTimeout(callback, 16);
+};
+
+const scheduleAfterNextPaint = (callback: () => void): number => {
+  if (typeof requestAnimationFrame === "function") {
+    return requestAnimationFrame(() => {
+      setTimeout(callback, 0);
+    });
+  }
+
+  return globalThis.setTimeout(callback, 0) as unknown as number;
+};
+
+const cancelScheduledFrame = (frameId: number): void => {
+  if (typeof cancelAnimationFrame === "function") {
+    cancelAnimationFrame(frameId);
+    return;
+  }
+
+  clearTimeout(frameId);
+};
+
+const collectExpandableNodeIds = (
+  nodes: readonly BuilderNode[],
+  target: Set<string>,
+): void => {
+  for (const node of nodes) {
+    const isComponentInstance =
+      node.type === "Component" || Boolean(node.componentRef);
+    if (isComponentInstance || !node.children?.length) {
+      continue;
+    }
+
+    target.add(node.id);
+    collectExpandableNodeIds(node.children, target);
+  }
 };
 
 export function useLayerExpansion(options: UseLayerExpansionOptions) {
@@ -52,10 +95,49 @@ export function useLayerExpansion(options: UseLayerExpansionOptions) {
   const hasInitialExpansion = ref(false);
   const expandableSnapshot = ref<Set<string> | null>(null);
   const isAllExpanded = ref(false);
+  const expandingNodes = ref<Set<string>>(new Set());
+  const isLayerTreeBusy = ref(false);
+  const layerTreeOperation = ref<"expanding" | "collapsing" | null>(null);
+  const expansionFrameIds = new Map<string, number>();
+  const expansionBusyTimers = new Map<string, ReturnType<typeof setTimeout>>();
   let expandAllRunId = 0;
 
   const isExpanded = (nodeId: string): boolean => {
     return expandedNodes.value.has(nodeId);
+  };
+
+  const isExpanding = (nodeId: string): boolean => {
+    return expandingNodes.value.has(nodeId);
+  };
+
+  const setExpanding = (nodeId: string, expanding: boolean): void => {
+    if (expanding) {
+      expandingNodes.value.add(nodeId);
+    } else {
+      expandingNodes.value.delete(nodeId);
+    }
+  };
+
+  const cancelPendingExpansion = (nodeId: string): void => {
+    const frameId = expansionFrameIds.get(nodeId);
+    if (frameId !== undefined) {
+      cancelScheduledFrame(frameId);
+      expansionFrameIds.delete(nodeId);
+    }
+
+    const busyTimer = expansionBusyTimers.get(nodeId);
+    if (busyTimer !== undefined) {
+      clearTimeout(busyTimer);
+      expansionBusyTimers.delete(nodeId);
+    }
+
+    setExpanding(nodeId, false);
+  };
+
+  const cancelAllPendingExpansions = (): void => {
+    for (const nodeId of expandingNodes.value) {
+      cancelPendingExpansion(nodeId);
+    }
   };
 
   const invalidateExpandableSnapshot = (): void => {
@@ -68,19 +150,21 @@ export function useLayerExpansion(options: UseLayerExpansionOptions) {
       return new Set(expandableSnapshot.value);
     }
 
-    const allIds = new Set(collectAllNodeIds(currentPageNodes.value));
+    const allIds = new Set<string>();
+    allIds.add(currentVirtualSlot.value);
+    collectExpandableNodeIds(currentPageNodes.value, allIds);
 
     if (currentLayout.value?.slots) {
       for (const slot of currentLayout.value.slots) {
         allIds.add(slot.name);
         if (resolveSlotRoots) {
-          for (const nodeId of collectAllNodeIds(resolveSlotRoots(slot.name))) {
-            allIds.add(nodeId);
-          }
+          collectExpandableNodeIds(resolveSlotRoots(slot.name), allIds);
         }
       }
     }
 
+    // Keep unused virtual groups in the snapshot without disturbing the
+    // parent-first order of the active tree.
     Object.values(virtualSlotNames).forEach((slotName) => {
       allIds.add(slotName);
     });
@@ -106,40 +190,62 @@ export function useLayerExpansion(options: UseLayerExpansionOptions) {
     isAllExpanded.value = true;
   };
 
-  const isEveryExpandableIdExpanded = (): boolean => {
-    const allIds = collectExpandableIds();
-    if (allIds.size === 0) {
-      return false;
-    }
-
-    for (const id of allIds) {
-      if (!expandedNodes.value.has(id)) {
-        return false;
-      }
-    }
-
-    return true;
-  };
-
   const getCollapseState = (nodeId: string): CollapseState => {
     return collapseState.value.get(nodeId) ?? "expanded";
   };
 
   const toggleExpand = (nodeId: string, event?: Event): void => {
     event?.stopPropagation();
-    const expanded = new Set(expandedNodes.value);
 
-    if (expanded.has(nodeId)) {
-      expanded.delete(nodeId);
+    if (expandedNodes.value.has(nodeId)) {
+      expandedNodes.value.delete(nodeId);
       collapseState.value.set(nodeId, "soft-collapsed");
       isAllExpanded.value = false;
     } else {
-      expanded.add(nodeId);
+      expandedNodes.value.add(nodeId);
       collapseState.value.set(nodeId, "expanded");
     }
 
-    expandedNodes.value = expanded;
     refreshIsAllExpandedFromSnapshot();
+  };
+
+  /**
+   * Gives the browser a paint opportunity before mounting a cold branch.
+   * The synchronous toggle remains available for programmatic tree updates.
+   */
+  const requestToggleExpand = (nodeId: string, event?: Event): void => {
+    event?.stopPropagation();
+
+    if (isLayerTreeBusy.value) {
+      return;
+    }
+
+    if (isExpanded(nodeId)) {
+      cancelPendingExpansion(nodeId);
+      toggleExpand(nodeId);
+      return;
+    }
+
+    if (isExpanding(nodeId)) {
+      cancelPendingExpansion(nodeId);
+      return;
+    }
+
+    setExpanding(nodeId, true);
+    const frameId = scheduleAfterNextPaint(() => {
+      expansionFrameIds.delete(nodeId);
+      if (!isExpanding(nodeId)) {
+        return;
+      }
+
+      toggleExpand(nodeId);
+      const busyTimer = setTimeout(() => {
+        expansionBusyTimers.delete(nodeId);
+        setExpanding(nodeId, false);
+      }, EXPANSION_BUSY_MIN_MS);
+      expansionBusyTimers.set(nodeId, busyTimer);
+    });
+    expansionFrameIds.set(nodeId, frameId);
   };
 
   const expandSlotsOnly = (): void => {
@@ -159,52 +265,88 @@ export function useLayerExpansion(options: UseLayerExpansionOptions) {
   };
 
   const expandAll = (): void => {
-    const allIds = Array.from(collectExpandableIds());
-    const nextExpanded = new Set(expandedNodes.value);
     const runId = ++expandAllRunId;
+    isLayerTreeBusy.value = true;
+    layerTreeOperation.value = "expanding";
 
-    if (allIds.length <= EXPAND_ALL_BATCH_SIZE) {
-      allIds.forEach((id) => {
-        nextExpanded.add(id);
-        collapseState.value.set(id, "expanded");
-      });
-      expandedNodes.value = nextExpanded;
-      isAllExpanded.value = true;
-      return;
-    }
+    scheduleAfterNextPaint(() => {
+      if (runId !== expandAllRunId) {
+        return;
+      }
 
+      const allIds = Array.from(collectExpandableIds());
+      let index = 0;
+      const applyBatch = (): void => {
+        if (runId !== expandAllRunId) {
+          return;
+        }
+
+        const batchEnd = Math.min(index + EXPAND_ALL_BATCH_SIZE, allIds.length);
+        for (; index < batchEnd; index += 1) {
+          const id = allIds[index];
+          expandedNodes.value.add(id);
+          collapseState.value.set(id, "expanded");
+        }
+
+        if (index < allIds.length) {
+          scheduleNextFrame(applyBatch);
+          return;
+        }
+
+        isAllExpanded.value = allIds.length > 0;
+        isLayerTreeBusy.value = false;
+        layerTreeOperation.value = null;
+      };
+
+      applyBatch();
+    });
+  };
+
+  const collapseAll = (): void => {
+    const runId = ++expandAllRunId;
+    cancelAllPendingExpansions();
+    isAllExpanded.value = false;
+    isLayerTreeBusy.value = true;
+    layerTreeOperation.value = "collapsing";
+
+    // The cached snapshot is parent-first. Reverse it so small descendant
+    // branches unmount before their parent group instead of removing the
+    // entire rendered tree in one synchronous update.
+    const remainingIds = Array.from(collectExpandableIds())
+      .filter((id) => expandedNodes.value.has(id))
+      .reverse();
     let index = 0;
     const applyBatch = (): void => {
       if (runId !== expandAllRunId) {
         return;
       }
 
-      const batchEnd = Math.min(index + EXPAND_ALL_BATCH_SIZE, allIds.length);
+      const batchEnd = Math.min(
+        index + COLLAPSE_ALL_BATCH_SIZE,
+        remainingIds.length,
+      );
       for (; index < batchEnd; index += 1) {
-        const id = allIds[index];
-        nextExpanded.add(id);
-        collapseState.value.set(id, "expanded");
+        expandedNodes.value.delete(remainingIds[index]);
       }
-      expandedNodes.value = new Set(nextExpanded);
 
-      if (index < allIds.length) {
+      if (index < remainingIds.length) {
         scheduleNextFrame(applyBatch);
-      } else {
-        isAllExpanded.value = true;
+        return;
       }
+
+      isLayerTreeBusy.value = false;
+      layerTreeOperation.value = null;
     };
 
-    applyBatch();
-  };
-
-  const collapseAll = (): void => {
-    expandAllRunId += 1;
-    expandedNodes.value.clear();
-    isAllExpanded.value = false;
+    scheduleAfterNextPaint(applyBatch);
   };
 
   const toggleAll = (): void => {
-    if (isEveryExpandableIdExpanded()) {
+    if (isLayerTreeBusy.value) {
+      return;
+    }
+
+    if (isAllExpanded.value) {
       collapseAll();
     } else {
       expandAll();
@@ -255,15 +397,17 @@ export function useLayerExpansion(options: UseLayerExpansionOptions) {
       return;
     }
 
-    const expanded = new Set(expandedNodes.value);
     ancestors.forEach((ancestorId) => {
-      expanded.add(ancestorId);
+      expandedNodes.value.add(ancestorId);
     });
-    expanded.add(slotGroupKey ?? currentVirtualSlot.value);
-    expandedNodes.value = expanded;
+    expandedNodes.value.add(slotGroupKey ?? currentVirtualSlot.value);
   };
 
   watch(currentItemSlug, () => {
+    expandAllRunId += 1;
+    isLayerTreeBusy.value = false;
+    layerTreeOperation.value = null;
+    cancelAllPendingExpansions();
     hasInitialExpansion.value = false;
     invalidateExpandableSnapshot();
   });
@@ -304,14 +448,26 @@ export function useLayerExpansion(options: UseLayerExpansionOptions) {
     }
   };
 
+  if (getCurrentScope()) {
+    onScopeDispose(() => {
+      expandAllRunId += 1;
+      cancelAllPendingExpansions();
+    });
+  }
+
   return {
     expandedNodes,
     collapseState,
     isAllExpanded,
+    isLayerTreeBusy,
+    layerTreeOperation,
+    expandingNodes,
     collectExpandableIds,
     isExpanded,
+    isExpanding,
     getCollapseState,
     toggleExpand,
+    requestToggleExpand,
     toggleAll,
     expandAncestors,
     runInitialExpansion,

@@ -115,4 +115,53 @@ describe("useLayerReorderHistory", () => {
     expect(executeMock).not.toHaveBeenCalled();
     expect(applyBlocks).not.toHaveBeenCalled();
   });
+
+  it("records an already-applied reorder without replaying it", async () => {
+    const { useLayerReorderHistory } =
+      await import("../../admin/features/Layers/composables/useLayerReorderHistory");
+
+    const applyBlocks = vi.fn(async () => {});
+    const { recordLayerReorder } = useLayerReorderHistory({
+      execute: executeMock,
+    } as never);
+
+    const result = await recordLayerReorder({
+      previousBlocks: [
+        {
+          id: "a",
+          type: "Text",
+          props: {},
+          styles: {},
+          children: [],
+        },
+      ],
+      nextBlocks: [
+        {
+          id: "b",
+          type: "Text",
+          props: {},
+          styles: {},
+          children: [],
+        },
+      ],
+      description: "Move block after hero",
+      itemType: "page",
+      itemSlug: "landing",
+      alreadyApplied: true,
+      applyBlocks,
+    });
+
+    expect(result).toEqual({ success: true });
+    expect(applyBlocks).not.toHaveBeenCalled();
+
+    await lastOperation?.undo();
+    expect(applyBlocks).toHaveBeenLastCalledWith([
+      expect.objectContaining({ id: "a" }),
+    ]);
+
+    await lastOperation?.redo();
+    expect(applyBlocks).toHaveBeenLastCalledWith([
+      expect.objectContaining({ id: "b" }),
+    ]);
+  });
 });
