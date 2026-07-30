@@ -13,7 +13,6 @@ import {
   IMAGE_NON_MANAGED_HTML_ATTRS,
   resolveRenderedButtonVariant,
 } from "../../../../lib/blocks/renderSemantics";
-import { resolveNodeClasses } from "../../../../lib/blocks/resolveNodeClasses";
 import { BUTTON_VARIANT_ATTRIBUTE } from "../../../../lib/blocks/buttonVariants";
 import {
   buildButtonContentRowStyle,
@@ -1065,7 +1064,7 @@ export function useStageLiveCanvasUpdates(
           payload.props.icon !== undefined
             ? payload.props.icon
             : (element.getAttribute("icon") ?? ""),
-        classNameValue: existingNode ? resolveNodeClasses(existingNode) : "",
+        classNameValue: existingNode?.props?.className,
         ariaLabelValue:
           payload.props.ariaLabel !== undefined
             ? payload.props.ariaLabel

@@ -88,6 +88,7 @@ vi.mock("../../../admin/features/Core", () => ({
 
 import { useStageLiveCanvasUpdates } from "../../../admin/features/Stage/composables/useStageLiveCanvasUpdates";
 import { CANVAS_DISABLED_ATTRIBUTE } from "../../../admin/features/Stage/utils/canvasRenderAttributes";
+import { hydrateIconHost } from "../../../admin/features/Stage/utils/canvasIconHydration";
 
 function createImageNode(id = "image-1"): BuilderNode {
   return {
@@ -742,6 +743,50 @@ describe("useStageLiveCanvasUpdates", () => {
     expect(collectResponsiveStyleCSS).toHaveBeenCalledWith(
       [createIconNode()],
       expect.any(Map),
+    );
+
+    wrapper.unmount();
+  });
+
+  it("keeps node utility classes off the icon host during live icon updates", () => {
+    const stageDocument = createIconStageDocument();
+    const iframeRef = {
+      value: { contentDocument: stageDocument } as HTMLIFrameElement,
+    };
+    const iconNode = {
+      ...createIconNode(),
+      props: {
+        icon: "i-lucide:star",
+        className: "icon-content",
+      },
+      classNames: {
+        base: ["size-6"],
+      },
+    } satisfies BuilderNode;
+
+    const { wrapper } = mountLiveUpdates({
+      iframeRef,
+      blocks: [iconNode],
+    });
+
+    bridgeCallbacks.propsUpdate?.({
+      nodeId: "icon-1",
+      props: {
+        icon: "i-lucide:activity",
+      },
+      source: "inspector-live",
+    });
+
+    expect(vi.mocked(hydrateIconHost)).toHaveBeenCalledWith(
+      expect.objectContaining({
+        iconValue: "i-lucide:activity",
+        classNameValue: "icon-content",
+      }),
+    );
+    expect(vi.mocked(hydrateIconHost)).not.toHaveBeenCalledWith(
+      expect.objectContaining({
+        classNameValue: "size-6",
+      }),
     );
 
     wrapper.unmount();

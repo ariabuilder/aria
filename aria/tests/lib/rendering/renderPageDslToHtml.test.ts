@@ -5,6 +5,7 @@ import { renderPageDslToHtml } from "../../../lib/rendering/renderPageDslToHtml"
 import { renderPageHtmlFromStorage } from "../../../lib/rendering/renderPageHtml";
 import { createDefaultUniversalDesignSystem } from "../../../lib/styles/universalDesignSystem";
 import type { AriaCollection, AriaEntryRecord } from "../../../lib/cms/schemas";
+import { createIconAssetFetcher } from "../../helpers/iconAssetFetcher";
 
 const fullWidthLayout: LayoutDSL = {
   id: "full-width",
@@ -220,6 +221,49 @@ describe("renderPageDslToHtml", () => {
     expect(html).toContain('<html lang="fr"');
     expect(html).toContain('name="robots" content="noindex');
     expect(html).not.toContain('rel="canonical"');
+  });
+
+  it("inlines canonical Lucide icons from the runtime static-assets binding", async () => {
+    const page: PageDSL = {
+      id: "icons",
+      slug: "icons",
+      title: "Icons",
+      nodes: [
+        {
+          id: "feature-icon",
+          type: "Icon",
+          props: {
+            icon: {
+              id: "lucide:star",
+              pack: "lucide",
+              name: "star",
+              source: "iconify",
+              version: "2026-02-25-snapshot",
+            },
+            ariaLabel: "Feature icon",
+          },
+          styles: {},
+          children: [],
+        },
+      ],
+    };
+
+    const { html } = await renderPageDslToHtml({
+      page,
+      adapter: createAdapter(null),
+      locals: {
+        assetOrigin: "http://aria.test",
+        cfBindings: {
+          aria_assets: createIconAssetFetcher(),
+        },
+      },
+    });
+
+    expect(html).toContain(
+      '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"',
+    );
+    expect(html).toContain("<path");
+    expect(html).not.toContain('class="i-lucide:star"');
   });
 
   it("merges slot-only layout defaultContent into the document body", async () => {
