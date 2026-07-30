@@ -144,7 +144,10 @@ async function ensureStarterCollections(
   ]);
 }
 
-async function applySiteShell(adapter: StorageAdapter, actor: ActorRef): Promise<void> {
+async function applySiteShell(
+  adapter: StorageAdapter,
+  actor: ActorRef,
+): Promise<void> {
   for (const layout of STARTER_LAYOUTS) {
     if (await adapter.getLayoutDSL(layout.id)) continue;
     await adapter.saveLayoutDSL(layout.id, layout, undefined, {
@@ -153,12 +156,12 @@ async function applySiteShell(adapter: StorageAdapter, actor: ActorRef): Promise
     });
   }
 
-  if (!(await adapter.getDesignSystem())) {
-    await adapter.saveDesignSystem(buildStarterDesignSystem(), {
-      actor,
-      mutationKind: "seed",
-    });
-  }
+  const designSystem =
+    (await adapter.getDesignSystem()) ?? buildStarterDesignSystem();
+  await adapter.saveDesignSystem(designSystem, {
+    actor,
+    mutationKind: "seed",
+  });
 
   await ensurePage(adapter, actor, STARTER_HOME_PAGE, "standard");
   await ensurePage(adapter, actor, buildNotFoundPage(), "not-found");

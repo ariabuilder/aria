@@ -49,6 +49,7 @@ import {
 } from "../styles/universalDesignSystem";
 import { type BuilderNode, type LayoutDSL, type PageDSL } from "../types/nodes";
 import { buildResolvedThemeCssVariables } from "../styles/resolvedUserTheme";
+import { buildGlobalStylesCss } from "../styles/globalStylesCss";
 import {
   RenderCmsDataOptionsSchema,
   resolveCmsBoundNodes,
@@ -584,6 +585,7 @@ export async function renderPageDslToHtml(
     globalCSSHash: designSystem.artifacts.globalCSSHash,
     globalCSSHref: options.globalCSSHref,
     inlineGeneratedDocumentCss,
+    inlineGlobalStylesCSS: buildGlobalStylesCss(designSystem),
     suppressFrameworkTags: inlineSnapshotCss.length > 0,
     customFonts,
     darkMode: darkMode === "disabled" ? undefined : darkMode,

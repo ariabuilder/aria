@@ -165,6 +165,33 @@ describe("renderPageDslToHtml", () => {
     expect(html).toContain('<html lang="fr"');
   });
 
+  it("serializes document spacing through the fallback Global Styles path", async () => {
+    const designSystem = createDefaultUniversalDesignSystem();
+    designSystem.globalStyles.defaults.root.margin = "2px";
+    designSystem.globalStyles.defaults.root.padding = "var(--root-space)";
+    designSystem.globalStyles.defaults.body.margin = "1rem auto";
+    designSystem.globalStyles.defaults.body.padding = "24px";
+    const adapter = {
+      ...createAdapter(null),
+      getDesignSystem: async () => designSystem,
+    } as StorageAdapter;
+    const page: PageDSL = {
+      id: "spacing",
+      slug: "spacing",
+      title: "Spacing",
+      nodes: [],
+    };
+
+    const { html } = await renderPageDslToHtml({ page, adapter });
+
+    expect(html).toContain("html {\n  margin: 2px;");
+    expect(html).toContain("padding: var(--root-space);");
+    expect(html).toContain(
+      "body {\n  margin: 1rem auto;\n  padding: 24px;",
+    );
+    expect(html).not.toContain("html, body {");
+  });
+
   it("suppresses canonicals for localized error documents", async () => {
     const page: PageDSL = {
       id: "not-found",

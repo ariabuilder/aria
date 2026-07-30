@@ -233,6 +233,8 @@ describe("useGlobalStyles", () => {
 
     expect(globalStylesStore.globalStyles.value.defaults.root).toEqual({
       fontSize: "",
+      margin: "0",
+      padding: "0",
       cursor: "",
       caretColor: "",
       selectionColor: "",
@@ -248,7 +250,11 @@ describe("useGlobalStyles", () => {
       maxWidth: "",
       width: "",
     });
-    expect(globalStylesStore.globalStyles.value.defaults.body.maxWidth).toBe("");
+    expect(globalStylesStore.globalStyles.value.defaults.body).toMatchObject({
+      maxWidth: "",
+      margin: "0",
+      padding: "0",
+    });
   });
 
   it("re-links alias sources when a custom variable key changes", async () => {

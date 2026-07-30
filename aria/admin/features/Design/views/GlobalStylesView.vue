@@ -15,7 +15,10 @@ import {
 import DesignHeaderTeleport from "../components/DesignHeaderTeleport.vue";
 import HeaderActionTooltip from "@/features/Studio/core/components/HeaderActionTooltip.vue";
 import { useStudioI18n, type StudioMessageKey } from "@/i18n";
-import { GLOBAL_STYLE_BUTTON_VARIANTS } from "../../../../lib/styles/universalDesignSystem";
+import {
+  createDefaultGlobalStylesConfig,
+  GLOBAL_STYLE_BUTTON_VARIANTS,
+} from "../../../../lib/styles/universalDesignSystem";
 import { useDesignSystem } from "../composables/useDesignSystem";
 import { usePointerScrubSession } from "../../Inspector/composables/usePointerScrubSession";
 import { resolveColorPickerPreviewValue } from "../lib/colorPickerValue";
@@ -68,6 +71,7 @@ type VariableReferenceOption = {
 };
 
 const EMPTY_SELECT_VALUE = "__empty__";
+const DEFAULT_GLOBAL_STYLES = createDefaultGlobalStylesConfig();
 const VARIABLE_REFERENCE_PATTERN =
   /^var\(--([a-zA-Z0-9-_]+)(?:\s*,\s*[^)]+)?\)$/;
 const directFieldValues = ref<Record<string, string>>({});
@@ -279,6 +283,20 @@ const DEFAULT_SECTIONS: readonly SectionDefinition[] = [
         kind: "measurement",
         units: SIZE_UNITS,
         placeholder: "",
+      },
+      {
+        label: "Margin",
+        path: "defaults.body.margin",
+        kind: "measurement",
+        units: SPACING_UNITS,
+        placeholder: "0",
+      },
+      {
+        label: "Padding",
+        path: "defaults.body.padding",
+        kind: "measurement",
+        units: SPACING_UNITS,
+        placeholder: "0",
       },
       {
         label: "Text Wrap",
@@ -524,6 +542,20 @@ const DEFAULT_SECTIONS: readonly SectionDefinition[] = [
         kind: "measurement",
         units: SIZE_UNITS,
         placeholder: "16",
+      },
+      {
+        label: "Margin",
+        path: "defaults.root.margin",
+        kind: "measurement",
+        units: SPACING_UNITS,
+        placeholder: "0",
+      },
+      {
+        label: "Padding",
+        path: "defaults.root.padding",
+        kind: "measurement",
+        units: SPACING_UNITS,
+        placeholder: "0",
       },
       {
         label: "Cursor",
@@ -792,6 +824,8 @@ const FIELD_LABEL_KEYS = {
   Weight: "design.globalStyles.field.weight",
   "Letter Spacing": "design.globalStyles.field.letterSpacing",
   "Max Width": "design.globalStyles.field.maxWidth",
+  Margin: "design.globalStyles.field.margin",
+  Padding: "design.globalStyles.field.padding",
   "Text Wrap": "design.globalStyles.field.textWrap",
   Transform: "design.globalStyles.field.transform",
   Default: "design.globalStyles.field.default",
@@ -1051,18 +1085,27 @@ const resolvedFontOptions = computed(() => {
   });
 });
 
-function getEntry(path: string): unknown {
+function getEntryFrom(source: unknown, path: string): unknown {
   return path.split(".").reduce<unknown>((currentValue, segment) => {
     if (!currentValue || typeof currentValue !== "object") {
       return undefined;
     }
 
     return (currentValue as Record<string, unknown>)[segment];
-  }, globalStyles.value as unknown);
+  }, source);
+}
+
+function getEntry(path: string): unknown {
+  return getEntryFrom(globalStyles.value, path);
 }
 
 function getStringValue(path: string): string {
   const value = getEntry(path);
+  return typeof value === "string" ? value : "";
+}
+
+function getDefaultStringValue(path: string): string {
+  const value = getEntryFrom(DEFAULT_GLOBAL_STYLES, path);
   return typeof value === "string" ? value : "";
 }
 
@@ -1625,11 +1668,11 @@ function hasSelectValue(path: string): boolean {
 }
 
 function isFieldChanged(path: string): boolean {
-  return getStringValue(path).trim().length > 0;
+  return getStringValue(path) !== getDefaultStringValue(path);
 }
 
 function resetFieldValue(path: string): void {
-  setStringValue(path, "");
+  setStringValue(path, getDefaultStringValue(path));
 }
 
 function getFieldResetButtonTestId(path: string): string {

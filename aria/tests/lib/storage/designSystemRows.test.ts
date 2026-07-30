@@ -12,6 +12,7 @@ import {
   normalizeStylesDataToUniversalDesignSystem,
 } from "../../../lib/styles/universalDesignSystem";
 import type { StylesData } from "../../../lib/types/classes";
+import { buildStarterDesignSystem } from "../../../lib/storage/starterContent";
 
 const sampleStyles: StylesData = {
   tokens: {
@@ -38,6 +39,26 @@ const sampleStyles: StylesData = {
 };
 
 describe("designSystemRows segment parsing", () => {
+  it("serializes document spacing defaults into starter seed rows", () => {
+    const rows = serializeStoredDesignSystemRows(
+      buildStarterDesignSystem(),
+      "2026-07-29T00:00:00.000Z",
+    ).map((row) => ({
+      id: row.id,
+      stylesJson: row.stylesJson,
+    }));
+
+    const parsed = parseStoredDesignSystemRows(rows);
+    expect(parsed?.globalStyles.defaults.root).toMatchObject({
+      margin: "0",
+      padding: "0",
+    });
+    expect(parsed?.globalStyles.defaults.body).toMatchObject({
+      margin: "0",
+      padding: "0",
+    });
+  });
+
   it("creates stable segment row ids", () => {
     expect(createDesignSystemSegmentId("global-styles")).toBe(
       "default:global-styles",

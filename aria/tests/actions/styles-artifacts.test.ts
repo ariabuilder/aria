@@ -129,7 +129,8 @@ describe("buildGlobalCSSArtifactsSnapshot", () => {
     const designSystem = createDefaultUniversalDesignSystem();
     designSystem.globalStyles.defaults.root.caretColor = "#0ea5e9";
     designSystem.globalStyles.defaults.root.selectionColor = "#ffffff";
-    designSystem.globalStyles.defaults.root.selectionBackgroundColor = "#0f172a";
+    designSystem.globalStyles.defaults.root.selectionBackgroundColor =
+      "#0f172a";
     designSystem.globalStyles.defaults.container.maxWidth = "72rem";
     designSystem.globalStyles.defaults.container.width = "100%";
 
@@ -147,7 +148,7 @@ describe("buildGlobalCSSArtifactsSnapshot", () => {
     const result = await buildGlobalCSSArtifactsSnapshot(adapter as never);
 
     expect(result.designSystem.artifacts.globalCSS).toContain(
-      "html {\n  caret-color: #0ea5e9;\n}",
+      "html {\n  margin: 0;\n  padding: 0;\n  caret-color: #0ea5e9;\n}",
     );
     expect(result.designSystem.artifacts.globalCSS).toContain(
       "::selection {\n  color: #ffffff;\n  background-color: #0f172a;\n}",
@@ -228,7 +229,7 @@ describe("buildGlobalCSSArtifactsSnapshot", () => {
       ":root {\n  --brand: #2db749;\n  --surface: var(--brand);\n}",
     );
     expect(result.designSystem.artifacts.globalCSS).toContain(
-      "body {\n  background-color: #2db749;\n}",
+      "body {\n  background-color: #2db749;\n  margin: 0;\n  padding: 0;\n}",
     );
   });
 
@@ -408,7 +409,7 @@ describe("buildGlobalCSSArtifactsSnapshot", () => {
     );
   });
 
-  it("moves generated reset and responsive node CSS into the compiled stylesheet", async () => {
+  it("moves serialized Global Styles and responsive node CSS into the compiled stylesheet", async () => {
     const designSystem = createDefaultUniversalDesignSystem();
     designSystem.fonts.google["google-bricolage"] = {
       id: "google-bricolage",
@@ -454,17 +455,24 @@ describe("buildGlobalCSSArtifactsSnapshot", () => {
 
     const result = await buildGlobalCSSArtifactsSnapshot(adapter as never);
 
-    expect(result.designSystem.artifacts.baseCSS).not.toContain("html, body {");
+    expect(result.designSystem.artifacts.baseCSS).toContain(
+      "html {\n  margin: 0;\n  padding: 0;\n}",
+    );
+    expect(result.designSystem.artifacts.baseCSS).toContain(
+      "body {\n  margin: 0;\n  padding: 0;\n}",
+    );
     expect(result.designSystem.artifacts.baseCSS).toContain(
       '@import url("https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:ital,wght@0,200;0,300;0,400;0,500&display=swap");',
     );
     expect(result.designSystem.artifacts.baseCSS).toContain(
       "@media (max-width: 1023.98px) {\n  p.aria-testimonial-text-1 { font-family: DM Sans; }\n}",
     );
-    expect(result.designSystem.artifacts.globalCSS).not.toContain("html, body {");
+    expect(result.designSystem.artifacts.globalCSS).not.toContain(
+      "html, body {",
+    );
   });
 
-  it("keeps starter color tokens while omitting reset and icon-system CSS", async () => {
+  it("keeps starter color tokens and document spacing without icon-system CSS", async () => {
     const designSystem = buildStarterDesignSystem();
     const adapter = {
       getSiteSettings: vi.fn(async () => ({ utilityEngine: "custom" })),
@@ -481,6 +489,8 @@ describe("buildGlobalCSSArtifactsSnapshot", () => {
     const globalCSS = result.designSystem.artifacts.globalCSS;
 
     expect(globalCSS).toContain("/* Design System Colors */");
+    expect(globalCSS).toContain("html {\n  margin: 0;\n  padding: 0;\n}");
+    expect(globalCSS).toContain("body {\n  margin: 0;\n  padding: 0;\n}");
     expect(globalCSS).not.toContain("html, body {");
     expect(globalCSS).not.toContain("[data-aria-icon-list='root']");
   });
