@@ -31,11 +31,7 @@ import { unwrapLayoutInventoryActionResult } from "../../../composables/layoutIn
 import type { PagePolicyResult } from "../../../../lib/pages/policy";
 import { JsonObjectSchema } from "../../../../lib/schemas/json";
 import type { JsonObject, PageDSL } from "../../../../lib/types/nodes";
-import {
-  unwrapPageSettingsPageResult,
-  unwrapPageSettingsPolicyResult,
-  unwrapPageSettingsUpdateResult,
-} from "../composables/pageSettingsActionResults";
+import { unwrapPageSettingsPolicyResult } from "../composables/pageSettingsActionResults";
 import type { MediaAsset } from "@/features/Studio/media/types/media";
 import { useStudioCapabilities } from "@/composables/useStudioCapabilities";
 import { useStudioI18n } from "@/i18n";
@@ -534,27 +530,7 @@ const handleSave = async (): Promise<void> => {
 
     applyPolicy(policyResult.data);
 
-    const { data, error: fetchError } = await actions.getItem({
-      collection: "pages",
-      slug: props.page.slug,
-    });
-
-    const currentResult = unwrapPageSettingsPageResult(
-      {
-        data,
-        error: fetchError,
-      },
-      t("composer.pageSettings.loadPageFailed"),
-      {
-        source: "PageSettingsPanel.handleSave.getItem",
-        slug: props.page.slug,
-      },
-    );
-    if (!currentResult.success) {
-      throw new Error(currentResult.error);
-    }
-
-    const current = currentResult.data;
+    const current = props.page;
     const nextPage: PageDSL = {
       ...current,
       title: title.value.trim() || current.slug,
@@ -581,31 +557,7 @@ const handleSave = async (): Promise<void> => {
       updatedAt: new Date().toISOString(),
     };
 
-    const { data: saveData, error: saveError } = await actions.updateItem({
-      collection: "pages",
-      slug: current.slug,
-      data: nextPage,
-      expectedVersion: current.version,
-    });
-
-    const saveResult = unwrapPageSettingsUpdateResult(
-      {
-        data: saveData,
-        error: saveError,
-      },
-      t("composer.pageSettings.saveFailed"),
-      {
-        source: "PageSettingsPanel.handleSave.updateItem",
-        slug: current.slug,
-      },
-    );
-    if (!saveResult.success) {
-      throw new Error(saveResult.error);
-    }
-
-    // updateItem creates a new page revision. Keep Composer's optimistic-save
-    // token in sync so a settings save cannot conflict with the next content save.
-    emit("pageSaved", { ...nextPage, version: saveResult.version });
+    emit("pageSaved", nextPage);
   } catch (err) {
     error.value = err instanceof Error ? err.message : t("composer.pageSettings.saveFailed");
   } finally {

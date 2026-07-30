@@ -63,15 +63,16 @@ export const EN_COMPOSER_MESSAGES = {
   "composer.drafts.recoveryUnavailable":
     "Local draft recovery is unavailable. Keep this tab open until you save your changes.",
   "composer.drafts.savedVersionChanged":
-    "The saved version changed. Your local draft has been preserved and was not overwritten.",
-  "composer.drafts.reloadServerVersion": "Refresh server version",
+    "A newer draft was saved elsewhere. Your changes are still stored on this device.",
+  "composer.drafts.reloadServerVersion": "Load saved draft",
   "composer.drafts.serverVersionRefreshed":
-    "Server version refreshed. You can save again.",
+    "Saved draft loaded. Your recovery copy remains on this device.",
   "composer.drafts.serverVersionRefreshFailed":
-    "Could not refresh the server version. Try leaving Composer and editing again.",
+    "Unable to load the saved draft. Your recovery copy remains on this device.",
   "composer.drafts.saveFailed":
     "The draft could not be saved. Your local recovery draft is safe.",
-  "composer.drafts.discardFailed": "Could not discard the local Composer draft.",
+  "composer.drafts.discardFailed":
+    "Could not discard the local Composer draft.",
   "composer.drafts.leave.title": "Unsaved Composer changes",
   "composer.drafts.leave.description":
     "Save your draft before leaving, or discard these changes. Your local recovery draft remains available unless you discard it.",
@@ -189,18 +190,19 @@ export const FR_COMPOSER_MESSAGES = {
   "composer.drafts.conflict":
     "Un brouillon local de Composer est en conflit avec du contenu plus récent sur le serveur. Il reste stocké localement jusqu’à ce que vous le supprimiez.",
   "composer.drafts.discardLocal": "Supprimer le brouillon local",
-  "composer.drafts.available": "Un brouillon local non enregistré est disponible.",
+  "composer.drafts.available":
+    "Un brouillon local non enregistré est disponible.",
   "composer.drafts.restore": "Restaurer",
   "composer.drafts.discard": "Supprimer",
   "composer.drafts.recoveryUnavailable":
     "La récupération du brouillon local est indisponible. Gardez cet onglet ouvert jusqu’à l’enregistrement de vos modifications.",
   "composer.drafts.savedVersionChanged":
-    "La version enregistrée a changé. Votre brouillon local a été conservé et n’a pas été écrasé.",
-  "composer.drafts.reloadServerVersion": "Actualiser la version du serveur",
+    "Un brouillon plus récent a été enregistré ailleurs. Vos modifications restent stockées sur cet appareil.",
+  "composer.drafts.reloadServerVersion": "Charger le brouillon enregistré",
   "composer.drafts.serverVersionRefreshed":
-    "Version du serveur actualisée. Vous pouvez enregistrer à nouveau.",
+    "Brouillon enregistré chargé. Votre copie de récupération reste sur cet appareil.",
   "composer.drafts.serverVersionRefreshFailed":
-    "Impossible d’actualiser la version du serveur. Quittez Composer et rouvrez la page.",
+    "Impossible de charger le brouillon enregistré. Votre copie de récupération reste sur cet appareil.",
   "composer.drafts.saveFailed":
     "Le brouillon n’a pas pu être enregistré. Votre brouillon de récupération local est en sécurité.",
   "composer.drafts.discardFailed":

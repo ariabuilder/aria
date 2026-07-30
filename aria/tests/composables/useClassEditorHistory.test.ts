@@ -306,7 +306,7 @@ describe("useClassEditorHistory", () => {
     expect(onUndo).not.toHaveBeenCalled();
   });
 
-  it("fails node custom-class history when the action response is malformed", async () => {
+  it("records node custom-class history locally without a server mutation", async () => {
     addCustomClassMock.mockResolvedValue({
       error: null,
       data: {},
@@ -333,11 +333,9 @@ describe("useClassEditorHistory", () => {
       },
     );
 
-    expect(result).toEqual({
-      success: false,
-      error: "Failed to add custom class",
-    });
-    expect(onRedo).not.toHaveBeenCalled();
+    expect(result).toEqual({ success: true });
+    expect(addCustomClassMock).not.toHaveBeenCalled();
+    expect(onRedo).toHaveBeenCalledTimes(1);
     expect(onUndo).not.toHaveBeenCalled();
   });
 });

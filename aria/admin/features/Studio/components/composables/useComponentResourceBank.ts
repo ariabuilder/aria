@@ -19,12 +19,24 @@ const MAX_TOTAL_SIZE_BYTES = 10 * 1024 * 1024;
 
 const entries = new Map<string, ComponentResourceEntry>();
 const inFlightLoads = new Map<string, Promise<ComponentResourceEntry>>();
+const generations = new Map<string, number>();
 
 let totalEntrySize = 0;
 let testLoader: ComponentResourceLoader | null = null;
 
 function normalizeId(id: string): string {
   return id.trim();
+}
+
+function currentGeneration(id: string): number {
+  return generations.get(id) ?? 0;
+}
+
+function advanceGeneration(id: string): number {
+  const generation = currentGeneration(id) + 1;
+  generations.set(id, generation);
+  inFlightLoads.delete(id);
+  return generation;
 }
 
 function estimateSize(component: ComponentDSL): number {
@@ -133,10 +145,23 @@ export async function loadComponentResource(
   const existingLoad = inFlightLoads.get(normalizedId);
   if (existingLoad) return existingLoad;
 
-  const load = getLoader()(normalizedId)
-    .then(rememberComponent)
+  const generation = currentGeneration(normalizedId);
+  let load!: Promise<ComponentResourceEntry>;
+  load = getLoader()(normalizedId)
+    .then((component) => {
+      if (currentGeneration(normalizedId) !== generation) {
+        const committed = entries.get(normalizedId);
+        if (committed && !isComponentResourceInvalidated(committed)) {
+          return committed;
+        }
+        return loadComponentResource(normalizedId, { revalidate: true });
+      }
+      return rememberComponent(component);
+    })
     .finally(() => {
-      inFlightLoads.delete(normalizedId);
+      if (inFlightLoads.get(normalizedId) === load) {
+        inFlightLoads.delete(normalizedId);
+      }
     });
 
   inFlightLoads.set(normalizedId, load);
@@ -147,7 +172,10 @@ export function invalidateComponentResource(
   id: string,
   reason = "mutation",
 ): void {
-  const existing = entries.get(normalizeId(id));
+  const normalizedId = normalizeId(id);
+  if (!normalizedId) return;
+  advanceGeneration(normalizedId);
+  const existing = entries.get(normalizedId);
   if (!existing) return;
   existing.invalidatedAt = Date.now();
   existing.invalidationReason = reason;
@@ -156,11 +184,18 @@ export function invalidateComponentResource(
 export function updateCachedComponentResource(
   component: ComponentDSL,
 ): ComponentResourceEntry {
+  const id = normalizeId(component.id);
+  if (id) {
+    advanceGeneration(id);
+  }
   return rememberComponent(component);
 }
 
 export function evictComponentResource(id: string): void {
-  removeEntry(normalizeId(id));
+  const normalizedId = normalizeId(id);
+  if (!normalizedId) return;
+  advanceGeneration(normalizedId);
+  removeEntry(normalizedId);
 }
 
 export function useComponentResourceBank() {
@@ -177,6 +212,7 @@ export function useComponentResourceBank() {
 export function __resetComponentResourceBankForTests(): void {
   entries.clear();
   inFlightLoads.clear();
+  generations.clear();
   totalEntrySize = 0;
   testLoader = null;
 }

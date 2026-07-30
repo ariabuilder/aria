@@ -408,6 +408,11 @@ watch(saveConflict, (hasConflict) => {
       label: t("composer.drafts.reloadServerVersion"),
       onClick: () => {
         void (async () => {
+          await composerDrafts.flushLocalDraft();
+          if (composerDrafts.localError.value) {
+            toast.error(t("composer.drafts.recoveryUnavailable"));
+            return;
+          }
           const resolved = await resolveSaveConflict();
           if (resolved) {
             toast.dismiss(SAVE_CONFLICT_TOAST_ID);

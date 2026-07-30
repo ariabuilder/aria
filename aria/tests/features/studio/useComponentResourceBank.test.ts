@@ -84,4 +84,42 @@ describe("useComponentResourceBank", () => {
     expect(entry.component.name).toBe("Saved");
     expect(getCachedComponentResource("hero")).toBe(entry);
   });
+
+  it("does not let an older load overwrite a committed save", async () => {
+    let resolveLoad!: (value: ComponentDSL) => void;
+    __setComponentResourceBankLoaderForTests(
+      () =>
+        new Promise((resolve) => {
+          resolveLoad = resolve;
+        }),
+    );
+
+    const staleLoad = loadComponentResource("hero");
+    const committed = updateCachedComponentResource(component("hero", "Saved"));
+    resolveLoad(component("hero", "Old"));
+
+    await expect(staleLoad).resolves.toBe(committed);
+    expect(getCachedComponentResource("hero")?.component.name).toBe("Saved");
+  });
+
+  it("refetches when an uncached in-flight load is invalidated", async () => {
+    const resolvers: Array<(value: ComponentDSL) => void> = [];
+    __setComponentResourceBankLoaderForTests(
+      () =>
+        new Promise((resolve) => {
+          resolvers.push(resolve);
+        }),
+    );
+
+    const staleLoad = loadComponentResource("hero");
+    invalidateComponentResource("hero", "realtime");
+    resolvers[0]?.(component("hero", "Old"));
+    await Promise.resolve();
+    resolvers[1]?.(component("hero", "Fresh"));
+
+    await expect(staleLoad).resolves.toMatchObject({
+      component: { name: "Fresh" },
+    });
+    expect(getCachedComponentResource("hero")?.component.name).toBe("Fresh");
+  });
 });

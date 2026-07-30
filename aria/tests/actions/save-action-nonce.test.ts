@@ -228,6 +228,23 @@ describe("save action nonce handling", () => {
     );
   });
 
+  it("returns the committed save when snapshot refresh fails afterward", async () => {
+    const { save } = await import("../../actions/save");
+    savePageSnapshotMock.mockRejectedValueOnce(new Error("snapshot unavailable"));
+
+    await expect(
+      (save.page as any).handler(
+        {
+          id: "home",
+          blocks: [{ id: "hero", type: "section", props: {}, children: [] }],
+          layout: "default",
+          expectedVersion: "v-current",
+        },
+        { locals: {} } as never,
+      ),
+    ).resolves.toEqual({ version: "v-next" });
+  });
+
   it("does not validate or consume a nonce when an ordinary save fails", async () => {
     const { save } = await import("../../actions/save");
 

@@ -4,6 +4,7 @@ const SaveActionDataSchema = z
   .object({
     success: z.literal(true).optional(),
     version: z.string().trim().min(1),
+    layoutVersion: z.string().trim().min(1).optional(),
     nonce: z.string().trim().min(1).optional(),
   })
   .strict();

@@ -91,6 +91,62 @@ function createCmsRenderAdapter(input: {
 }
 
 describe("renderPageDslToHtml", () => {
+  it("renders published component and layout dependency pins", async () => {
+    const page: PageDSL = {
+      id: "home",
+      slug: "home",
+      title: "Home",
+      layout: "full-width",
+      status: "published",
+      version: "page-v1",
+      _publicationDependencies: {
+        layout: { id: "full-width", version: "layout-v1" },
+        components: { header: "component-v1" },
+      },
+      nodes: [
+        {
+          id: "header-instance",
+          type: "Component",
+          props: {},
+          styles: {},
+          children: [],
+          reference: {
+            id: "header",
+            masterId: "header",
+            type: "instance",
+          },
+        },
+      ],
+    };
+    const adapter = createAdapter(fullWidthLayout);
+    adapter.getLayoutDSL = async (_id, version) => {
+      expect(version).toBe("layout-v1");
+      return { ...fullWidthLayout, version: "layout-v1" };
+    };
+    adapter.getComponentDSL = async (_id, version) => ({
+      id: "header",
+      name: "Header",
+      category: "custom",
+      version: version ?? "component-v2",
+      nodes: [
+        {
+          id: "header-text",
+          type: "Text",
+          props: {
+            text: version === "component-v1" ? "Published header" : "Draft header",
+          },
+          styles: {},
+          children: [],
+        },
+      ],
+    });
+
+    const { html } = await renderPageDslToHtml({ page, adapter });
+
+    expect(html).toContain("Published header");
+    expect(html).not.toContain("Draft header");
+  });
+
   it("sets the document language from the resolved CMS locale", async () => {
     const page: PageDSL = {
       id: "post-template",

@@ -242,54 +242,10 @@ export function useNodeComponentHandlers(
       },
       {
         undo: async () => {
-          const deleteResponse = await actions.deleteNode({
-            collection: mutationPath.collection,
-            id: mutationPath.id,
-            nodeId,
-          });
-
-          if (deleteResponse.error) {
-            throw new Error(deleteResponse.error.message);
-          }
-
-          const insertResponse = await actions.insertNode({
-            collection: mutationPath.collection,
-            id: mutationPath.id,
-            parentId,
-            node: originalNode,
-            position: index,
-          });
-
-          if (insertResponse.error) {
-            throw new Error(insertResponse.error.message);
-          }
-
           replaceNodeInEditorTree(nodeId, parentId, index, originalNode);
           setSelectedBlock(originalNode.id);
         },
         redo: async () => {
-          const deleteResponse = await actions.deleteNode({
-            collection: mutationPath.collection,
-            id: mutationPath.id,
-            nodeId,
-          });
-
-          if (deleteResponse.error) {
-            throw new Error(deleteResponse.error.message);
-          }
-
-          const insertResponse = await actions.insertNode({
-            collection: mutationPath.collection,
-            id: mutationPath.id,
-            parentId,
-            node: componentInstanceNode,
-            position: index,
-          });
-
-          if (insertResponse.error) {
-            throw new Error(insertResponse.error.message);
-          }
-
           replaceNodeInEditorTree(
             nodeId,
             parentId,

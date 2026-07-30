@@ -15,12 +15,12 @@ import {
 import { useBuilderData } from "@/composables/useBuilderData";
 import { markPageThumbnailStale } from "@/features/Studio/pages/composables/pageThumbnailInvalidation";
 import { markComponentThumbnailStale } from "@/features/Studio/components/composables/componentThumbnailInvalidation";
+import { commitSavedComponentToClientCaches } from "./componentCacheCoherence";
 import { invalidateComposeCache } from "../../../composables/composeClientCache";
 import { unwrapItemLoadingComposeResult } from "../../../composables/itemLoadingActionResults";
 import {
   JsonObjectSchema,
   LayoutDSLSchema,
-  PageDSLSchema,
 } from "../../../../lib/schemas/nodes";
 import { snapshotLayoutSlots } from "../../../../lib/layouts/slotEditing";
 import type {
@@ -45,6 +45,7 @@ const PublishActionDataSchema = z
     darkMode: z.string().optional(),
     timestamp: z.string().optional(),
     published: z.boolean().optional(),
+    version: z.string().trim().min(1),
   })
   .strict();
 
@@ -90,12 +91,13 @@ export interface SavePublishDeps {
   onDraftSynced?: (
     version: string,
     persistedBlocksSnapshot: string,
+    currentDocumentMatchesSavedDraft?: boolean,
   ) => void | Promise<void>;
 }
 
 export interface SavePublishReturn {
   handleSave: () => Promise<void>;
-  handlePublish: () => Promise<void>;
+  handlePublish: () => Promise<boolean>;
   handleSaveAndPublish: (options?: {
     showSuccessToast?: boolean;
   }) => Promise<void>;
@@ -104,10 +106,7 @@ export interface SavePublishReturn {
   sanitizeNodes: (nodes: BuilderNode[]) => BuilderNode[];
   currentVersion: Ref<string | null>;
   saveConflict: Ref<boolean>;
-  /**
-   * Refresh authoritative version pins from the server without a full page
-   * reload, then re-apply the user's local blocks so they can save again.
-   */
+  /** Load the authoritative server draft without overwriting local recovery. */
   resolveSaveConflict: () => Promise<boolean>;
 }
 
@@ -152,21 +151,18 @@ export function useSavePublish(deps: SavePublishDeps): SavePublishReturn {
     return parsed.data.data;
   }
 
-  function parseReloadedPage(payload: unknown): PageDSL | null {
-    const parsed = PageDSLSchema.safeParse(payload);
-    return parsed.success ? parsed.data : null;
-  }
-
   function markLayoutSlotsSaved(): void {
     layoutSlotsSnapshot.value = snapshotLayoutSlots(currentLayout.value);
   }
 
   function markPageSaved(
+    pageId: string,
     updatedAt: string,
     version: string,
     persistedSnapshot: string,
+    currentDocumentMatchesSavedDraft: boolean,
   ): void {
-    if (!currentPage.value) {
+    if (currentItemType.value !== "page" || currentPage.value?.id !== pageId) {
       return;
     }
 
@@ -181,7 +177,8 @@ export function useSavePublish(deps: SavePublishDeps): SavePublishReturn {
     currentPage.value.version = version;
     currentVersion.value = version;
     lastSavedSnapshot.value = persistedSnapshot;
-    syncDirtyState();
+    hasUnsavedChanges.value = !currentDocumentMatchesSavedDraft;
+    syncDirtyState(true);
     invalidateComposeCache("page", currentPage.value.slug);
   }
 
@@ -217,7 +214,8 @@ export function useSavePublish(deps: SavePublishDeps): SavePublishReturn {
   }): boolean {
     return (
       error.code === "VERSION_CONFLICT" ||
-      error.message?.toLowerCase().includes("changed by another editor") === true ||
+      error.message?.toLowerCase().includes("changed by another editor") ===
+        true ||
       error.message?.toLowerCase().includes("draft is out of date") === true ||
       error.message?.toLowerCase().includes("version conflict") === true
     );
@@ -227,12 +225,17 @@ export function useSavePublish(deps: SavePublishDeps): SavePublishReturn {
     document: PageDSL | LayoutDSL | ComponentDSL,
   ): string {
     if (!document.version) {
-      throw new Error("This item has no current version. Reload Composer before saving.");
+      throw new Error(
+        "This item has no current version. Reload Composer before saving.",
+      );
     }
     return document.version;
   }
 
-  function actionErrorToError(error: { message?: string; code?: string }): Error {
+  function actionErrorToError(error: {
+    message?: string;
+    code?: string;
+  }): Error {
     return Object.assign(new Error(error.message || "Failed to save"), {
       code: error.code,
     });
@@ -323,9 +326,9 @@ export function useSavePublish(deps: SavePublishDeps): SavePublishReturn {
   };
 
   /**
-   * Soft conflict recovery: pull fresh version pins from compose, keep the
-   * user's local canvas blocks, and clear the conflict flag. Avoids
-   * location.reload(), which rehydrates a stale session version and loops.
+   * Load the authoritative server draft after a conflict. The conflicting
+   * local tree remains in IndexedDB recovery and is never paired with a fresh
+   * server version token.
    */
   async function resolveSaveConflict(): Promise<boolean> {
     const itemType = currentItemType.value;
@@ -333,10 +336,6 @@ export function useSavePublish(deps: SavePublishDeps): SavePublishReturn {
     if (!slug) {
       return false;
     }
-
-    const localBlocks = JSON.parse(
-      JSON.stringify(pageBlocks.value),
-    ) as BuilderNode[];
 
     if (itemType === "page") {
       invalidateComposeCache("page", slug);
@@ -366,37 +365,58 @@ export function useSavePublish(deps: SavePublishDeps): SavePublishReturn {
 
       composeNonce.value = composed.data.nonce;
       currentVersion.value = serverVersion;
+      const serverBlocks = Array.isArray(composed.data.pageBlocks)
+        ? composed.data.pageBlocks
+        : [];
 
       if (itemType === "page" && currentPage.value) {
         currentPage.value = {
           ...currentPage.value,
+          ...composed.data.pageMetadata,
           version: serverVersion,
-          updatedAt:
-            composed.data.pageMetadata.updatedAt ?? currentPage.value.updatedAt,
-          nodes: localBlocks,
+          nodes: serverBlocks,
         };
+        const serverLayout = composed.data.currentLayout;
+        if (serverLayout) {
+          currentLayout.value = LayoutDSLSchema.parse({
+            id: serverLayout.id,
+            name: serverLayout.title ?? serverLayout.slug ?? serverLayout.id,
+            slug: serverLayout.slug,
+            title: serverLayout.title,
+            version: serverLayout.version,
+            nodes: [],
+            slots: JSON.parse(
+              JSON.stringify(serverLayout.slots ?? []),
+            ) as LayoutDSL["slots"],
+            metadata: {
+              regions: JSON.parse(
+                JSON.stringify(serverLayout.regions ?? {}),
+              ) as NonNullable<LayoutDSL["metadata"]>["regions"],
+            },
+          });
+        } else {
+          currentLayout.value = null;
+        }
+        markLayoutSlotsSaved();
       } else if (itemType === "layout" && currentLayout.value) {
         currentLayout.value = {
           ...currentLayout.value,
           version: serverVersion,
-          nodes: localBlocks,
+          nodes: serverBlocks,
         };
       } else if (itemType === "component" && currentComponent.value) {
         currentComponent.value = {
           ...currentComponent.value,
           version: serverVersion,
-          nodes: localBlocks,
+          nodes: serverBlocks,
         };
       } else {
         return false;
       }
 
-      // Baseline against the server tree so local blocks remain dirty.
-      lastSavedSnapshot.value = createSnapshot(
-        Array.isArray(composed.data.pageBlocks) ? composed.data.pageBlocks : [],
-      );
-      pageBlocks.value = localBlocks;
-      hasUnsavedChanges.value = true;
+      pageBlocks.value = serverBlocks;
+      lastSavedSnapshot.value = createSnapshot(serverBlocks);
+      hasUnsavedChanges.value = false;
       saveConflict.value = false;
       return true;
     } catch (error) {
@@ -409,26 +429,42 @@ export function useSavePublish(deps: SavePublishDeps): SavePublishReturn {
     }
   }
 
-  function syncDirtyState(): void {
+  function syncDirtyState(preserveExistingDirty = false): void {
     const pageDirty =
       createSnapshot(pageBlocks.value) !== lastSavedSnapshot.value;
     const layoutDirty =
       snapshotLayoutSlots(currentLayout.value) !== layoutSlotsSnapshot.value;
-    hasUnsavedChanges.value = pageDirty || layoutDirty;
+    hasUnsavedChanges.value =
+      pageDirty ||
+      layoutDirty ||
+      (preserveExistingDirty && hasUnsavedChanges.value);
   }
 
   async function savePageWithNonceRetry(
-    pageId: string,
+    page: PageDSL,
     sanitizedBlocks: BuilderNode[],
     layout: string | undefined,
+    initialNonce: string | null,
+    layoutDraft?: {
+      id: string;
+      expectedVersion: string;
+      dsl: LayoutDSL;
+    },
   ): Promise<SaveActionData> {
+    let nonce = initialNonce;
     for (let attempt = 0; attempt < 2; attempt++) {
       const actionResult = await actions.savePage({
-        id: pageId,
+        id: page.id,
         blocks: sanitizedBlocks,
+        title: page.title,
+        description: page.description,
         layout,
-        nonce: composeNonce.value ?? undefined,
-        expectedVersion: expectedVersionFor(currentPage.value!),
+        settings: page.settings
+          ? JsonObjectSchema.parse(JSON.parse(JSON.stringify(page.settings)))
+          : undefined,
+        nonce: nonce ?? undefined,
+        expectedVersion: expectedVersionFor(page),
+        ...(layoutDraft ? { layoutDraft } : {}),
       });
 
       if (!actionResult.error) {
@@ -443,8 +479,17 @@ export function useSavePublish(deps: SavePublishDeps): SavePublishReturn {
           code: (error as { code?: string }).code,
         })
       ) {
+        if (
+          currentItemType.value !== "page" ||
+          currentPage.value?.id !== page.id
+        ) {
+          throw new Error(
+            "The edited page changed while saving. Return to it and try again.",
+          );
+        }
         const refreshed = await refreshComposeNonceFromServer();
         if (refreshed) {
+          nonce = composeNonce.value;
           continue;
         }
       }
@@ -454,42 +499,6 @@ export function useSavePublish(deps: SavePublishDeps): SavePublishReturn {
     }
 
     throw new Error("Failed to save page");
-  }
-
-  async function saveLayoutWithNonceRetry(
-    layout: LayoutDSL,
-    sanitizedBlocks: BuilderNode[],
-  ): Promise<SaveActionData> {
-    for (let attempt = 0; attempt < 2; attempt++) {
-      const actionResult = await actions.saveLayout({
-        id: layout.id,
-        blocks: sanitizedBlocks,
-        title: layout.title,
-        expectedVersion: expectedVersionFor(layout),
-      });
-
-      if (!actionResult.error) {
-        return parseSaveActionData(actionResult.data, "layout");
-      }
-
-      const error = actionResult.error;
-      if (
-        attempt === 0 &&
-        isInvalidNonceError({
-          message: error.message,
-          code: (error as { code?: string }).code,
-        })
-      ) {
-        const refreshed = await refreshComposeNonceFromServer();
-        if (refreshed) {
-          continue;
-        }
-      }
-
-      throw actionErrorToError(error as { message?: string; code?: string });
-    }
-
-    throw new Error("Failed to save layout");
   }
 
   async function saveComponentWithNonceRetry(
@@ -546,103 +555,215 @@ export function useSavePublish(deps: SavePublishDeps): SavePublishReturn {
 
     try {
       const itemType = currentItemType.value;
+      const pageToSave = currentPage.value
+        ? (JSON.parse(JSON.stringify(currentPage.value)) as PageDSL)
+        : null;
+      const layoutToSave = currentLayout.value
+        ? (JSON.parse(JSON.stringify(currentLayout.value)) as LayoutDSL)
+        : null;
+      const componentToSave = currentComponent.value
+        ? (JSON.parse(JSON.stringify(currentComponent.value)) as ComponentDSL)
+        : null;
+      const nonceToSave = composeNonce.value;
       saveConflict.value = false;
       const updatedAt = new Date().toISOString();
       const draftBlocksSnapshot = JSON.stringify(pageBlocks.value);
       const sanitizedBlocks = sanitizeNodes(pageBlocks.value);
       const persistedBlocksSnapshot = JSON.stringify(sanitizedBlocks);
+      const pagePayloadSnapshot =
+        pageToSave && itemType === "page"
+          ? JSON.stringify({
+              id: pageToSave.id,
+              title: pageToSave.title,
+              description: pageToSave.description,
+              layout: pageToSave.layout,
+              settings: pageToSave.settings,
+              nodes: sanitizedBlocks,
+            })
+          : null;
+      const layoutDocumentSnapshot =
+        layoutToSave && itemType === "layout"
+          ? JSON.stringify(
+              layoutPayloadForStorage({
+                ...layoutToSave,
+                nodes: sanitizedBlocks,
+              }),
+            )
+          : null;
+      const componentDocumentSnapshot =
+        componentToSave && itemType === "component"
+          ? JSON.stringify({
+              id: componentToSave.id,
+              name: componentToSave.name,
+              category: componentToSave.category,
+              description: componentToSave.description,
+              nodes: sanitizedBlocks,
+            })
+          : null;
 
-      if (itemType === "page" && currentPage.value) {
+      if (itemType === "page" && pageToSave) {
         const layoutDirty =
-          currentLayout.value &&
-          snapshotLayoutSlots(currentLayout.value) !==
-            layoutSlotsSnapshot.value;
+          layoutToSave &&
+          snapshotLayoutSlots(layoutToSave) !== layoutSlotsSnapshot.value;
 
-        if (layoutDirty && currentLayout.value) {
-          const layoutSlug = currentLayout.value.slug ?? currentLayout.value.id;
-          const layoutPayload = LayoutDSLSchema.parse(currentLayout.value);
-          const layoutResult = await actions.updateItem({
-            collection: "layouts",
-            slug: layoutSlug,
-            data: layoutPayloadForStorage(layoutPayload),
-            expectedVersion: expectedVersionFor(currentLayout.value),
-          });
-
-          if (layoutResult.error) {
-            if (
-              isVersionConflictError({
-                message: layoutResult.error.message,
-                code: (layoutResult.error as { code?: string }).code,
-              })
-            ) {
-              saveConflict.value = true;
-            }
-            throw actionErrorToError(
-              layoutResult.error as { message?: string; code?: string },
-            );
-          }
-
-          const layoutVersion = (layoutResult.data as { version?: unknown } | undefined)
-            ?.version;
-          if (typeof layoutVersion === "string") {
-            currentLayout.value.version = layoutVersion;
-          }
-          markLayoutSlotsSaved();
+        // hasUnsavedChanges also covers staged page metadata. Save the whole
+        // page document even when only title/settings changed, and create one
+        // guarded revision for the explicit Save draft operation.
+        const saveData = await savePageWithNonceRetry(
+          pageToSave,
+          sanitizedBlocks,
+          pageToSave.layout,
+          nonceToSave,
+          layoutDirty && layoutToSave
+            ? {
+                id: layoutToSave.slug ?? layoutToSave.id,
+                expectedVersion: expectedVersionFor(layoutToSave),
+                dsl: LayoutDSLSchema.parse(layoutToSave),
+              }
+            : undefined,
+        );
+        if (layoutDirty && !saveData.layoutVersion) {
+          throw new Error("Invalid atomic page save response");
         }
-
-        const pageDirty =
-          createSnapshot(pageBlocks.value) !== lastSavedSnapshot.value;
-
-        if (pageDirty) {
-          const saveData = await savePageWithNonceRetry(
-            currentPage.value.id,
-            sanitizedBlocks,
-            currentPage.value.layout,
-          );
+        if (
+          layoutDirty &&
+          layoutToSave &&
+          saveData.layoutVersion &&
+          currentLayout.value?.id === layoutToSave.id
+        ) {
+          currentLayout.value.version = saveData.layoutVersion;
+          layoutSlotsSnapshot.value = snapshotLayoutSlots(layoutToSave);
+        }
+        const sameActivePage =
+          currentItemType.value === "page" &&
+          currentPage.value?.id === pageToSave.id;
+        const currentDocumentMatchesSavedDraft =
+          sameActivePage &&
+          JSON.stringify({
+            id: currentPage.value!.id,
+            title: currentPage.value!.title,
+            description: currentPage.value!.description,
+            layout: currentPage.value!.layout,
+            settings: currentPage.value!.settings,
+            nodes: sanitizeNodes(pageBlocks.value),
+          }) === pagePayloadSnapshot &&
+          snapshotLayoutSlots(currentLayout.value) ===
+            snapshotLayoutSlots(layoutToSave);
+        if (sameActivePage) {
           refreshComposeNonce(saveData);
-          markPageSaved(updatedAt, saveData.version, persistedBlocksSnapshot);
-          await onDraftSynced?.(saveData.version, draftBlocksSnapshot);
-          markPageThumbnailStale(currentPage.value.id);
-          await refreshPagesNow();
+          markPageSaved(
+            pageToSave.id,
+            updatedAt,
+            saveData.version,
+            persistedBlocksSnapshot,
+            currentDocumentMatchesSavedDraft,
+          );
+          await onDraftSynced?.(
+            saveData.version,
+            draftBlocksSnapshot,
+            currentDocumentMatchesSavedDraft,
+          );
         }
-      } else if (itemType === "layout" && currentLayout.value) {
-        const saveData = await saveLayoutWithNonceRetry(
-          currentLayout.value,
-          sanitizedBlocks,
-        );
-        refreshComposeNonce(saveData);
+        markPageThumbnailStale(pageToSave.id);
+        await refreshPagesNow();
+      } else if (itemType === "layout" && layoutToSave) {
+        const layoutPayload = LayoutDSLSchema.parse({
+          ...layoutToSave,
+          nodes: sanitizedBlocks,
+        });
+        const layoutSlug = layoutToSave.slug ?? layoutToSave.id;
+        const layoutResult = await actions.updateItem({
+          collection: "layouts",
+          slug: layoutSlug,
+          data: layoutPayloadForStorage(layoutPayload),
+          expectedVersion: expectedVersionFor(layoutToSave),
+        });
+        if (layoutResult.error) {
+          throw actionErrorToError(
+            layoutResult.error as { message?: string; code?: string },
+          );
+        }
+        const layoutVersion = (
+          layoutResult.data as { version?: unknown } | undefined
+        )?.version;
+        if (typeof layoutVersion !== "string" || layoutVersion.length === 0) {
+          throw new Error("Invalid layout save response");
+        }
 
-        if (saveData.success) {
+        if (
+          currentItemType.value === "layout" &&
+          currentLayout.value?.id === layoutToSave.id
+        ) {
+          const currentDocumentMatchesSavedDraft =
+            JSON.stringify(
+              layoutPayloadForStorage({
+                ...currentLayout.value,
+                nodes: sanitizeNodes(pageBlocks.value),
+              }),
+            ) === layoutDocumentSnapshot;
           currentLayout.value.updatedAt = updatedAt;
-          currentLayout.value.version = saveData.version;
-          currentVersion.value = saveData.version;
+          currentLayout.value.version = layoutVersion;
+          currentVersion.value = layoutVersion;
           lastSavedSnapshot.value = persistedBlocksSnapshot;
-          markLayoutSlotsSaved();
-          syncDirtyState();
-          await onDraftSynced?.(saveData.version, draftBlocksSnapshot);
+          layoutSlotsSnapshot.value = snapshotLayoutSlots(layoutToSave);
+          hasUnsavedChanges.value = !currentDocumentMatchesSavedDraft;
+          syncDirtyState(true);
+          await onDraftSynced?.(
+            layoutVersion,
+            draftBlocksSnapshot,
+            currentDocumentMatchesSavedDraft,
+          );
         }
-      } else if (itemType === "component" && currentComponent.value) {
+      } else if (itemType === "component" && componentToSave) {
         const saveData = await saveComponentWithNonceRetry(
-          currentComponent.value,
+          componentToSave,
           sanitizedBlocks,
         );
-        refreshComposeNonce(saveData);
 
-        if (saveData.success) {
+        const savedComponent: ComponentDSL = {
+          ...componentToSave,
+          nodes: sanitizedBlocks,
+          updatedAt,
+          version: saveData.version,
+        };
+        commitSavedComponentToClientCaches(savedComponent);
+        invalidateComposeCache("component", savedComponent.id);
+        markComponentThumbnailStale(savedComponent.id);
+
+        if (
+          currentItemType.value === "component" &&
+          currentComponent.value?.id === componentToSave.id
+        ) {
+          const currentDocumentMatchesSavedDraft =
+            JSON.stringify({
+              id: currentComponent.value.id,
+              name: currentComponent.value.name,
+              category: currentComponent.value.category,
+              description: currentComponent.value.description,
+              nodes: sanitizeNodes(pageBlocks.value),
+            }) === componentDocumentSnapshot;
+          refreshComposeNonce(saveData);
           currentComponent.value.updatedAt = updatedAt;
           currentComponent.value.version = saveData.version;
           currentVersion.value = saveData.version;
           lastSavedSnapshot.value = persistedBlocksSnapshot;
-          markComponentThumbnailStale(currentComponent.value.id);
-          syncDirtyState();
-          await onDraftSynced?.(saveData.version, draftBlocksSnapshot);
+          hasUnsavedChanges.value = !currentDocumentMatchesSavedDraft;
+          syncDirtyState(true);
+          await onDraftSynced?.(
+            saveData.version,
+            draftBlocksSnapshot,
+            currentDocumentMatchesSavedDraft,
+          );
         }
       }
     } catch (err) {
       if (
         isVersionConflictError({
           message: err instanceof Error ? err.message : undefined,
-          code: err && typeof err === "object" ? (err as { code?: string }).code : undefined,
+          code:
+            err && typeof err === "object"
+              ? (err as { code?: string }).code
+              : undefined,
         })
       ) {
         saveConflict.value = true;
@@ -658,7 +779,7 @@ export function useSavePublish(deps: SavePublishDeps): SavePublishReturn {
       toast.error(`${errorMsg}${hint}`);
     } finally {
       loadingState.value.isSaving = false;
-      syncDirtyState();
+      syncDirtyState(true);
     }
   };
 
@@ -666,16 +787,7 @@ export function useSavePublish(deps: SavePublishDeps): SavePublishReturn {
    * Handle save operation with proper state management
    */
   const handleSave = async (): Promise<void> => {
-    await enqueueSave(async () => {
-      const snapshotBefore = lastSavedSnapshot.value;
-      await performSave();
-      if (
-        hasUnsavedChanges.value &&
-        lastSavedSnapshot.value !== snapshotBefore
-      ) {
-        await performSave();
-      }
-    });
+    await enqueueSave(performSave);
   };
 
   /**
@@ -683,12 +795,15 @@ export function useSavePublish(deps: SavePublishDeps): SavePublishReturn {
    */
   const handlePublish = async (
     options: { skipSave?: boolean } = {},
-  ): Promise<void> => {
+  ): Promise<boolean> => {
     if (currentItemType.value !== "page") {
       toast.error("Only pages can be published");
-      return;
+      return false;
     }
 
+    if (loadingState.value.isPublishing) {
+      return false;
+    }
     loadingState.value.isPublishing = true;
 
     try {
@@ -701,23 +816,23 @@ export function useSavePublish(deps: SavePublishDeps): SavePublishReturn {
       // combined save-and-publish action has already completed that work.
       if (!options.skipSave) {
         await handleSave();
+        if (hasUnsavedChanges.value || saveConflict.value) {
+          return false;
+        }
       }
       if (hasUnsavedChanges.value) {
         throw new Error("Save the current draft before publishing");
       }
 
-      const sanitizedBlocks = sanitizeNodes(pageBlocks.value);
+      const publishingPageId = currentPage.value.id;
+      const publishingPageSlug = currentPage.value.slug;
+      const requestedVersion = expectedVersionFor(currentPage.value);
+      const requestedBlocksSnapshot = createSnapshot(pageBlocks.value);
 
       // Use the publish action to advance the page's published revision.
       const result = await actions.publishing.publish({
-        id: currentPage.value.id,
-        slug: currentPage.value.slug,
-        title: currentPage.value.title,
-        description: currentPage.value.description,
-        layout: currentPage.value.layout,
-        nodes: sanitizedBlocks,
-        settings: currentPage.value.settings,
-        expectedVersion: expectedVersionFor(currentPage.value),
+        id: publishingPageId,
+        expectedVersion: requestedVersion,
       });
 
       if (result.error) {
@@ -729,35 +844,47 @@ export function useSavePublish(deps: SavePublishDeps): SavePublishReturn {
         ) {
           saveConflict.value = true;
         }
-        throw new Error(result.error.message || "Failed to publish");
+        throw actionErrorToError(
+          result.error as { message?: string; code?: string },
+        );
       }
 
       if (result.data) {
         const publishedData = parsePublishActionData(result.data);
+        if (publishedData.version !== requestedVersion) {
+          throw new Error(
+            "Published revision did not match the requested saved draft",
+          );
+        }
         log("info", "[useSavePublish] Page published", {
           slug: publishedData.slug,
           htmlSize: `${(publishedData.htmlSize / 1024).toFixed(2)}KB`,
           withCompiledCSS: publishedData.globalCSSEnabled,
         });
 
-        // Reload page to get updated status from server
-        // (Action already marked as published)
-        const reloaded = await actions.getItem({
-          collection: "pages",
-          slug: currentPage.value!.slug,
-        });
-        const reloadedPage = parseReloadedPage(reloaded.data);
-        if (reloadedPage) {
-          currentPage.value = reloadedPage;
-        } else {
+        if (currentPage.value?.id === publishingPageId) {
+          const draftAdvancedWhilePublishing =
+            currentPage.value.version !== requestedVersion ||
+            createSnapshot(pageBlocks.value) !== requestedBlocksSnapshot ||
+            hasUnsavedChanges.value;
+
           currentPage.value.status = "published";
+          currentPage.value.isModifiedSincePublish =
+            draftAdvancedWhilePublishing;
+          if (!draftAdvancedWhilePublishing) {
+            currentPage.value.version = publishedData.version;
+            currentVersion.value = publishedData.version;
+          } else {
+            currentVersion.value = currentPage.value.version ?? null;
+          }
         }
 
-        invalidateComposeCache("page", currentPage.value.slug);
-
-        markPageThumbnailStale(currentPage.value.id);
+        invalidateComposeCache("page", publishingPageSlug);
+        markPageThumbnailStale(publishingPageId);
         await refreshPagesNow();
+        return true;
       }
+      return false;
     } catch (err) {
       if (
         isVersionConflictError({
@@ -775,6 +902,7 @@ export function useSavePublish(deps: SavePublishDeps): SavePublishReturn {
       });
       const errorMsg = err instanceof Error ? err.message : "Failed to publish";
       toast.error(errorMsg);
+      return false;
     } finally {
       loadingState.value.isPublishing = false;
     }
@@ -790,11 +918,17 @@ export function useSavePublish(deps: SavePublishDeps): SavePublishReturn {
     const showSuccessToast = options?.showSuccessToast ?? true;
 
     await handleSave();
-    if (currentItemType.value === "page") {
-      await handlePublish({ skipSave: true });
+    if (hasUnsavedChanges.value || saveConflict.value) {
+      return;
     }
-    if (showSuccessToast) {
-      toast.success("Saved");
+    let completed = true;
+    if (currentItemType.value === "page") {
+      completed = await handlePublish({ skipSave: true });
+    }
+    if (showSuccessToast && completed) {
+      toast.success(
+        currentItemType.value === "page" ? "Page published" : "Draft saved",
+      );
     }
   };
 

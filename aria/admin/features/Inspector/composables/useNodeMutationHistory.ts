@@ -1,4 +1,3 @@
-import { actions } from "astro:actions";
 import { z } from "zod";
 
 import { JsonValueSchema } from "../../../../lib/schemas/json";
@@ -7,7 +6,6 @@ import {
   NodeMetadataSchema,
   StyleMapSchema,
 } from "../../../../lib/schemas/nodes";
-import { log } from "@/lib/utils/logger";
 import { useHistory } from "../../History";
 import type { OperationType } from "../../History";
 import type { NodeTarget } from "../types/inspector";
@@ -111,12 +109,6 @@ const NodeMutationExecutionSchema = z
   })
   .strict();
 
-const NodeMutationMutateResponseSchema = z
-  .object({
-    version: z.string().trim().min(1),
-  })
-  .strict();
-
 export type NodeMutationUpdates = z.infer<typeof NodeMutationUpdatesSchema>;
 
 type NodeMutationHistoryResult = {
@@ -142,37 +134,6 @@ interface ExecuteNodeMutationInput {
 export function useNodeMutationHistory() {
   const { execute } = useHistory();
 
-  async function runMutation(
-    target: z.infer<typeof NodeTargetSchema>,
-    updates: NodeMutationUpdates,
-    breakpoint: string,
-  ): Promise<string> {
-    const actionUpdates = NodeMutationActionUpdatesSchema.parse(updates);
-    const { data, error } = await actions.mutate({
-      collection: target.path.collection,
-      id: target.path.id,
-      nodeId: target.nodeId,
-      updates: actionUpdates,
-      breakpoint,
-      version: target.path.version,
-    });
-
-    if (error) {
-      throw new Error(error.message);
-    }
-
-    const parsedResponse = NodeMutationMutateResponseSchema.safeParse(data);
-    if (!parsedResponse.success) {
-      log("warn", "[useNodeMutationHistory] Invalid mutate response", {
-        target,
-        issues: parsedResponse.error.issues,
-      });
-      throw new Error("Invalid node mutation response");
-    }
-
-    return parsedResponse.data.version;
-  }
-
   async function executeNodeMutation(
     input: ExecuteNodeMutationInput,
   ): Promise<NodeMutationHistoryResult> {
@@ -187,26 +148,17 @@ export function useNodeMutationHistory() {
       };
     }
 
-    let nextVersion: string | undefined;
+    NodeMutationActionUpdatesSchema.parse(parsedInput.data.updates);
+    NodeMutationActionUpdatesSchema.parse(parsedInput.data.restoreUpdates);
     const result = await execute({
       type: parsedInput.data.metadata.type as OperationType,
       timestamp: Date.now(),
       description: parsedInput.data.metadata.description,
       affectedNodeIds: parsedInput.data.metadata.affectedNodeIds,
       undo: async () => {
-        await runMutation(
-          parsedInput.data.target,
-          parsedInput.data.restoreUpdates,
-          parsedInput.data.breakpoint,
-        );
         callbacks?.onUndo?.();
       },
       redo: async () => {
-        nextVersion = await runMutation(
-          parsedInput.data.target,
-          parsedInput.data.updates,
-          parsedInput.data.breakpoint,
-        );
         callbacks?.onRedo?.();
       },
     });
@@ -220,7 +172,6 @@ export function useNodeMutationHistory() {
 
     return {
       success: true,
-      version: nextVersion,
     };
   }
 

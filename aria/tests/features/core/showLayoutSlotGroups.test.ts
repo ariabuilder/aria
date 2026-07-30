@@ -131,14 +131,7 @@ describe("showLayoutSlotGroups", () => {
       insertionMode: "root",
     });
 
-    expect(actionsMock.insertNode).toHaveBeenCalledWith(
-      expect.objectContaining({
-        parentId: null,
-        node: expect.objectContaining({
-          id: "home-hero",
-        }),
-      }),
-    );
+    expect(actionsMock.insertNode).not.toHaveBeenCalled();
     expect(pageBlocks.value).toHaveLength(1);
     expect(pageBlocks.value[0]?.id).toBe("home-hero");
     expect(

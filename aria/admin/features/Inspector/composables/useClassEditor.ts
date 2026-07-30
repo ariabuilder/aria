@@ -100,11 +100,6 @@ const ClassEditorGeneratedCssActionSuccessSchema = z
       }),
   });
 
-const NodeUtilityClassActionSuccessSchema = z
-  .looseObject({
-    version: NonEmptyStringSchema,
-  });
-
 const ClassEditorSnapshotSchema = z
   .object({
     customClasses: CustomClassesMapSchema,
@@ -177,38 +172,6 @@ function normalizeNodeClassNames(value: unknown) {
   return {
     ...createEmptyClassNames(),
     ...cloneDeep(parsedClassNames.data),
-  };
-}
-
-function unwrapNodeUtilityClassActionResult(
-  result: ActionTransportResult,
-  fallback: string,
-  context: Record<string, unknown>,
-): { success: true; version: string } | { success: false; error: string } {
-  if (result.error) {
-    return {
-      success: false,
-      error: result.error.message ?? fallback,
-    };
-  }
-
-  const parsedResult = NodeUtilityClassActionSuccessSchema.safeParse(
-    result.data,
-  );
-  if (!parsedResult.success) {
-    log("warn", "[useClassEditor] Invalid node class action response", {
-      issues: parsedResult.error.issues,
-      ...context,
-    });
-    return {
-      success: false,
-      error: fallback,
-    };
-  }
-
-  return {
-    success: true,
-    version: parsedResult.data.version,
   };
 }
 
@@ -2447,24 +2410,6 @@ export function useClassEditor(): UseClassEditorReturn {
             : { base: [] },
         }),
         action: async () => {
-          const result = unwrapNodeUtilityClassActionResult(
-            await actions.nodes.addUtilityClass(validatedInput.data),
-            "Failed to add utility class",
-            {
-              source: "useClassEditor.addUtilityClass",
-              collection,
-              id,
-              nodeId,
-              className: actualClassName,
-              key,
-            },
-          );
-
-          if (!result.success) {
-            error.value = result.error;
-            throw new Error(error.value);
-          }
-
           // Update the selected node locally to trigger reactivity
           if (selectedNode.value && selectedNode.value.id === nodeId) {
             const currentClassNames =
@@ -2492,8 +2437,6 @@ export function useClassEditor(): UseClassEditorReturn {
             className: actualClassName,
             key,
           });
-
-          return result.version;
         },
         restoreProperty: async (_state, property, value) => {
           if (
@@ -2501,64 +2444,8 @@ export function useClassEditor(): UseClassEditorReturn {
             selectedNode.value &&
             selectedNode.value.id === nodeId
           ) {
-            // Determine if we're adding or removing the class based on the state
-            const currentClasses = selectedNode.value.classNames?.[key] ?? [];
             const targetClassMap =
               normalizeNodeClassNames(value) ?? createEmptyClassNames();
-            const targetClasses = targetClassMap[key] ?? [];
-
-            const wasAdded = targetClasses.includes(actualClassName);
-            const isCurrentlyAdded = currentClasses.includes(actualClassName);
-
-            if (wasAdded && !isCurrentlyAdded) {
-              // Need to add it back (redo)
-              const restoreResult = unwrapNodeUtilityClassActionResult(
-                await actions.nodes.addUtilityClass({
-                  collection,
-                  id,
-                  nodeId,
-                  className: actualClassName,
-                  key,
-                }),
-                "Failed to add utility class",
-                {
-                  source: "useClassEditor.addUtilityClass.restoreProperty",
-                  collection,
-                  id,
-                  nodeId,
-                  className: actualClassName,
-                  key,
-                },
-              );
-
-              if (!restoreResult.success) {
-                throw new Error(restoreResult.error);
-              }
-            } else if (!wasAdded && isCurrentlyAdded) {
-              // Need to remove it (undo)
-              const restoreResult = unwrapNodeUtilityClassActionResult(
-                await actions.nodes.removeUtilityClass({
-                  collection,
-                  id,
-                  nodeId,
-                  className: actualClassName,
-                  key,
-                }),
-                "Failed to remove utility class",
-                {
-                  source: "useClassEditor.addUtilityClass.restoreProperty",
-                  collection,
-                  id,
-                  nodeId,
-                  className: actualClassName,
-                  key,
-                },
-              );
-
-              if (!restoreResult.success) {
-                throw new Error(restoreResult.error);
-              }
-            }
 
             const updatedNode = updateSelectedNodeClassNames(
               nodeId,
@@ -2640,24 +2527,6 @@ export function useClassEditor(): UseClassEditorReturn {
             : { base: [] },
         }),
         action: async () => {
-          const result = unwrapNodeUtilityClassActionResult(
-            await actions.nodes.removeUtilityClass(validatedInput.data),
-            "Failed to remove utility class",
-            {
-              source: "useClassEditor.removeUtilityClass",
-              collection,
-              id,
-              nodeId,
-              className,
-              key,
-            },
-          );
-
-          if (!result.success) {
-            error.value = result.error;
-            throw new Error(error.value);
-          }
-
           // Update the selected node locally to trigger reactivity
           if (selectedNode.value && selectedNode.value.id === nodeId) {
             const currentClassNames =
@@ -2685,8 +2554,6 @@ export function useClassEditor(): UseClassEditorReturn {
             className,
             breakpoint: bp,
           });
-
-          return result.version;
         },
         restoreProperty: async (_state, property, value) => {
           if (
@@ -2694,65 +2561,8 @@ export function useClassEditor(): UseClassEditorReturn {
             selectedNode.value &&
             selectedNode.value.id === nodeId
           ) {
-            // Determine if we're adding or removing the class based on the state
-            const currentClasses = selectedNode.value.classNames?.[key] ?? [];
             const targetClassMap =
               normalizeNodeClassNames(value) ?? createEmptyClassNames();
-            const targetClasses = targetClassMap[key] ?? [];
-
-            // Find what classes should be present
-            const shouldHaveClass = targetClasses.includes(className);
-            const currentlyHasClass = currentClasses.includes(className);
-
-            if (shouldHaveClass && !currentlyHasClass) {
-              // Need to add it back (undo)
-              const restoreResult = unwrapNodeUtilityClassActionResult(
-                await actions.nodes.addUtilityClass({
-                  collection,
-                  id,
-                  nodeId,
-                  className,
-                  key,
-                }),
-                "Failed to add utility class",
-                {
-                  source: "useClassEditor.removeUtilityClass.restoreProperty",
-                  collection,
-                  id,
-                  nodeId,
-                  className,
-                  key,
-                },
-              );
-
-              if (!restoreResult.success) {
-                throw new Error(restoreResult.error);
-              }
-            } else if (!shouldHaveClass && currentlyHasClass) {
-              // Need to remove it (redo)
-              const restoreResult = unwrapNodeUtilityClassActionResult(
-                await actions.nodes.removeUtilityClass({
-                  collection,
-                  id,
-                  nodeId,
-                  className,
-                  key,
-                }),
-                "Failed to remove utility class",
-                {
-                  source: "useClassEditor.removeUtilityClass.restoreProperty",
-                  collection,
-                  id,
-                  nodeId,
-                  className,
-                  key,
-                },
-              );
-
-              if (!restoreResult.success) {
-                throw new Error(restoreResult.error);
-              }
-            }
 
             const updatedNode = updateSelectedNodeClassNames(
               nodeId,

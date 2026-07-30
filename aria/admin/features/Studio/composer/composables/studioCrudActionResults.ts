@@ -28,6 +28,7 @@ const StudioCrudActionFailureSchema = z.looseObject({
 const StudioCrudCreateOrUpdateSuccessSchema = z.looseObject({
   success: z.literal(true),
   slug: NonEmptyStringSchema,
+  version: NonEmptyStringSchema.optional(),
 })
 
 const StudioCrudDeleteSuccessSchema = z.looseObject({
@@ -79,6 +80,7 @@ export type StudioCrudCollection = keyof typeof StudioCrudGetItemSchemaMap
 type StudioCrudActionSuccess = {
   success: true
   slug?: string
+  version?: string
 }
 
 type StudioCrudActionFailure = {
@@ -139,6 +141,10 @@ export function unwrapStudioCrudActionResult(
     return {
       success: true,
       slug: data.slug,
+      version:
+        "version" in data && typeof data.version === "string"
+          ? data.version
+          : undefined,
     }
   }
 

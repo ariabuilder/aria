@@ -96,6 +96,144 @@ describe("usePageAccessState", () => {
     expect(getPolicyMock).toHaveBeenCalledTimes(1);
   });
 
+  it("bypasses a stale cached role after a CMS assignment", async () => {
+    getPolicyMock
+      .mockResolvedValueOnce({ data: basePolicy, error: null })
+      .mockResolvedValueOnce({
+        data: {
+          ...basePolicy,
+          systemRole: "cms-entry",
+        },
+        error: null,
+      });
+
+    const state = await loadComposable();
+    await state.loadPolicy("not-found-page");
+
+    state.systemRole.value = "cms-entry";
+    expect(state.isPolicyDirty.value).toBe(true);
+
+    await state.loadPolicy("not-found-page", {
+      force: true,
+      preserveLocalChanges: true,
+    });
+
+    expect(getPolicyMock).toHaveBeenCalledTimes(2);
+    expect(state.systemRole.value).toBe("cms-entry");
+    expect(state.isPolicyDirty.value).toBe(false);
+  });
+
+  it("rebases unrelated local access edits onto the assigned server role", async () => {
+    getPolicyMock
+      .mockResolvedValueOnce({ data: basePolicy, error: null })
+      .mockResolvedValueOnce({
+        data: {
+          ...basePolicy,
+          systemRole: "cms-collection",
+        },
+        error: null,
+      });
+
+    const state = await loadComposable();
+    await state.loadPolicy("not-found-page");
+
+    state.systemRole.value = "cms-collection";
+    state.accessMode.value = "private";
+
+    await state.loadPolicy("not-found-page", {
+      force: true,
+      preserveLocalChanges: true,
+    });
+
+    expect(state.systemRole.value).toBe("cms-collection");
+    expect(state.accessMode.value).toBe("private");
+    expect(state.isPolicyDirty.value).toBe(true);
+  });
+
+  it("accepts an authoritative demotion after the final CMS assignment is removed", async () => {
+    getPolicyMock
+      .mockResolvedValueOnce({
+        data: {
+          ...basePolicy,
+          systemRole: "cms-entry",
+        },
+        error: null,
+      })
+      .mockResolvedValueOnce({ data: basePolicy, error: null });
+
+    const state = await loadComposable();
+    await state.loadPolicy("not-found-page");
+    expect(state.systemRole.value).toBe("cms-entry");
+
+    await state.loadPolicy("not-found-page", {
+      force: true,
+      preserveLocalChanges: true,
+    });
+
+    expect(state.systemRole.value).toBe("standard");
+    expect(state.isPolicyDirty.value).toBe(false);
+  });
+
+  it("keeps local policy edits visible when forced reconciliation fails", async () => {
+    getPolicyMock
+      .mockResolvedValueOnce({ data: basePolicy, error: null })
+      .mockResolvedValueOnce({
+        data: null,
+        error: { message: "Policy refresh unavailable" },
+      });
+
+    const state = await loadComposable();
+    await state.loadPolicy("not-found-page");
+    state.systemRole.value = "cms-entry";
+
+    await state.loadPolicy("not-found-page", {
+      force: true,
+      preserveLocalChanges: true,
+    });
+
+    expect(state.systemRole.value).toBe("cms-entry");
+    expect(state.isPolicyDirty.value).toBe(true);
+    expect(state.error.value).toBe("Policy refresh unavailable");
+  });
+
+  it("does not let an older forced refresh poison the shared cache", async () => {
+    let resolveOlder: (value: unknown) => void = () => undefined;
+    let resolveNewer: (value: unknown) => void = () => undefined;
+    getPolicyMock
+      .mockResolvedValueOnce({ data: basePolicy, error: null })
+      .mockReturnValueOnce(
+        new Promise((resolve) => {
+          resolveOlder = resolve;
+        }),
+      )
+      .mockReturnValueOnce(
+        new Promise((resolve) => {
+          resolveNewer = resolve;
+        }),
+      );
+
+    const { usePageAccessState } =
+      await import("../../admin/features/Studio/pages/composables/usePageAccessState");
+    const state = usePageAccessState();
+    await state.loadPolicy("not-found-page");
+
+    const older = state.loadPolicy("not-found-page", { force: true });
+    const newer = state.loadPolicy("not-found-page", { force: true });
+    resolveNewer({
+      data: { ...basePolicy, systemRole: "cms-entry" },
+      error: null,
+    });
+    await newer;
+    resolveOlder({ data: basePolicy, error: null });
+    await older;
+
+    const remounted = usePageAccessState();
+    await remounted.loadPolicy("not-found-page");
+
+    expect(remounted.systemRole.value).toBe("cms-entry");
+    expect(getPolicyMock).toHaveBeenCalledTimes(3);
+  });
+
   it("does not report policy dirty while a replacement policy is loading", async () => {
     getPolicyMock.mockResolvedValueOnce({
       data: {

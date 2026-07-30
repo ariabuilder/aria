@@ -157,6 +157,7 @@ describe("ComponentSettingsPanel", () => {
       id: "hero",
       category: "marketing",
       description: "Hero component",
+      version: "component-v1",
     });
 
     const wrapper = mount(ComponentSettingsPanel, {
@@ -201,6 +202,7 @@ describe("ComponentSettingsPanel", () => {
       name: "Hero",
       description: "Hero component",
       category: "marketing",
+      expectedVersion: "component-v1",
     });
     expect(wrapper.emitted("componentSaved")).toBeUndefined();
     expect(wrapper.text()).toContain("Invalid component save response");

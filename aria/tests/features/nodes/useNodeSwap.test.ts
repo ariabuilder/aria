@@ -89,7 +89,7 @@ describe("useNodeSwap", () => {
     expect(getSwapOptionsForNode(pageBlocks.value[2]!)).toEqual([]);
   });
 
-  it("swaps svg to icon via replaceNode action", async () => {
+  it("swaps svg to icon locally without creating a server revision", async () => {
     const pageBlocks = pageBlocksRef([createNode("svg-1", "svg")]);
     const setSelectedBlock = vi.fn();
 
@@ -102,21 +102,11 @@ describe("useNodeSwap", () => {
 
     await swapNode("svg-1", "svg-to-icon");
 
-    expect(actionsMock.replaceNode).toHaveBeenCalledTimes(1);
-    const calls = actionsMock.replaceNode.mock.calls as unknown as Array<
-      [
-        {
-          node: BuilderNode;
-        },
-      ]
-    >;
-    const call = calls[0]?.[0]!;
-    expect(call.node.type).toBe("icon");
-    expect(call.node.id).toBe("svg-1");
-    expect(IconReferenceSchema.safeParse(call.node.props.icon).success).toBe(
-      true,
-    );
+    expect(actionsMock.replaceNode).not.toHaveBeenCalled();
     expect(pageBlocks.value[0]?.type).toBe("icon");
+    expect(
+      IconReferenceSchema.safeParse(pageBlocks.value[0]?.props.icon).success,
+    ).toBe(true);
     expect(setSelectedBlock).toHaveBeenCalledWith("svg-1");
     expect(toastMock.success).toHaveBeenCalled();
   });

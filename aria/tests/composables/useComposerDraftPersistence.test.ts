@@ -145,6 +145,81 @@ describe("useComposerDraftPersistence", () => {
     );
   });
 
+  it("keeps metadata edits made during save in local recovery", async () => {
+    const { useComposerDraftPersistence } =
+      await import("../../admin/features/Core/composables/useComposerDraftPersistence");
+    const deps = createDeps();
+    const drafts = useComposerDraftPersistence(
+      deps as unknown as ComposerDraftPersistenceDeps,
+    );
+    const savedSnapshot = JSON.stringify(deps.pageBlocks.value);
+    deps.currentPage.value!.title = "Edited during save";
+
+    await drafts.markCurrentDraftSynced("server-v2", savedSnapshot, false);
+
+    expect(saveDraftMock).toHaveBeenLastCalledWith(
+      "pages",
+      "page-home",
+      expect.objectContaining({ title: "Edited during save" }),
+      false,
+      undefined,
+    );
+    expect(deleteDraftMock).not.toHaveBeenCalled();
+  });
+
+  it("removes only the acknowledged recovery draft after an exact save", async () => {
+    const { useComposerDraftPersistence } =
+      await import("../../admin/features/Core/composables/useComposerDraftPersistence");
+    const deps = createDeps();
+    const drafts = useComposerDraftPersistence(
+      deps as unknown as ComposerDraftPersistenceDeps,
+    );
+
+    await drafts.markCurrentDraftSynced(
+      "server-v2",
+      JSON.stringify(deps.pageBlocks.value),
+    );
+
+    expect(deleteDraftMock).toHaveBeenCalledWith("pages", "page-home");
+    expect(saveDraftMock).not.toHaveBeenCalled();
+  });
+
+  it("removes a restored draft from its original tab after an exact save", async () => {
+    const { useComposerDraftPersistence } =
+      await import("../../admin/features/Core/composables/useComposerDraftPersistence");
+    const deps = createDeps();
+    const stored: DraftEntry = {
+      id: "page-home",
+      collection: "pages",
+      sessionId: "source-tab",
+      dsl: {
+        ...deps.currentPage.value!,
+        nodes: [createNode({ id: "recovered" })],
+      },
+      lastModified: Date.now(),
+      synced: false,
+    };
+    getDraftMock.mockResolvedValue(stored);
+    const drafts = useComposerDraftPersistence(
+      deps as unknown as ComposerDraftPersistenceDeps,
+    );
+    await nextTick();
+    await Promise.resolve();
+    await expect(drafts.restorePendingDraft()).resolves.toBe(true);
+
+    await drafts.markCurrentDraftSynced(
+      "server-v2",
+      JSON.stringify(deps.pageBlocks.value),
+    );
+
+    expect(deleteDraftMock).toHaveBeenCalledWith("pages", "page-home");
+    expect(deleteDraftMock).toHaveBeenCalledWith(
+      "pages",
+      "page-home",
+      "source-tab",
+    );
+  });
+
   it("does not inspect or persist drafts outside an active Composer session", async () => {
     const { useComposerDraftPersistence } =
       await import("../../admin/features/Core/composables/useComposerDraftPersistence");
@@ -177,6 +252,35 @@ describe("useComposerDraftPersistence", () => {
       await vi.advanceTimersByTimeAsync(300);
 
       expect(saveDraftMock).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("protects staged page metadata even when the draft was already dirty", async () => {
+    vi.useFakeTimers();
+    try {
+      const { useComposerDraftPersistence } =
+        await import("../../admin/features/Core/composables/useComposerDraftPersistence");
+      const deps = createDeps();
+      useComposerDraftPersistence(
+        deps as unknown as ComposerDraftPersistenceDeps,
+      );
+
+      const stagedPage = Object.assign({}, deps.currentPage.value, {
+        title: "Staged title",
+      }) as PageDSL;
+      deps.currentPage.value = stagedPage;
+      await nextTick();
+      await vi.advanceTimersByTimeAsync(300);
+
+      expect(saveDraftMock).toHaveBeenCalledWith(
+        "pages",
+        "page-home",
+        expect.objectContaining({ title: "Staged title" }),
+        false,
+        undefined,
+      );
     } finally {
       vi.useRealTimers();
     }

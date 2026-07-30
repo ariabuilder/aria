@@ -513,18 +513,6 @@ export function useNodeCrudHandlers(options: UseNodeCrudHandlersOptions) {
             return;
           }
 
-          const response = await actions.insertNode({
-            collection: mutationPath.collection,
-            id: mutationPath.id,
-            parentId,
-            node: deletedBlock,
-            position: index,
-          });
-
-          if (response.error) {
-            throw new Error(response.error.message);
-          }
-
           pageBlocks.value = insertNodeInTree(
             pageBlocks.value,
             parentId,
@@ -538,16 +526,6 @@ export function useNodeCrudHandlers(options: UseNodeCrudHandlersOptions) {
             deleteNodeFromEditor(validatedNodeId);
             setSelectedBlock(null);
             return;
-          }
-
-          const response = await actions.deleteNode({
-            collection: mutationPath.collection,
-            id: mutationPath.id,
-            nodeId: validatedNodeId,
-          });
-
-          if (response.error) {
-            throw new Error(response.error.message);
           }
 
           pageBlocks.value = deleteNodeById(pageBlocks.value, validatedNodeId);
@@ -654,18 +632,8 @@ export function useNodeCrudHandlers(options: UseNodeCrudHandlersOptions) {
           }
 
           // Re-insert in descending index order so earlier insertions
-          // don't shift the target indices of later insertions
+          // don't shift the target indices of later insertions.
           for (const pos of positions) {
-            const response = await actions.insertNode({
-              collection: mutationPath.collection,
-              id: mutationPath.id,
-              parentId: pos.parentId,
-              node: pos.node,
-              position: pos.index,
-            });
-            if (response.error) {
-              throw new Error(response.error.message);
-            }
             pageBlocks.value = insertNodeInTree(
               pageBlocks.value,
               pos.parentId,
@@ -680,16 +648,6 @@ export function useNodeCrudHandlers(options: UseNodeCrudHandlersOptions) {
               deleteNodeFromEditor(nodeId);
             }
             return;
-          }
-
-          const response = await actions.deleteNodes({
-            collection: mutationPath.collection,
-            id: mutationPath.id,
-            nodeIds: validatedNodeIds,
-          });
-
-          if (response.error) {
-            throw new Error(response.error.message);
           }
 
           pageBlocks.value = deleteNodesInTree(
@@ -756,16 +714,6 @@ export function useNodeCrudHandlers(options: UseNodeCrudHandlersOptions) {
             return;
           }
 
-          const response = await actions.deleteNode({
-            collection: mutationPath.collection,
-            id: mutationPath.id,
-            nodeId: clonedNode.id,
-          });
-
-          if (response.error) {
-            throw new Error(response.error.message);
-          }
-
           pageBlocks.value = deleteNodeById(pageBlocks.value, clonedNode.id);
         },
         redo: async () => {
@@ -778,18 +726,6 @@ export function useNodeCrudHandlers(options: UseNodeCrudHandlersOptions) {
             );
             setSelectedBlock(clonedNode.id);
             return;
-          }
-
-          const response = await actions.insertNode({
-            collection: mutationPath.collection,
-            id: mutationPath.id,
-            parentId,
-            node: clonedNode,
-            position: insertIndex,
-          });
-
-          if (response.error) {
-            throw new Error(response.error.message);
           }
 
           pageBlocks.value = insertNodeInTree(
@@ -951,16 +887,6 @@ export function useNodeCrudHandlers(options: UseNodeCrudHandlersOptions) {
               return;
             }
 
-            const response = await actions.deleteNode({
-              collection: mutationPath.collection,
-              id: mutationPath.id,
-              nodeId: clonedNode.id,
-            });
-
-            if (response.error) {
-              throw new Error(response.error.message);
-            }
-
             pageBlocks.value = deleteNodeById(pageBlocks.value, clonedNode.id);
           },
           redo: async () => {
@@ -973,18 +899,6 @@ export function useNodeCrudHandlers(options: UseNodeCrudHandlersOptions) {
               );
               setSelectedBlock(clonedNode.id);
               return;
-            }
-
-            const response = await actions.insertNode({
-              collection: mutationPath.collection,
-              id: mutationPath.id,
-              parentId,
-              node: clonedNode,
-              position: insertIndex,
-            });
-
-            if (response.error) {
-              throw new Error(response.error.message);
             }
 
             pageBlocks.value = insertNodeInTree(
@@ -1097,16 +1011,6 @@ export function useNodeCrudHandlers(options: UseNodeCrudHandlersOptions) {
           }
 
           for (const nodeId of importedNodeIds) {
-            const response = await actions.deleteNode({
-              collection: mutationPath.collection,
-              id: mutationPath.id,
-              nodeId,
-            });
-
-            if (response.error) {
-              throw new Error(response.error.message);
-            }
-
             pageBlocks.value = deleteNodeById(pageBlocks.value, nodeId);
           }
         },
@@ -1136,18 +1040,6 @@ export function useNodeCrudHandlers(options: UseNodeCrudHandlersOptions) {
             }
             setSelectedBlock(insertedNodes[0]?.id ?? null);
             return;
-          }
-
-          const response = await actions.insertNodes({
-            collection: mutationPath.collection,
-            id: mutationPath.id,
-            parentId,
-            nodes: insertedNodes,
-            position: insertIndex,
-          });
-
-          if (response.error) {
-            throw new Error(response.error.message);
           }
 
           pageBlocks.value = insertNodesInTree(

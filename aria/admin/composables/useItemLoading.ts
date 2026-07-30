@@ -309,6 +309,7 @@ function buildLayoutFromCompose(
     id: layout.id,
     name: layout.title || layout.slug || layout.id,
     description: layout.title || layout.slug,
+    version: layout.version,
     nodes: [],
     slots,
     metadata: { regions: layout.regions || {} },
@@ -333,6 +334,7 @@ function buildPageFromCompose(
   const candidatePage: PageDSL = {
     id: composed.pageMetadata.id || normalizedSlug,
     title: composed.pageMetadata.title || normalizedSlug,
+    description: composed.pageMetadata.description,
     slug: composed.pageMetadata.slug || normalizedSlug,
     nodes: toMutableNodes(composed.originalNodes || composed.pageBlocks),
     frontmatter: composed.pageMetadata.frontmatter || {},
@@ -343,6 +345,7 @@ function buildPageFromCompose(
     version: composed.pageMetadata.version,
     updatedAt: composed.pageMetadata.updatedAt || new Date().toISOString(),
     settings: {
+      ...composed.pageMetadata.settings,
       cssVariables: toTypedCssVariables(
         composed.pageMetadata.settings?.cssVariables,
       ),

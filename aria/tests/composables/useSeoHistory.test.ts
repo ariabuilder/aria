@@ -7,8 +7,9 @@ type CapturedOperation = {
 
 let lastOperation: CapturedOperation | null = null;
 
-const { executeMock, updateSeoMock } = vi.hoisted(() => ({
+const { executeMock, getItemMock, updateSeoMock } = vi.hoisted(() => ({
   executeMock: vi.fn(),
+  getItemMock: vi.fn(),
   updateSeoMock: vi.fn(),
 }));
 
@@ -20,6 +21,7 @@ vi.mock("../../admin/features/History", () => ({
 
 vi.mock("astro:actions", () => ({
   actions: {
+    getItem: getItemMock,
     pages: {
       updateSeo: updateSeoMock,
     },
@@ -49,6 +51,10 @@ describe("useSeoHistory", () => {
       data: {
         success: true,
       },
+    });
+    getItemMock.mockResolvedValue({
+      data: { version: "page-v1" },
+      error: null,
     });
   });
 
@@ -82,6 +88,7 @@ describe("useSeoHistory", () => {
         keywords: ["new", "launch"],
         noindex: true,
       }),
+      expectedVersion: "page-v1",
     });
     expect(applySeo).toHaveBeenCalledTimes(1);
     expect(applySeo).toHaveBeenCalledWith({
@@ -103,6 +110,7 @@ describe("useSeoHistory", () => {
         title: "Old Title",
         keywords: ["old"],
       }),
+      expectedVersion: "page-v1",
     });
     expect(applySeo).toHaveBeenCalledTimes(2);
     expect(applySeo).toHaveBeenLastCalledWith({

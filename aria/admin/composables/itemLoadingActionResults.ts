@@ -40,6 +40,7 @@ const ComposeMetadataSchema = z
     id: NonEmptyStringSchema.optional(),
     name: NonEmptyStringSchema.optional(),
     title: NonEmptyStringSchema.optional(),
+    description: z.string().optional(),
     slug: NonEmptyStringSchema.optional(),
     version: z.string().optional(),
     status: z.enum(["draft", "published", "archived"]).optional(),
@@ -64,6 +65,7 @@ const ComposeCurrentLayoutSchema = z
     id: NonEmptyStringSchema,
     slug: NonEmptyStringSchema.optional(),
     title: NonEmptyStringSchema.optional(),
+    version: NonEmptyStringSchema.optional(),
     slots: z.array(SlotDefinitionSchema).optional(),
     regions: LayoutRegionsSchema,
   });

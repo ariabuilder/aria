@@ -52,9 +52,25 @@ export function useSeoHistory() {
   const { execute } = useHistory()
 
   async function persistSeo(slug: string, seo: SeoData): Promise<void> {
+    const currentResult = await actions.getItem({
+      collection: "pages",
+      slug,
+    })
+    if (currentResult.error) {
+      throw new Error(
+        currentResult.error.message ?? "Failed to load page before saving SEO",
+      )
+    }
+    const currentVersion = z
+      .looseObject({ version: z.string().trim().min(1) })
+      .safeParse(currentResult.data)
+    if (!currentVersion.success) {
+      throw new Error("Reload this page before saving SEO settings")
+    }
     const result = await actions.pages.updateSeo({
       slug,
       seo: toSeoUpdatePayload(seo),
+      expectedVersion: currentVersion.data.version,
     })
 
     const parsedResult = UpdateSeoActionResultSchema.safeParse(result?.data)

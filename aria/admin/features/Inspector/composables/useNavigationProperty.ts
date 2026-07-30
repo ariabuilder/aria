@@ -1,5 +1,4 @@
 import { computed, watch } from "vue";
-import { actions } from "astro:actions";
 import { z } from "zod";
 import { usePropertySave } from "../../Core";
 import { useSelectedNodeState } from "../../Core/composables/useSelectedNodeState";
@@ -203,18 +202,6 @@ export function useNavigationProperty(options: {
     }
 
     const previousDataSource = resolveNode(nodeId)?.dataSource;
-    const persist = async (nextDataSource: NodeDataSource | undefined) => {
-      const response = await actions.nodes.mutate({
-        collection,
-        id,
-        nodeId,
-        updates: { dataSource: nextDataSource ?? null },
-        breakpoint: "base",
-      });
-      if (response.error) {
-        throw new Error(response.error.message);
-      }
-    };
 
     const result = await execute({
       type: "update-node-props",
@@ -222,11 +209,9 @@ export function useNavigationProperty(options: {
       description,
       affectedNodeIds: [nodeId],
       undo: async () => {
-        await persist(previousDataSource);
         updateSelectedNodeDataSource(nodeId, previousDataSource ?? null);
       },
       redo: async () => {
-        await persist(dataSource);
         updateSelectedNodeDataSource(nodeId, dataSource ?? null);
       },
     });
@@ -254,29 +239,15 @@ export function useNavigationProperty(options: {
       JSON.parse(JSON.stringify(currentNode)),
     );
     const nextNode = BuilderNodeSchema.parse(JSON.parse(JSON.stringify(node)));
-    const persist = async (next: BuilderNode) => {
-      const response = await actions.nodes.replaceNode({
-        collection,
-        id,
-        nodeId: next.id,
-        node: next,
-      });
-      if (response.error) {
-        throw new Error(response.error.message);
-      }
-    };
-
     const result = await execute({
       type: "update-node",
       timestamp: Date.now(),
       description,
       affectedNodeIds: [node.id],
       undo: async () => {
-        await persist(previousNode);
         replaceSelectedNode(node.id, previousNode);
       },
       redo: async () => {
-        await persist(nextNode);
         replaceSelectedNode(node.id, nextNode);
       },
     });

@@ -328,6 +328,14 @@ async function resolvePublishedLocalizedOwnerPage(input: {
     meta.publishedVersion,
   );
   const parsed = version ? PageDSLSchema.safeParse(version.dsl) : null;
+  if (parsed?.success && version) {
+    const canonicalSource = await input.adapter.getPublishedPageDSL(
+      input.page.id,
+      version.sourceVersion,
+    );
+    parsed.data._publicationDependencies =
+      canonicalSource?._publicationDependencies;
+  }
   return parsed?.success
     ? { page: parsed.data, version }
     : { page: input.page, version: null };
@@ -616,6 +624,14 @@ try {
     const localizedPage = localizedRoute
       ? PageDSLSchema.safeParse(localizedRoute.version.dsl)
       : null;
+    if (localizedPage?.success && localizedRoute) {
+      const canonicalSource = await adapter.getPublishedPageDSL(
+        localizedRoute.version.pageId,
+        localizedRoute.version.sourceVersion,
+      );
+      localizedPage.data._publicationDependencies =
+        canonicalSource?._publicationDependencies;
+    }
     if (localizedRoute && !localizedPage?.success) {
       logger('error', 'Published localized route has an invalid page snapshot', {
         pageId: localizedRoute.version.pageId,

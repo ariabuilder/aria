@@ -497,10 +497,11 @@ export const core = {
                     (await adapter.getLayoutDSL(resource.layout));
                   if (layout) {
                     layoutData = {
-                      id: layout.id,
-                      slug: layout.slug,
-                      title: layout.title || layout.slug,
-                      slots: layout.slots || [],
+                    id: layout.id,
+                    slug: layout.slug,
+                    title: layout.title || layout.slug,
+                    version: layout.version,
+                    slots: layout.slots || [],
                       regions: layout.regions || {},
                     };
                   }
@@ -547,6 +548,7 @@ export const core = {
                     id: resource.id,
                     slug: resource.slug,
                     title: resource.title || resource.slug,
+                    description: resource.description,
                     // The JSON snapshot can predate version stamping. The
                     // metadata pointer is canonical for optimistic saves.
                     version: resourceVersion,

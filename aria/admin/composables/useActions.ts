@@ -119,16 +119,19 @@ interface UseActionsReturn {
   readonly savePage: (
     id: string,
     blocks: readonly BuilderNode[],
+    expectedVersion: string,
     layout?: string,
     nonce?: string,
   ) => Promise<unknown>;
   readonly saveLayout: (
     id: string,
     blocks: readonly BuilderNode[],
+    expectedVersion: string,
   ) => Promise<unknown>;
   readonly saveComponent: (
     id: string,
     blocks: readonly BuilderNode[],
+    expectedVersion: string,
   ) => Promise<unknown>;
 
   // Server-side composition
@@ -416,11 +419,19 @@ export function useActions(): UseActionsReturn {
   async function savePage(
     id: string,
     blocks: readonly BuilderNode[],
+    expectedVersion: string,
     layout?: string,
     nonce?: string,
   ) {
     return executeAction(
-      () => actions.savePage({ id, blocks: [...blocks], layout, nonce }),
+      () =>
+        actions.savePage({
+          id,
+          blocks: [...blocks],
+          expectedVersion,
+          layout,
+          nonce,
+        }),
       { successMessage: "Page saved successfully" },
     );
   }
@@ -428,9 +439,13 @@ export function useActions(): UseActionsReturn {
   /**
    * Save layout with all blocks
    */
-  async function saveLayout(id: string, blocks: readonly BuilderNode[]) {
+  async function saveLayout(
+    id: string,
+    blocks: readonly BuilderNode[],
+    expectedVersion: string,
+  ) {
     return executeAction(
-      () => actions.saveLayout({ id, blocks: [...blocks] }),
+      () => actions.saveLayout({ id, blocks: [...blocks], expectedVersion }),
       {
         successMessage: "Layout saved successfully",
       },
@@ -440,9 +455,13 @@ export function useActions(): UseActionsReturn {
   /**
    * Save component with all blocks
    */
-  async function saveComponent(id: string, blocks: readonly BuilderNode[]) {
+  async function saveComponent(
+    id: string,
+    blocks: readonly BuilderNode[],
+    expectedVersion: string,
+  ) {
     return executeAction(
-      () => actions.saveComponent({ id, blocks: [...blocks] }),
+      () => actions.saveComponent({ id, blocks: [...blocks], expectedVersion }),
       {
         successMessage: "Component saved successfully",
       },

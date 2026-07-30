@@ -73,6 +73,7 @@ export function useStageContentSyncActions(
     }
 
     currentPage.value = parsedPage.data;
+    hasUnsavedChanges.value = true;
   };
 
   const handleActiveBlocksUpdate = (blocks: BuilderNode[]): void => {

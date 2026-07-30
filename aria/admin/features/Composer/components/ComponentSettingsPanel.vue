@@ -259,6 +259,9 @@ async function handleSave(): Promise<void> {
   error.value = null;
 
   try {
+    if (!props.component.version) {
+      throw new Error("Reload this component before saving its settings");
+    }
     const nextComponent: ComponentDSL = {
       ...props.component,
       name: parsed.data.name,
@@ -274,6 +277,7 @@ async function handleSave(): Promise<void> {
       name: nextComponent.name,
       description: nextComponent.description,
       category: nextComponent.category,
+      expectedVersion: props.component.version,
     });
 
     if (result.error) {
@@ -282,9 +286,12 @@ async function handleSave(): Promise<void> {
       );
     }
 
-    parseSaveActionData(result.data, "component");
+    const saveData = parseSaveActionData(result.data, "component");
 
-    emit("componentSaved", nextComponent);
+    emit("componentSaved", {
+      ...nextComponent,
+      version: saveData.version,
+    });
     await refreshComponents();
     await loadCodePreview();
     toast.success(t("composer.componentSettings.saved"));

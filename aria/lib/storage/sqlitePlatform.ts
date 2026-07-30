@@ -65,6 +65,7 @@ import type {
 } from "./adapter";
 import {
   normalizeSiteSettings,
+  PagePublicationDependenciesSchema,
   serializeSiteSettingsForStorage,
 } from "./adapter";
 import { AdapterMetricsSchema } from "./adapterMetricsSchemas";
@@ -368,6 +369,8 @@ export class SQLiteStoragePlatform implements StorageAdapter {
       createPageLifecycleStorageDomain({
         resolvePageIdentity: (idOrSlug: string) =>
           this.resolvePageIdentity(idOrSlug),
+        resolveLayoutVersionState: (id: string) =>
+          this.resolveLayoutVersionState(id),
         getStoredVersionRow: (
           tableName:
             | "aria_page_versions"
@@ -380,9 +383,19 @@ export class SQLiteStoragePlatform implements StorageAdapter {
           this.resolveStoredVersionContentHash(input),
         syncPageUsage: (id: string, dsl: PageDSL) =>
           this.syncPageUsage(id, dsl),
+        syncMediaUsageBestEffort: (
+          kind: StoredMediaUsageKind,
+          id: string,
+          dsl: unknown,
+        ) => this.syncMediaUsageBestEffort(kind, id, dsl),
         normalizeVersion: (version?: string) => this.normalizeVersion(version),
         nowIso: () => this.nowIso(),
         run: (sql: string, args = []) => this.run(sql, asSqlArgs(args)),
+        runBatch: (statements) => this.runBatch(statements),
+        runBatchWithChanges: (statements) =>
+          this.runBatchWithChanges(statements),
+        runWithChanges: (sql: string, args = []) =>
+          this.runWithChanges(sql, asSqlArgs(args)),
         deletePageThumbnail: (pageId: string, stage: "draft" | "published") =>
           this.deletePageThumbnail(pageId, stage),
         pruneStoredVersionHistory: (
@@ -852,6 +865,29 @@ export class SQLiteStoragePlatform implements StorageAdapter {
     );
   }
 
+  private async runBatchWithChanges(
+    statements: Array<{ sql: string; args?: readonly unknown[] }>,
+  ): Promise<Array<{ changes: number }>> {
+    await this.ensureInitialized();
+    const results = await this.client.batch(
+      statements.map((statement) => ({
+        sql: statement.sql,
+        args: asSqlArgs(statement.args ?? []),
+      })),
+      "write",
+    );
+    return results.map((result) => ({ changes: result.rowsAffected }));
+  }
+
+  private async runWithChanges(
+    sql: string,
+    args: SqlArgs = [],
+  ): Promise<{ changes: number }> {
+    await this.ensureInitialized();
+    const result = await this.client.execute({ sql, args });
+    return { changes: result.rowsAffected };
+  }
+
   private async getStoredThumbnailRow(input: {
     kind: StoredThumbnailKind;
     refId: string;
@@ -1027,8 +1063,11 @@ export class SQLiteStoragePlatform implements StorageAdapter {
     id: string,
     version: string,
   ): Promise<PageDSL | null> {
-    const row = await this.queryFirst<{ dsl_json: string }>(
-      `SELECT dsl_json
+    const row = await this.queryFirst<{
+      dsl_json: string;
+      dependency_versions_json: string | null;
+    }>(
+      `SELECT dsl_json, dependency_versions_json
        FROM aria_page_versions
        WHERE id = ? AND version = ?
        LIMIT 1`,
@@ -1053,6 +1092,22 @@ export class SQLiteStoragePlatform implements StorageAdapter {
       }
 
       const { dsl } = migratePageDSL(stripped);
+      if (row.dependency_versions_json) {
+        try {
+          const dependencies = PagePublicationDependenciesSchema.safeParse(
+            JSON.parse(row.dependency_versions_json),
+          );
+          if (dependencies.success) {
+            dsl._publicationDependencies = dependencies.data;
+          }
+        } catch (error) {
+          log("warn", "Ignoring invalid page publication dependency pins", {
+            id,
+            version,
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+      }
       return dsl as PageDSL;
     } catch (error) {
       log("error", "Failed to parse page DSL from SQLite storage", {

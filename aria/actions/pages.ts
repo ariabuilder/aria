@@ -110,6 +110,20 @@ import {
 
 type LogLevel = "debug" | "info" | "warn" | "error";
 
+function rethrowPageVersionConflict(error: unknown, message: string): void {
+  if (
+    error &&
+    typeof error === "object" &&
+    "code" in error &&
+    (error as { code?: unknown }).code === "VERSION_CONFLICT"
+  ) {
+    throw new ActionError({
+      code: "CONFLICT",
+      message,
+    });
+  }
+}
+
 function log(
   level: LogLevel,
   message: string,
@@ -268,37 +282,55 @@ async function persistPageDraft(
     parsedAuthorship,
   );
 
-  if (options?.snapshot !== false) {
-    await savePageSnapshot(
-      {
-        page,
-        stage: "draft",
-      },
-      adapter,
-      { locals: context.locals },
-    );
-  }
-
-  if (options?.revisionTouch !== false) {
-    await touchContentRevisionForAction(
-      adapter,
-      {
-        mutationKind: "save-page",
-        mutationTarget: page.id,
-      },
-      context,
-    );
-  }
-
-  if (options?.invalidateCache) {
-    await invalidateComposeCache(
-      context,
-      "page",
-      page.slug ?? page.id,
-      version,
-      "crud",
-    );
-  }
+  const postCommitResults = await Promise.allSettled([
+    ...(options?.snapshot !== false
+      ? [
+          savePageSnapshot(
+            {
+              page,
+              stage: "draft",
+            },
+            adapter,
+            { locals: context.locals },
+          ),
+        ]
+      : []),
+    ...(options?.revisionTouch !== false
+      ? [
+          touchContentRevisionForAction(
+            adapter,
+            {
+              mutationKind: "save-page" as const,
+              mutationTarget: page.id,
+            },
+            context,
+          ),
+        ]
+      : []),
+    ...(options?.invalidateCache
+      ? [
+          invalidateComposeCache(
+            context,
+            "page",
+            page.slug ?? page.id,
+            version,
+            "crud",
+          ),
+        ]
+      : []),
+  ]);
+  postCommitResults.forEach((result, index) => {
+    if (result.status === "rejected") {
+      log("warn", "Page draft post-commit side effect failed", {
+        pageId: page.id,
+        index,
+        error:
+          result.reason instanceof Error
+            ? result.reason.message
+            : String(result.reason),
+      });
+    }
+  });
 
   return version;
 }
@@ -1028,8 +1060,9 @@ export const pages = {
     input: z.object({
       slug: z.string().min(1, "Page slug is required"),
       seo: SeoSchema,
+      expectedVersion: z.string().trim().min(1),
     }),
-    handler: async ({ slug, seo }, context) => {
+    handler: async ({ slug, seo, expectedVersion }, context) => {
       const { authorship } = await resolveAuthorizedMutation(
         context,
         "pages.updateSeo",
@@ -1066,9 +1099,16 @@ export const pages = {
           updatedAt: new Date().toISOString(),
         };
 
-        await persistPageDraft(adapter, context, updatedPage, authorship, {
-          activityAction: "seo_updated",
-        });
+        const version = await persistPageDraft(
+          adapter,
+          context,
+          updatedPage,
+          authorship,
+          {
+            activityAction: "seo_updated",
+            versionSaveOptions: { expectedVersion },
+          },
+        );
 
         const duration = endPerformanceTracking(operation);
         log("info", "Page SEO updated", { slug, duration: `${duration}ms` });
@@ -1078,6 +1118,7 @@ export const pages = {
           data: {
             slug,
             seo: updatedPage.settings?.seo,
+            version,
           },
         };
       } catch (error) {
@@ -1744,6 +1785,13 @@ export const pages = {
             message: "Page not found",
           });
         }
+        const expectedVersion = input.expectedVersion ?? page.version;
+        if (!expectedVersion) {
+          throw new ActionError({
+            code: "CONFLICT",
+            message: "Reload this page before updating its cover image.",
+          });
+        }
 
         page.featuredImage = {
           src: input.src,
@@ -1762,13 +1810,23 @@ export const pages = {
           }
         }
 
-        await persistPageDraft(adapter, context, page, authorship, {
-          activityAction: "settings_updated",
-          activityTarget: "cover image",
-        });
+        const version = await persistPageDraft(
+          adapter,
+          context,
+          page,
+          authorship,
+          {
+            activityAction: "settings_updated",
+            activityTarget: "cover image",
+            versionSaveOptions: {
+              expectedVersion,
+            },
+          },
+        );
 
         const output = UpdateCoverImageOutputSchema.parse({
           success: true,
+          version,
           featuredImage: page.featuredImage,
           ogImageUpdated,
         });
@@ -1785,6 +1843,10 @@ export const pages = {
       } catch (err) {
         endPerformanceTracking(operation);
         if (err instanceof ActionError) throw err;
+        rethrowPageVersionConflict(
+          err,
+          "This draft changed before the cover image was saved. Reload the page and try again.",
+        );
         log("error", "Failed to update cover image", {
           slug: input.pageSlug,
           error: err,
@@ -1823,6 +1885,13 @@ export const pages = {
             message: "Page not found",
           });
         }
+        const expectedVersion = input.expectedVersion ?? page.version;
+        if (!expectedVersion) {
+          throw new ActionError({
+            code: "CONFLICT",
+            message: "Reload this page before removing its cover image.",
+          });
+        }
 
         const removedSrc = page.featuredImage?.src;
         delete page.featuredImage;
@@ -1837,13 +1906,23 @@ export const pages = {
           }
         }
 
-        await persistPageDraft(adapter, context, page, authorship, {
-          activityAction: "settings_updated",
-          activityTarget: "cover image",
-        });
+        const version = await persistPageDraft(
+          adapter,
+          context,
+          page,
+          authorship,
+          {
+            activityAction: "settings_updated",
+            activityTarget: "cover image",
+            versionSaveOptions: {
+              expectedVersion,
+            },
+          },
+        );
 
         const output = RemoveCoverImageOutputSchema.parse({
           success: true,
+          version,
         });
 
         const duration = endPerformanceTracking(operation);
@@ -1857,6 +1936,10 @@ export const pages = {
       } catch (err) {
         endPerformanceTracking(operation);
         if (err instanceof ActionError) throw err;
+        rethrowPageVersionConflict(
+          err,
+          "This draft changed before the cover image was removed. Reload the page and try again.",
+        );
         log("error", "Failed to remove cover image", {
           slug: input.pageSlug,
           error: err,

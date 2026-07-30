@@ -13,7 +13,7 @@ import {
   invalidatePageResourceById,
 } from "@/features/Studio/pages/composables/usePageResourceBank";
 import { clearPagePolicyCache } from "@/features/Studio/pages/composables/usePageAccessState";
-import { invalidateComponentResource } from "@/features/Studio/components/composables/useComponentResourceBank";
+import { invalidateComponentClientCaches } from "@/features/Core/composables/componentCacheCoherence";
 
 type PresenceUpdate = Omit<StudioPresenceUpdate, "type">;
 type StudioLiveAvailability = "available" | "unavailable" | "retry";
@@ -65,7 +65,7 @@ function applyInvalidation(event: StudioLiveInvalidation): void {
     }
     if (event.scopes.includes("policy")) clearPagePolicyCache();
   } else if (event.resourceType === "component") {
-    invalidateComponentResource(event.resourceId, "realtime");
+    invalidateComponentClientCaches(event.resourceId, "realtime");
     if (event.scopes.includes("render")) {
       invalidateAllPageResources("component-dependency");
     }

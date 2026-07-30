@@ -1,6 +1,13 @@
 import type { RuntimeLocals } from "../../cloudflare/env";
+import {
+  invalidateComposeCache,
+  purgePublicPageCache,
+} from "../../cache/service";
 import { invalidateCmsEntryPublicCache } from "../../cms/invalidateEntryCache";
+import { touchContentRevisionForAction } from "../../content-sync/mutations";
+import { savePageSnapshot } from "../../rendering/pageSnapshots";
 import type { StorageAdapter } from "../../storage/adapter";
+import { log } from "../../utils/logger";
 import {
   claimDueCmsEntry,
   findDueCmsEntries,
@@ -15,7 +22,6 @@ import {
   findDuePages,
   recoverExpiredPageScheduleLeases,
   recordPageScheduleFailure,
-  releasePageScheduleLease,
 } from "./pages";
 import {
   ReconcileOptionsSchema,
@@ -104,6 +110,7 @@ async function processDuePages(
   sql: ScheduleSqlExecutor,
   now: string,
   batchLimit: number,
+  cacheLocals?: RuntimeLocals,
 ): Promise<
   Pick<ReconcileResult, "pagesProcessed" | "pagesSucceeded" | "pagesFailed">
 > {
@@ -132,16 +139,54 @@ async function processDuePages(
       if (!publishedVersion) {
         throw new Error(`Unable to publish scheduled page "${claimed.id}"`);
       }
-      const released = await releasePageScheduleLease(
-        sql,
-        { id: claimed.id },
-        leaseToken,
-        now,
-      );
-      if (released) {
-        pagesSucceeded += 1;
-      } else {
-        pagesFailed += 1;
+      pagesSucceeded += 1;
+      if (cacheLocals) {
+        const sideEffects = await Promise.allSettled([
+          (async () => {
+            const publishedPage = await adapter.getPublishedPageDSL(claimed.id);
+            if (!publishedPage) return;
+            await savePageSnapshot(
+              { page: publishedPage, stage: "published" },
+              adapter,
+              { locals: cacheLocals },
+            );
+          })(),
+          touchContentRevisionForAction(
+            adapter,
+            {
+              mutationKind: "save-page",
+              mutationTarget: claimed.id,
+            },
+            { locals: cacheLocals },
+          ),
+          (async () => {
+            const publishedPage = await adapter.getPublishedPageDSL(claimed.id);
+            const slug = publishedPage?.slug || claimed.id;
+            await invalidateComposeCache(
+              { locals: cacheLocals },
+              "page",
+              slug,
+              publishedVersion,
+              "publishing",
+            );
+            await purgePublicPageCache(
+              { locals: cacheLocals },
+              { id: claimed.id, slug },
+            );
+          })(),
+        ]);
+        sideEffects.forEach((result, index) => {
+          if (result.status === "rejected") {
+            log("warn", "Scheduled page publish side effect failed", {
+              pageId: claimed.id,
+              index,
+              error:
+                result.reason instanceof Error
+                  ? result.reason.message
+                  : String(result.reason),
+            });
+          }
+        });
       }
     } catch (error) {
       const message =
@@ -189,7 +234,13 @@ export async function reconcileScheduledPublications(
     batchLimit,
     cacheLocals,
   );
-  const pages = await processDuePages(adapter, sql, now, batchLimit);
+  const pages = await processDuePages(
+    adapter,
+    sql,
+    now,
+    batchLimit,
+    cacheLocals,
+  );
 
   return ReconcileResultSchema.parse({
     ...cms,

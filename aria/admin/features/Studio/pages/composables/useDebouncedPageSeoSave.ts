@@ -57,12 +57,17 @@ export function buildPageSeoUpdatePayload(
 export interface UseDebouncedPageSeoSaveOptions {
   slug: ComputedRef<string>;
   getSeo: () => PageSeoSnapshot | undefined;
+  getExpectedVersion: () => string | undefined;
   canSave: ComputedRef<boolean>;
 }
 
 export function useDebouncedPageSeoSave(
   options: UseDebouncedPageSeoSaveOptions & {
-    onSaved?: (seo: PageSeoSnapshot | undefined) => void;
+    onSaved?: (
+      seo: PageSeoSnapshot | undefined,
+      version: string,
+      submittedSeoIsCurrent: boolean,
+    ) => void;
   },
 ) {
   return useDebouncedSettingsSave<PageSeoSnapshot | undefined>({
@@ -73,10 +78,15 @@ export function useDebouncedPageSeoSave(
 
       const slug = options.slug.value.trim();
       if (!slug) return;
+      const expectedVersion = options.getExpectedVersion();
+      if (!expectedVersion) {
+        throw new Error("Reload this page before saving SEO settings");
+      }
 
       const result = await actions.pages.updateSeo({
         slug,
         seo: buildPageSeoUpdatePayload(seo),
+        expectedVersion,
       });
 
       if (result.error) {
@@ -92,8 +102,14 @@ export function useDebouncedPageSeoSave(
         );
       }
 
+      const version = parsed.data.data?.version;
+      if (typeof version !== "string" || version.length === 0) {
+        throw new Error("Invalid SEO save response");
+      }
       options.onSaved?.(
         (parsed.data.data?.seo as PageSeoSnapshot | undefined) ?? seo,
+        version,
+        serializePageSeo(options.getSeo()) === serializePageSeo(seo),
       );
     },
     onError: (error) => {

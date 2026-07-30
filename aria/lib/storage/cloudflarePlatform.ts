@@ -6,13 +6,16 @@
 type D1Row = Record<string, unknown>;
 type D1Result<T extends D1Row = D1Row> = {
   results?: T[];
+  meta?: {
+    changes?: number;
+  };
 };
 
 type D1PreparedStatementLike = {
   bind(...values: unknown[]): D1PreparedStatementLike;
   first<T extends D1Row = D1Row>(): Promise<T | null>;
   all<T extends D1Row = D1Row>(): Promise<D1Result<T>>;
-  run(): Promise<unknown>;
+  run(): Promise<D1Result>;
 };
 
 type D1DatabaseLike = {
@@ -151,6 +154,7 @@ import type {
 } from "./adapter";
 import {
   normalizeSiteSettings,
+  PagePublicationDependenciesSchema,
   serializeSiteSettingsForStorage,
 } from "./adapter";
 import { AdapterMetricsSchema } from "./adapterMetricsSchemas";
@@ -362,6 +366,8 @@ export class CloudflareStoragePlatform implements StorageAdapter {
       createPageLifecycleStorageDomain({
         resolvePageIdentity: (idOrSlug: string) =>
           this.resolvePageIdentity(idOrSlug),
+        resolveLayoutVersionState: (id: string) =>
+          this.resolveLayoutVersionState(id),
         getStoredVersionRow: (
           tableName:
             | "aria_page_versions"
@@ -374,9 +380,19 @@ export class CloudflareStoragePlatform implements StorageAdapter {
           this.resolveStoredVersionContentHash(input),
         syncPageUsage: (id: string, dsl: PageDSL) =>
           this.syncPageUsage(id, dsl),
+        syncMediaUsageBestEffort: (
+          kind: StoredMediaUsageKind,
+          id: string,
+          dsl: unknown,
+        ) => this.syncMediaUsageBestEffort(kind, id, dsl),
         normalizeVersion: (version?: string) => this.normalizeVersion(version),
         nowIso: () => this.nowIso(),
         run: (sql: string, args = []) => this.run(sql, [...args]),
+        runBatch: (statements) => this.runBatch(statements),
+        runBatchWithChanges: (statements) =>
+          this.runBatchWithChanges(statements),
+        runWithChanges: (sql: string, args = []) =>
+          this.runWithChanges(sql, [...args]),
         deletePageThumbnail: (pageId: string, stage: "draft" | "published") =>
           this.deletePageThumbnail(pageId, stage),
         pruneStoredVersionHistory: (
@@ -552,6 +568,30 @@ export class CloudflareStoragePlatform implements StorageAdapter {
         db.prepare(statement.sql).bind(...(statement.args ?? [])),
       ),
     );
+  }
+
+  private async runBatchWithChanges(
+    statements: Array<{ sql: string; args?: readonly unknown[] }>,
+  ): Promise<Array<{ changes: number }>> {
+    await this.ensureCanonicalTables();
+    const db = this.requireDb();
+    const results = await db.batch(
+      statements.map((statement) =>
+        db.prepare(statement.sql).bind(...(statement.args ?? [])),
+      ),
+    );
+    return results.map((result) => ({
+      changes: Number(result.meta?.changes ?? 0),
+    }));
+  }
+
+  private async runWithChanges(
+    sql: string,
+    args: unknown[] = [],
+  ): Promise<{ changes: number }> {
+    await this.ensureCanonicalTables();
+    const result = await this.requireDb().prepare(sql).bind(...args).run();
+    return { changes: Number(result.meta?.changes ?? 0) };
   }
 
   private normalizeVersion(version?: string): string | undefined {
@@ -788,8 +828,11 @@ export class CloudflareStoragePlatform implements StorageAdapter {
     id: string,
     version: string,
   ): Promise<PageDSL | null> {
-    const row = await this.queryFirst<{ dsl_json: string }>(
-      `SELECT dsl_json
+    const row = await this.queryFirst<{
+      dsl_json: string;
+      dependency_versions_json: string | null;
+    }>(
+      `SELECT dsl_json, dependency_versions_json
        FROM aria_page_versions
        WHERE id = ? AND version = ?
        LIMIT 1`,
@@ -810,6 +853,22 @@ export class CloudflareStoragePlatform implements StorageAdapter {
       }
 
       const { dsl } = migratePageDSL(stripped);
+      if (row.dependency_versions_json) {
+        try {
+          const dependencies = PagePublicationDependenciesSchema.safeParse(
+            JSON.parse(row.dependency_versions_json),
+          );
+          if (dependencies.success) {
+            dsl._publicationDependencies = dependencies.data;
+          }
+        } catch (error) {
+          log("warn", "Ignoring invalid page publication dependency pins", {
+            id,
+            version,
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+      }
       return dsl as PageDSL;
     } catch (error) {
       logError("Failed to parse page DSL in Cloudflare storage", error);

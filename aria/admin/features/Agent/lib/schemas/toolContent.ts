@@ -430,7 +430,9 @@ export type AriaPublishPageInput = z.infer<typeof AriaPublishPageInputSchema>;
 export const AriaPublishPageOutputSchema = z
   .object({
     slug: z.string(),
-    published: z.literal(true),
+    published: z.boolean(),
+    scheduled: z.boolean().optional(),
+    scheduledFor: z.iso.datetime().optional(),
     timestamp: z.iso.datetime(),
   })
   .strict();

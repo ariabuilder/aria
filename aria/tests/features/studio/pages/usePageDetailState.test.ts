@@ -1,10 +1,24 @@
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { PageDSL } from "@/lib/types/nodes";
 import {
   resolveLoadedPageDetail,
   setPageDetailRemoteLoadMerge,
   __resetPageDetailStateForTests,
+  usePageDetailState,
 } from "@/features/Studio/pages/composables/usePageDetailState";
+import {
+  __resetPageResourceBankForTests,
+  __setPageResourceBankLoaderForTests,
+  invalidatePageResource,
+} from "@/features/Studio/pages/composables/usePageResourceBank";
+
+const routeState = vi.hoisted(() => ({
+  params: { slug: "home" },
+}));
+
+vi.mock("vue-router", () => ({
+  useRoute: () => routeState,
+}));
 
 function pageWithSeo(
   slug: string,
@@ -73,5 +87,61 @@ describe("resolveLoadedPageDetail", () => {
     });
 
     __resetPageDetailStateForTests();
+  });
+});
+
+describe("usePageDetailState load contract", () => {
+  beforeEach(() => {
+    routeState.params.slug = "home";
+    __resetPageDetailStateForTests();
+    __resetPageResourceBankForTests();
+  });
+
+  it("does not resolve a stale cached load before revalidation finishes", async () => {
+    __setPageResourceBankLoaderForTests(async () => ({
+      page: {
+        ...pageWithSeo("home", { title: "Initial" }),
+        version: "v1",
+      },
+    }));
+
+    const state = usePageDetailState();
+    await state.loadPage("home");
+    expect(state.page.value?.version).toBe("v1");
+
+    invalidatePageResource("home", "saved");
+
+    let resolveFresh:
+      | ((bundle: {
+          page: PageDSL;
+        }) => void)
+      | undefined;
+    __setPageResourceBankLoaderForTests(
+      () =>
+        new Promise((resolve) => {
+          resolveFresh = resolve;
+        }),
+    );
+
+    let settled = false;
+    const pendingLoad = state.loadPage("home").then(() => {
+      settled = true;
+    });
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(state.page.value?.version).toBe("v1");
+    expect(settled).toBe(false);
+
+    resolveFresh?.({
+      page: {
+        ...pageWithSeo("home", { title: "Saved" }),
+        version: "v2",
+      },
+    });
+    await pendingLoad;
+
+    expect(settled).toBe(true);
+    expect(state.page.value?.version).toBe("v2");
   });
 });
