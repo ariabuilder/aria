@@ -1,6 +1,5 @@
 import presetTypography from "@unocss/preset-typography";
 import { presetWind3 } from "@unocss/preset-wind3";
-import transformerDirectives from "@unocss/transformer-directives";
 import transformerVariantGroup from "@unocss/transformer-variant-group";
 import {
   parseUserUnoConfigOverrides,
@@ -40,7 +39,10 @@ export function createUserUnoConfig(
       }),
       presetTypography(),
     ],
-    transformers: [transformerDirectives(), transformerVariantGroup()],
+    // Published-site compilation scans class tokens; it does not transform
+    // authored CSS directives. Keeping only variant groups avoids pulling
+    // css-tree's CommonJS JSON loader into the Cloudflare Worker.
+    transformers: [transformerVariantGroup()],
     theme: {
       font: {
         sans: resolvedTheme?.fontFamilies.sans ?? ["system-ui", "sans-serif"],
