@@ -768,5 +768,39 @@ useLayerCanvasSignals({
 
 :deep(.layer-children) {
   display: block;
+  margin-inline-start: 0.375rem;
+  padding-inline-start: 0.5rem;
+}
+
+:deep(.layer-children > [data-layer-node])::before,
+:deep(.layer-children > [data-layer-node])::after {
+  content: "";
+  position: absolute;
+  inset-inline-start: -0.5rem;
+  pointer-events: none;
+  border-color: color-mix(in srgb, var(--border) 52%, transparent);
+}
+
+:deep(.layer-children > [data-layer-node])::before {
+  inset-block-start: 0.875rem;
+  inline-size: 0.75rem;
+  border-block-start-style: dashed;
+  border-block-start-width: 1px;
+}
+
+:deep(.layer-children > [data-layer-node])::after {
+  inset-block: 0;
+  border-inline-start-style: dashed;
+  border-inline-start-width: 1px;
+}
+
+:deep(.layer-children > [data-layer-node]:last-child)::after {
+  inset-block-end: auto;
+  block-size: 0.875rem;
+}
+
+:deep(.layer-children > [data-layer-selected-path="true"])::before,
+:deep(.layer-children > [data-layer-selected-path="true"])::after {
+  border-color: color-mix(in srgb, var(--primary) 38%, transparent);
 }
 </style>

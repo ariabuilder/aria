@@ -236,6 +236,16 @@ describe("LayerNodeRecursive", () => {
     ).toContain("pb-3");
   });
 
+  it("marks nested branches for compact connector styling", () => {
+    const wrapper = mountRecursive({});
+    const childList = wrapper.get('[data-layer-children-list="parent"]');
+
+    expect(childList.classes()).toContain("layer-children");
+    expect(
+      wrapper.get('[data-layer-node="child"]').attributes("data-layer-node"),
+    ).toBe("child");
+  });
+
   it("keeps a previously expanded child branch mounted when collapsed", async () => {
     const isExpanded = vi.fn((nodeId: string) => nodeId === "parent");
 
@@ -282,13 +292,13 @@ describe("LayerNodeRecursive", () => {
     ).toBe("none");
   });
 
-  it("applies child branch background styling without painting the outer wrapper", () => {
+  it("marks only selected-path nodes without painting the child branch", () => {
     const wrapper = mount(LayerNodeRecursive, {
       props: {
         node: createNode("parent", "Container", [createNode("child", "Text")]),
         depth: 0,
-        selectedNodeId: "parent",
-        selectedNodePath: ["parent"],
+        selectedNodeId: "child",
+        selectedNodePath: ["parent", "child"],
         hoveredNodeId: undefined,
         editingNodeId: null,
         activeDragListId: null,
@@ -311,8 +321,13 @@ describe("LayerNodeRecursive", () => {
     });
 
     expect(
+      wrapper
+        .get('[data-layer-node="child"]')
+        .attributes("data-layer-selected-path"),
+    ).toBe("true");
+    expect(
       wrapper.get('[data-layer-children-list="parent"]').classes(),
-    ).toContain("bg-card/30");
+    ).not.toEqual(expect.arrayContaining(["bg-primary/8", "bg-card/30"]));
     expect((wrapper.element as HTMLElement).className).not.toContain(
       "bg-sidebar/70",
     );

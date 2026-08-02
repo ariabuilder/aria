@@ -146,7 +146,11 @@ export function createListNode(
     metadata: {
       label: "List",
     },
-    styles: {},
+    styles: {
+      listStyleType: {
+        base: options.ordered ? "decimal" : "none",
+      },
+    },
     children: options.items.map((item, index) =>
       createTextListItemNode(item, `Item ${index + 1}`),
     ),

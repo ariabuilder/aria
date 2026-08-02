@@ -369,11 +369,12 @@ describe("LayerItem", () => {
     expect(wrapper.get("span.truncate").text()).toBe("Text");
   });
 
-  it("uses a rounded primary tint for expandable rows", () => {
+  it("uses a prominent primary treatment for selected rows", () => {
     const wrapper = mountLayerItem({ selected: true, hasChildren: true });
     const classes = wrapper.get("[data-layer-item]").classes();
 
     expect(classes).toContain("bg-primary/10");
+    expect(classes).toContain("border-primary/20");
     expect(classes).toContain("text-foreground");
     expect(classes).toContain("rounded-sm");
     expect(classes).toContain("shadow-none");

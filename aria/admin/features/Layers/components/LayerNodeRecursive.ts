@@ -375,11 +375,6 @@ export const LayerNodeRecursive = defineComponent({
         props.selectedNodeId === node.id;
       const isSelectedBranch =
         props.selectedNodePath?.includes(node.id) ?? false;
-      const highlightSelectedBranch =
-        isSelectedBranch &&
-        isNodeExpanded &&
-        !isComponentInstance &&
-        children.length > 0;
       const childListDropTargetId = `children:${node.id}`;
       const childListDropIndicatorClass = props.getDropIndicatorClass(
         childListDropTargetId,
@@ -397,6 +392,9 @@ export const LayerNodeRecursive = defineComponent({
         "div",
         {
           key: node.id,
+          class: "relative",
+          "data-layer-node": node.id,
+          "data-layer-selected-path": isSelectedBranch ? "true" : undefined,
           style:
             isFullyCollapsed || !isVisible ? { display: "none" } : undefined,
         },
@@ -459,16 +457,9 @@ export const LayerNodeRecursive = defineComponent({
                       ...DRAG_CONFIG,
                       modelValue: renderedChildren,
                       class: [
-                        children.length === 0
-                          ? isDraggingAnyLayer
-                            ? "layer-children ml-3 min-h-7 border-l border-border/70 pb-3 pl-2"
-                            : "layer-children ml-3 min-h-7 border-l border-border/70 pl-2"
-                          : isDraggingAnyLayer
-                            ? "layer-children ml-3 border-l border-border/70 pb-3 pl-2"
-                            : "layer-children ml-3 border-l border-border/70 pl-2",
-                        highlightSelectedBranch
-                          ? "border-primary/35 bg-card/30"
-                          : "",
+                        "layer-children",
+                        children.length === 0 ? "min-h-7" : "",
+                        isDraggingAnyLayer ? "pb-3" : "",
                       ],
                       "data-layer-children-list": node.id,
                       onStart: (event: LayerDragEvent) => {
