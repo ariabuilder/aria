@@ -168,6 +168,10 @@ export function useLayerTreeActions(options: UseLayerTreeActionsOptions) {
       : virtualSlotNames.COMPONENT_CONTENT;
   });
 
+  const isVirtualRootSlot = (slotName: string): boolean =>
+    slotName === virtualSlotNames.PAGE_CONTENT ||
+    slotName === virtualSlotNames.COMPONENT_CONTENT;
+
   const getNodesInSlot = (slotName: string): BuilderNode[] => {
     if (nodeRegistry) {
       if (
@@ -226,7 +230,7 @@ export function useLayerTreeActions(options: UseLayerTreeActionsOptions) {
       ? snapshotLayoutSlots(currentLayout.value)
       : undefined;
 
-    if (nodeRegistry && slotName) {
+    if (nodeRegistry && slotName && !isVirtualRootSlot(slotName)) {
       nodeRegistry.setRootNodesForSlot(slotName, nextRoots);
       if (currentItemType.value === "layout") {
         onLayoutSlotsDirty?.();
@@ -379,7 +383,7 @@ export function useLayerTreeActions(options: UseLayerTreeActionsOptions) {
     }
 
     if (slotName === virtualSlotNames.COMPONENT_CONTENT) {
-      return slotName;
+      return undefined;
     }
 
     const normalized = normalizeRootSlotName(slotName);

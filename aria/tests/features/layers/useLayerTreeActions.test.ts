@@ -99,6 +99,40 @@ function createHarness(
   };
 }
 
+function createRegistryHarness(
+  initialBlocks: BuilderNode[],
+  itemType: "page" | "component",
+) {
+  const blocks = pageBlocksRef(initialBlocks);
+  const currentLayout = layoutRef(null);
+  const currentItemType = ref(itemType);
+  const registry = useEditorNodeRegistry({
+    pageBlocks: blocks,
+    currentLayout,
+    activeSlot: ref({ name: "default", scope: "page" as const }),
+    currentItemType,
+  });
+  const updates: Array<{ newBlocks: BuilderNode[]; description: string }> = [];
+  const actions = useLayerTreeActions({
+    blocks,
+    currentLayout: layerLayoutRef(currentLayout),
+    currentItemType,
+    virtualSlotNames: VIRTUAL_SLOT_NAMES,
+    hasChildren: (node) => Array.isArray(node.children),
+    expandedNodes: ref(new Set<string>()),
+    collapseState: ref(
+      new Map<string, "expanded" | "soft-collapsed" | "full-collapsed">(),
+    ),
+    updateBlocksWithHistory: (newBlocks, description) => {
+      blocks.value = newBlocks;
+      updates.push({ newBlocks, description });
+    },
+    nodeRegistry: registry,
+  });
+
+  return { actions, blocks, updates };
+}
+
 describe("useLayerTreeActions", () => {
   it("rejects invalid inside drops onto leaf nodes", () => {
     const dragged = createNode("dragged", "Text");
@@ -177,6 +211,26 @@ describe("useLayerTreeActions", () => {
     ]);
   });
 
+  it("invalidates layer order when Sortable change arrives after drag end", () => {
+    const dragged = createNode("dragged", "Text");
+    const target = createNode("target", "Text");
+    const harness = createHarness([dragged, target]);
+
+    harness.actions.handleDragStart(createDragEvent(dragged));
+    harness.actions.handleDragEnd();
+    harness.actions.handleSlotChange(
+      {
+        moved: { element: dragged, oldIndex: 0, newIndex: 1 },
+      },
+      VIRTUAL_SLOT_NAMES.PAGE_CONTENT,
+    );
+
+    expect(harness.blocks.value?.map((node) => node.id)).toEqual([
+      "target",
+      "dragged",
+    ]);
+  });
+
   it("defers sortable list commits until drag end", () => {
     const dragged = createNode("dragged", "Text");
     const target = createNode("target", "Text");
@@ -200,6 +254,34 @@ describe("useLayerTreeActions", () => {
       "dragged",
     ]);
   });
+
+  it.each([
+    ["page", VIRTUAL_SLOT_NAMES.PAGE_CONTENT],
+    ["component", VIRTUAL_SLOT_NAMES.COMPONENT_CONTENT],
+  ] as const)(
+    "reorders no-layout %s roots without duplicating virtual-slot content",
+    (itemType, virtualSlotName) => {
+      const first = createNode("first", "Section");
+      const second = createNode("second", "Section");
+      const third = createNode("third", "Section");
+      const harness = createRegistryHarness([first, second, third], itemType);
+
+      harness.actions.handleDragStart(createDragEvent(first));
+      harness.actions.handleSlotChange(
+        {
+          moved: { element: first, oldIndex: 0, newIndex: 2 },
+        },
+        virtualSlotName,
+      );
+      harness.actions.handleDragEnd();
+
+      const nodeIds = harness.blocks.value.map((node) => node.id);
+      expect(harness.updates).toHaveLength(1);
+      expect(nodeIds).toEqual(["second", "third", "first"]);
+      expect(nodeIds).toHaveLength(3);
+      expect(new Set(nodeIds).size).toBe(3);
+    },
+  );
 
   it("routes nested sibling reorders through the shared executor", () => {
     const childA = createNode("a", "Text");
