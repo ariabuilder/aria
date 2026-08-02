@@ -262,6 +262,18 @@ function getResponsiveStyleSelector(nodeId: string, tag = "div"): string {
   return `${tag}.${getResponsiveStyleClass(nodeId)}`;
 }
 
+function getRenderedStyleTag(node: BuilderNode, props: JsonObject): string {
+  const normalizedType = normalizeContainerNodeType(node.type).toLowerCase();
+  if (
+    normalizedType === "icon" &&
+    getCanonicalIconIdFromValue(props.icon)
+  ) {
+    return "svg";
+  }
+
+  return getNativeTagForRenderableNode(node, props) ?? "div";
+}
+
 function collectNodeResponsiveCssRules(
   styles: StyleMap = {},
   nodeId: string,
@@ -1319,7 +1331,7 @@ function collectResponsiveStyleRules(
     );
 
     if (Object.keys(renderStyles).length > 0) {
-      const tag = getNativeTagForRenderableNode(node, renderProps) ?? "div";
+      const tag = getRenderedStyleTag(node, renderProps);
       collectNodeResponsiveCssRules(
         renderStyles,
         node.id,
@@ -1415,7 +1427,7 @@ export function collectNodeStylesheet(
     );
 
     if (hasRenderableStyles(resolvedStyles)) {
-      const tag = getNativeTagForRenderableNode(node, renderProps) ?? "div";
+      const tag = getRenderedStyleTag(node, renderProps);
       collectNodeStylesheetRules(
         resolvedStyles,
         node.id,
