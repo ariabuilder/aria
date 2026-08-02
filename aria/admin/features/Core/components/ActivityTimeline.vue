@@ -76,29 +76,9 @@ function isHighlightedItem(
   return item.isHighlighted ?? index === 0;
 }
 
-function isPublishedActivity(action: string): boolean {
-  return action.trim().toLowerCase() === "published";
-}
-
-type LatestAccent = "published" | "latest";
-
-function latestAccent(
-  item: ActivityTimelineItem,
-  index: number,
-): LatestAccent | null {
-  if (!isHighlightedItem(item, index)) {
-    return null;
-  }
-  return isPublishedActivity(item.action) ? "published" : "latest";
-}
-
 function dotClass(item: ActivityTimelineItem, index: number): string {
-  const accent = latestAccent(item, index);
-  if (accent === "published") {
-    return "size-2.5 bg-emerald-500 ring-4 ring-emerald-500/15";
-  }
-  if (accent === "latest") {
-    return "size-2.5 bg-secondary ring-4 ring-secondary/15";
+  if (isHighlightedItem(item, index)) {
+    return "size-2.5 bg-primary ring-4 ring-primary/15";
   }
   return "size-2 bg-muted-foreground/25";
 }
@@ -107,12 +87,8 @@ function railSegmentClass(
   item: ActivityTimelineItem,
   index: number,
 ): string {
-  const accent = latestAccent(item, index);
-  if (accent === "published") {
-    return "bg-primary";
-  }
-  if (accent === "latest") {
-    return "bg-[color-mix(in_srgb,var(--secondary)_40%,transparent)]";
+  if (isHighlightedItem(item, index)) {
+    return "bg-[color-mix(in_srgb,var(--primary)_40%,transparent)]";
   }
   return "bg-border";
 }
