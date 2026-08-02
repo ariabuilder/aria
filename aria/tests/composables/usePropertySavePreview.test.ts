@@ -1,10 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { BuilderNode } from "../../lib/types/nodes";
 
 const mockState = vi.hoisted(() => ({
-  selectedNode: { value: null as any },
+  selectedNode: { value: null as unknown as BuilderNode },
   selectedNodeId: { value: null as string | null },
   selectedNodeIds: { value: ["node-1"] as string[] },
-  selectionTreeRootNodes: { value: [] as any[] },
+  selectionTreeRootNodes: { value: [] as BuilderNode[] },
   targetBreakpoint: { value: "base" as string | null },
   activeBreakpoints: {
     value: [{ name: "base", label: "Base", minWidth: 0 }],
@@ -124,7 +125,7 @@ describe("usePropertySave preview helpers", () => {
       },
     });
     expect(mockState.updateSelectedNodeStylesMock).not.toHaveBeenCalled();
-    expect(mockState.selectedNode.value.styles.fontSize.base).toBe("16px");
+    expect(mockState.selectedNode.value.styles.fontSize?.base).toBe("16px");
   });
 
   it("keeps live prop preview without mutating selected-node props", async () => {

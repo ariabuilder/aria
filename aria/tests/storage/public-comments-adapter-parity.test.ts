@@ -29,7 +29,7 @@ function comment(id = "comment-1"): PublicComment {
 describe("public comments adapter parity", () => {
   it.each([
     ["SQLite", () => new SQLiteStorageAdapter(client, { seedStarterLayouts: false, seedStarterPages: false, seedStarterCms: false, seedStarterDesign: false, seedStarterSiteSettings: false })],
-    ["D1", () => new CloudflareStorageAdapter({ aria_db: createD1Mock(client) } as any)],
+    ["D1", () => new CloudflareStorageAdapter({ aria_db: createD1Mock(client) })],
   ])("keeps pending comments private and moderation compare-and-swap on %s", async (_name, createAdapter) => {
     const adapter = createAdapter();
     const first = await adapter.createPublicComment(comment());
@@ -49,7 +49,7 @@ describe("public comments adapter parity", () => {
 
   it.each([
     ["SQLite", () => new SQLiteStorageAdapter(client, { seedStarterLayouts: false, seedStarterPages: false, seedStarterCms: false, seedStarterDesign: false, seedStarterSiteSettings: false })],
-    ["D1", () => new CloudflareStorageAdapter({ aria_db: createD1Mock(client) } as any)],
+    ["D1", () => new CloudflareStorageAdapter({ aria_db: createD1Mock(client) })],
   ])("enforces durable rolling submission reservations on %s", async (_name, createAdapter) => {
     const adapter = createAdapter();
     const reserve = (index: number) => adapter.reservePublicCommentRateSlot({
@@ -74,7 +74,7 @@ describe("public comments adapter parity", () => {
 
   it.each([
     ["SQLite", () => new SQLiteStorageAdapter(client, { seedStarterLayouts: false, seedStarterPages: false, seedStarterCms: false, seedStarterDesign: false, seedStarterSiteSettings: false })],
-    ["D1", () => new CloudflareStorageAdapter({ aria_db: createD1Mock(client) } as any)],
+    ["D1", () => new CloudflareStorageAdapter({ aria_db: createD1Mock(client) })],
   ])("anonymizes deleted commenter projections while retaining moderation records on %s", async (_name, createAdapter) => {
     const adapter = createAdapter();
     await adapter.createPublicComment(comment());
@@ -90,7 +90,7 @@ describe("public comments adapter parity", () => {
 
   it.each([
     ["SQLite", () => new SQLiteStorageAdapter(client, { seedStarterLayouts: false, seedStarterPages: false, seedStarterCms: false, seedStarterDesign: false, seedStarterSiteSettings: false })],
-    ["D1", () => new CloudflareStorageAdapter({ aria_db: createD1Mock(client) } as any)],
+    ["D1", () => new CloudflareStorageAdapter({ aria_db: createD1Mock(client) })],
   ])("prunes expired durable rate reservations on %s", async (_name, createAdapter) => {
     const adapter = createAdapter();
     await adapter.reservePublicCommentRateSlot({
@@ -105,7 +105,7 @@ describe("public comments adapter parity", () => {
 
   it.each([
     ["SQLite", () => new SQLiteStorageAdapter(client, { seedStarterLayouts: false, seedStarterPages: false, seedStarterCms: false, seedStarterDesign: false, seedStarterSiteSettings: false })],
-    ["D1", () => new CloudflareStorageAdapter({ aria_db: createD1Mock(client) } as any)],
+    ["D1", () => new CloudflareStorageAdapter({ aria_db: createD1Mock(client) })],
   ])("reports scoped moderation metrics on %s", async (_name, createAdapter) => {
     const adapter = createAdapter();
     const first = await adapter.createPublicComment(comment());

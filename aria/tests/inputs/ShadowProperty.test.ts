@@ -268,7 +268,7 @@ describe("ShadowProperty", () => {
 
     const ShadowProperty = (
       await import(
-        "../../admin/features/Inspector/inputs/ShadowProperty.vue" as any,
+        "../../admin/features/Inspector/inputs/ShadowProperty.vue",
       )
     ).default;
 
@@ -357,7 +357,7 @@ describe("ShadowProperty", () => {
 
     const ShadowProperty = (
       await import(
-        "../../admin/features/Inspector/inputs/ShadowProperty.vue" as any,
+        "../../admin/features/Inspector/inputs/ShadowProperty.vue",
       )
     ).default;
 
@@ -415,7 +415,7 @@ describe("ShadowProperty", () => {
 
     const ShadowProperty = (
       await import(
-        "../../admin/features/Inspector/inputs/ShadowProperty.vue" as any,
+        "../../admin/features/Inspector/inputs/ShadowProperty.vue",
       )
     ).default;
 

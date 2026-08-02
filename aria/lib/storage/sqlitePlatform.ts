@@ -384,7 +384,7 @@ export class SQLiteStoragePlatform implements StorageAdapter {
           id: string,
           version: string,
         ) => this.getStoredVersionRow(tableName, id, version),
-        resolveStoredVersionContentHash: (input: any) =>
+        resolveStoredVersionContentHash: (input) =>
           this.resolveStoredVersionContentHash(input),
         syncPageUsage: (id: string, dsl: PageDSL) =>
           this.syncPageUsage(id, dsl),
@@ -432,7 +432,7 @@ export class SQLiteStoragePlatform implements StorageAdapter {
           id: string,
           version: string,
         ) => this.getStoredVersionRow(tableName, id, version),
-        resolveStoredVersionContentHash: (input: any) =>
+        resolveStoredVersionContentHash: (input) =>
           this.resolveStoredVersionContentHash(input),
         syncMediaUsageBestEffort: (
           kind: StoredMediaUsageKind,

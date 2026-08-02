@@ -143,12 +143,16 @@ function locationForPath(
 function findNode(
   dsl: Record<string, unknown>,
   nodeId: string,
-): Record<string, any> | null {
-  const walk = (nodes: unknown): Record<string, any> | null => {
+): (Record<string, unknown> & { props?: Record<string, unknown> }) | null {
+  const walk = (
+    nodes: unknown,
+  ): (Record<string, unknown> & { props?: Record<string, unknown> }) | null => {
     if (!Array.isArray(nodes)) return null;
     for (const node of nodes) {
       if (!node || typeof node !== "object") continue;
-      const record = node as Record<string, any>;
+      const record = node as Record<string, unknown> & {
+        props?: Record<string, unknown>;
+      };
       if (record.id === nodeId) return record;
       const child = walk(record.children);
       if (child) return child;
@@ -251,7 +255,7 @@ async function edit(row: MatrixRow): Promise<void> {
     });
     if (error || !data)
       throw new Error(error?.message ?? "Unable to load translation.");
-    const value = data as any;
+    const value = data;
     editor.value = {
       locale: row.locale,
       label: row.label,

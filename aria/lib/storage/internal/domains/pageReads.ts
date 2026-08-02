@@ -8,6 +8,7 @@ import {
 import { parseAssetAuthorship } from "../../../authorship/projections";
 import type { AssetAuthorship } from "../../../auth/types";
 import type { PageDSL } from "../../../types/nodes";
+import type { ResolvedPageIdentity } from "./contextTypes";
 
 export type PageReadStorageDomain = Pick<
   StorageAdapter,
@@ -15,7 +16,7 @@ export type PageReadStorageDomain = Pick<
 >;
 
 type PageReadStorageContext = {
-  resolvePageIdentity(idOrSlug: string): Promise<any>;
+  resolvePageIdentity(idOrSlug: string): Promise<ResolvedPageIdentity | null>;
   normalizeVersion(version?: string): string | undefined;
   loadPageVersion(id: string, version: string): Promise<PageDSL | null>;
   queryAll<T extends Record<string, unknown>>(

@@ -481,7 +481,7 @@ describe("BorderProperty", () => {
 
     const BorderProperty = (
       await import(
-        "../../admin/features/Inspector/inputs/BorderProperty.vue" as any,
+        "../../admin/features/Inspector/inputs/BorderProperty.vue",
       )
     ).default;
 
@@ -548,7 +548,7 @@ describe("BorderProperty", () => {
 
     const BorderProperty = (
       await import(
-        "../../admin/features/Inspector/inputs/BorderProperty.vue" as any,
+        "../../admin/features/Inspector/inputs/BorderProperty.vue",
       )
     ).default;
 
@@ -642,7 +642,7 @@ describe("BorderProperty", () => {
 
     const BorderProperty = (
       await import(
-        "../../admin/features/Inspector/inputs/BorderProperty.vue" as any,
+        "../../admin/features/Inspector/inputs/BorderProperty.vue",
       )
     ).default;
 

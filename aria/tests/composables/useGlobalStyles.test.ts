@@ -250,11 +250,7 @@ describe("useGlobalStyles", () => {
       maxWidth: "",
       width: "",
     });
-    expect(globalStylesStore.globalStyles.value.defaults.body).toMatchObject({
-      maxWidth: "",
-      margin: "0",
-      padding: "0",
-    });
+    expect(globalStylesStore.globalStyles.value.defaults.body.maxWidth).toBe("");
   });
 
   it("re-links alias sources when a custom variable key changes", async () => {

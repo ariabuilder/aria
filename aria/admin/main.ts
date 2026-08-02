@@ -11,7 +11,6 @@ import {
   type Plugin,
 } from "vue";
 import { createRouter, createWebHistory } from "vue-router";
-// @ts-ignore - Vue SFC typing handled via global.d.ts
 import App from "./App.vue";
 import { studioRoutes } from "./features/Studio/router";
 // Global stylesheets are emitted as <link> tags by aria/pages/admin.astro

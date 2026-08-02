@@ -5,10 +5,17 @@ import { tmpdir } from "os";
 import { join } from "path";
 import type {
   PageInventoryItem,
+  SiteSettings,
   StorageAdapter,
 } from "../../lib/storage/adapter";
-import type { ComponentDSL, LayoutDSL } from "../../lib/types/nodes";
+import type { ComponentDSL, LayoutDSL, PageDSL } from "../../lib/types/nodes";
 import type { SessionUser } from "../../lib/auth";
+import type { RuntimeLocals } from "../../lib/cloudflare/env";
+import type {
+  AriaCollection,
+  AriaEntryRecord,
+  AriaEntryRevision,
+} from "../../lib/cms/schemas";
 import { generateSiteExportArchive } from "../../lib/export/generator";
 import { createDefaultUniversalDesignSystem } from "../../lib/styles/universalDesignSystem";
 import {
@@ -56,7 +63,7 @@ function createStorageAdapterMock(): StorageAdapter {
     style: "normal",
   };
 
-  const publishedHomePage = {
+  const publishedHomePage: PageDSL = {
     id: "home",
     slug: "index",
     title: "Home",
@@ -88,8 +95,8 @@ function createStorageAdapterMock(): StorageAdapter {
         title: "Home SEO",
       },
     },
-  } as any;
-  const draftContactPage = {
+  };
+  const draftContactPage: PageDSL = {
     id: "contact",
     slug: "contact",
     title: "Contact",
@@ -118,23 +125,23 @@ function createStorageAdapterMock(): StorageAdapter {
     status: "draft",
     updatedAt: now,
     settings: {},
-  } as any;
-  const layout = {
+  };
+  const layout: LayoutDSL = {
     id: "default-layout",
     name: "default-layout",
     title: "Default Layout",
     nodes: [],
     slots: [{ name: "default", isDefault: true }],
     updatedAt: now,
-  } as any;
-  const component = {
+  };
+  const component: ComponentDSL = {
     id: "cta-banner",
     name: "cta-banner",
     title: "CTA Banner",
     nodes: [],
     updatedAt: now,
-  } as any;
-  const blogCollection = {
+  };
+  const blogCollection: AriaCollection = {
     id: "collection-blog",
     name: "blog",
     label: "Blog",
@@ -160,8 +167,8 @@ function createStorageAdapterMock(): StorageAdapter {
     supports: ["body", "seo", "scheduling"],
     createdAt: now,
     updatedAt: now,
-  } as any;
-  const blogEntry = {
+  };
+  const blogEntry: AriaEntryRecord = {
     entry: {
       id: "entry-launch",
       collectionId: "collection-blog",
@@ -239,7 +246,7 @@ function createStorageAdapterMock(): StorageAdapter {
       },
       publishedBy: null,
     },
-  } as any;
+  };
 
   return {
     getPageDSL: async (id: string) => {
@@ -324,7 +331,7 @@ function createStorageAdapterMock(): StorageAdapter {
     deleteEntry: async () => undefined,
     listEntryRevisions: async () => [],
     getEntryRevision: async () => null,
-    saveEntryRevision: async (revision: any) => revision,
+    saveEntryRevision: async (revision: AriaEntryRevision) => revision,
     saveOrder: async () => undefined,
     getOrder: async (kind: string) =>
       kind === "pages"
@@ -379,12 +386,11 @@ function createStorageAdapterMock(): StorageAdapter {
       return designSystem;
     },
     saveDesignSystem: async () => undefined,
-    getSiteSettings: async () =>
-      ({
-        siteName: "Aria Test",
-        siteUrl: "https://example.com",
-        utilityEngine: "unocss",
-      }) as any,
+    getSiteSettings: async (): Promise<SiteSettings> => ({
+      siteName: "Aria Test",
+      siteUrl: "https://example.com",
+      utilityEngine: "unocss",
+    }),
     saveSiteSettings: async () => undefined,
     touchResource: async () => undefined,
     getResourceTouch: async () => null,
@@ -584,9 +590,7 @@ describe("site export flow", () => {
       ?.async("string");
     expect(markdownEntry).toContain('title: "Launch Post"');
     expect(markdownEntry).toContain('status: "scheduled"');
-    expect(markdownEntry).toContain(
-      'scheduledFor: "2026-03-30T12:00:00.000Z"',
-    );
+    expect(markdownEntry).toContain('scheduledFor: "2026-03-30T12:00:00.000Z"');
     expect(markdownEntry).toContain(
       'frontmatter: {"summary":"CMS export coverage"}',
     );
@@ -631,8 +635,9 @@ describe("site export flow", () => {
     ]);
     expect(
       JSON.parse(
-        (await contents.file("export/content/redirects.json")?.async("string")) ??
-          "[]",
+        (await contents
+          .file("export/content/redirects.json")
+          ?.async("string")) ?? "[]",
       ).map((rule: { id: string }) => rule.id),
     ).toEqual(["redirect-disabled", "redirect-enabled"]);
     expect(
@@ -699,7 +704,7 @@ describe("site export flow", () => {
   it("exports full-width slot layouts with defaultContent and slotted page bodies", async () => {
     const adapter = createStorageAdapterMock();
     const now = new Date("2026-03-19T16:00:00.000Z").toISOString();
-    const fullWidthLayout = {
+    const fullWidthLayout: LayoutDSL = {
       id: "full-width",
       name: "Full Width",
       nodes: [],
@@ -731,8 +736,8 @@ describe("site export flow", () => {
         },
       ],
       updatedAt: now,
-    } as any;
-    const fullWidthPage = {
+    };
+    const fullWidthPage: PageDSL = {
       id: "fw-home",
       slug: "fw-home",
       title: "FW Home",
@@ -749,7 +754,7 @@ describe("site export flow", () => {
       ],
       status: "published",
       updatedAt: now,
-    } as any;
+    };
 
     const exportAdapter: StorageAdapter = {
       ...adapter,
@@ -862,6 +867,72 @@ describe("site export flow", () => {
     expect(parsed.cmsCollectionCount).toBe(0);
     expect(parsed.cmsEntryCount).toBe(0);
     expect(parsed.redirectCount).toBe(0);
+  });
+
+  it("consumes every R2 cursor page when listing exports", async () => {
+    const older = buildSiteExportRecord({
+      id: "55555555-5555-4555-8555-555555555555",
+      filename: "aria-site-export-older.zip",
+      createdAt: "2026-03-26T10:00:00.000Z",
+      expiresAt: "2099-03-27T12:00:00.000Z",
+      createdBy: { id: testUser.id, username: testUser.username },
+      pageCount: 1,
+      mediaCount: 0,
+      sizeBytes: 4,
+    });
+    const newer = buildSiteExportRecord({
+      id: "66666666-6666-4666-8666-666666666666",
+      filename: "aria-site-export-newer.zip",
+      createdAt: "2026-03-27T10:00:00.000Z",
+      expiresAt: "2099-03-27T12:00:00.000Z",
+      createdBy: { id: testUser.id, username: testUser.username },
+      pageCount: 2,
+      mediaCount: 1,
+      sizeBytes: 8,
+    });
+    const records = new Map([
+      [older.metadataKey, older],
+      [newer.metadataKey, newer],
+    ]);
+    const cursors: Array<string | undefined> = [];
+    const r2 = {
+      async get(key: string) {
+        const record = records.get(key);
+        if (!record) return null;
+        const raw = JSON.stringify(record);
+        return {
+          async text() {
+            return raw;
+          },
+          async arrayBuffer() {
+            return new TextEncoder().encode(raw).buffer;
+          },
+        };
+      },
+      async put() {},
+      async delete() {},
+      async list(options: { prefix?: string; cursor?: string }) {
+        cursors.push(options.cursor);
+        return options.cursor === undefined
+          ? {
+              objects: [{ key: older.metadataKey }],
+              truncated: true,
+              cursor: "page-2",
+            }
+          : {
+              objects: [{ key: newer.metadataKey }],
+              truncated: false,
+            };
+      },
+    };
+    const locals = {
+      cfBindings: { aria_r2: r2 as unknown as R2Bucket },
+    } satisfies RuntimeLocals;
+
+    const listed = await createSiteExportStore(locals).listForUser(testUser);
+
+    expect(cursors).toEqual([undefined, "page-2"]);
+    expect(listed.map((record) => record.id)).toEqual([newer.id, older.id]);
   });
 
   it("stores, lists, and reads temporary exports from local storage without deleting", async () => {

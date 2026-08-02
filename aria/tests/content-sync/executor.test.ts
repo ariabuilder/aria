@@ -6,6 +6,7 @@ import type {
   AriaEntryRecord,
   AriaEntryRevision,
 } from "../../lib/cms/types";
+import type { PageLocaleRecord } from "../../lib/localization/siteTranslationSchemas";
 
 function createStorageAdapterMock(
   overrides: Partial<StorageAdapter> = {},
@@ -75,7 +76,7 @@ function createStorageAdapterMock(
 
 describe("ContentSyncExecutor", () => {
   it("copies a complete localized page record after its pinned source revision", async () => {
-    const record = {
+    const record: PageLocaleRecord = {
       meta: {
         pageId: "about",
         locale: "fr",
@@ -86,11 +87,42 @@ describe("ContentSyncExecutor", () => {
         updatedAt: "2026-03-16T12:05:00.000Z",
       },
       versions: [
-        { sourceVersion: "source-v1", layoutId: null, fallbackLayoutVersion: null },
-        { sourceVersion: "source-v2", layoutId: null, fallbackLayoutVersion: null },
+        ...["source-v1", "source-v2"].map((sourceVersion) => ({
+          pageId: "about",
+          locale: "fr",
+          version: sourceVersion === "source-v1" ? "fr-v1" : "fr-v2",
+          sourceVersion,
+          slug: "a-propos",
+          accessPromptTitle: null,
+          accessPromptDescription: null,
+          seo: {
+            title: null,
+            description: null,
+            canonicalPath: null,
+            noindex: false,
+            nofollow: false,
+            ogTitle: null,
+            ogDescription: null,
+            ogImage: null,
+          },
+          dsl: {},
+          translatedPaths: [],
+          sourceManifestHash: "manifest-hash-1234",
+          sourceStructureHash: "structure-hash-1234",
+          layoutId: null,
+          fallbackLayoutVersion: null,
+          contentHash: null,
+          createdAt: "2026-03-16T12:00:00.000Z",
+          actor: {
+            id: null,
+            username: null,
+            email: null,
+            avatarUrl: null,
+          },
+        })),
       ],
       routes: [],
-    } as any;
+    };
     const savePageDSL = vi.fn(async () => "source-v2");
     const replacePageLocaleRecord = vi.fn(async () => undefined);
     const executor = new ContentSyncExecutor();

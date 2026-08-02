@@ -2,10 +2,15 @@ import { mount } from "@vue/test-utils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { nextTick } from "vue";
 
+type MockEditor = ReturnType<typeof createMockEditor>["editor"];
+type MockEditorOptions = {
+  onUpdate: (context: { editor: MockEditor }) => void;
+};
+
 const tiptapMock = vi.hoisted(() => ({
-  editor: null as any,
-  options: null as any,
-  useEditor: vi.fn((options: any) => {
+  editor: null as unknown as MockEditor,
+  options: null as MockEditorOptions | null,
+  useEditor: vi.fn((options: MockEditorOptions) => {
     tiptapMock.options = options;
     return { value: tiptapMock.editor };
   }),
@@ -88,7 +93,7 @@ const StructuredTextEditor = (
 
 function createMockEditor() {
   const calls: string[] = [];
-  const chain: Record<string, any> = {};
+  const chain: Record<string, ReturnType<typeof vi.fn>> = {};
   const chainMethod = (name: string) =>
     vi.fn((...args: unknown[]) => {
       calls.push(`${name}:${JSON.stringify(args)}`);
@@ -277,7 +282,8 @@ describe("StructuredTextEditor", () => {
     );
 
     tiptapMock.editor.text = "One ".repeat(226).trim();
-    tiptapMock.options.onUpdate({ editor: tiptapMock.editor });
+    expect(tiptapMock.options).not.toBeNull();
+    tiptapMock.options?.onUpdate({ editor: tiptapMock.editor });
     await nextTick();
 
     expect(wrapper.get('[data-testid="structured-text-stats"]').text()).toBe(

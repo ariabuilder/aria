@@ -70,6 +70,7 @@
     "preview": "node --import tsx aria/scripts/project-command.ts preview",
     "astro": "node --import tsx aria/scripts/project-command.ts astro",
     "check": "node --import tsx aria/scripts/project-command.ts check",
+    "check:type-safety": "node --import tsx aria/scripts/check-type-safety.ts",
     "check:push-guards": "node scripts/check-repository-push-guards.mjs",
     "release:check-version": "node scripts/check-release-version.mjs",
     "db:init": "node --import tsx aria/scripts/apply-d1-migrations.ts --remote",

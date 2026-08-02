@@ -1,4 +1,9 @@
-import { createClient, type Client } from "@libsql/client";
+import {
+  createClient,
+  type Client,
+  type InArgs,
+  type InValue,
+} from "@libsql/client";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import fs from "fs/promises";
 import path from "path";
@@ -9,6 +14,24 @@ import {
 } from "../../lib/storage/verifyLocalizationSchema";
 
 let client: Client;
+
+function toLibsqlArgs(values: readonly unknown[]): InArgs {
+  return values.map((value): InValue => {
+    if (
+      value === null ||
+      typeof value === "string" ||
+      typeof value === "number" ||
+      typeof value === "bigint" ||
+      typeof value === "boolean" ||
+      value instanceof Uint8Array ||
+      value instanceof Date
+    ) {
+      return value;
+    }
+
+    throw new TypeError("Unsupported localization verification SQL argument.");
+  });
+}
 
 beforeEach(async () => {
   client = createClient({ url: ":memory:" });
@@ -26,7 +49,7 @@ describe("pre-release baseline schema", () => {
   async function verify() {
     return verifyLocalizationSchema({
       async execute(sql, args = []) {
-        const result = await client.execute({ sql, args: args as any });
+        const result = await client.execute({ sql, args: toLibsqlArgs(args) });
         return { rows: result.rows as Record<string, unknown>[] };
       },
     });

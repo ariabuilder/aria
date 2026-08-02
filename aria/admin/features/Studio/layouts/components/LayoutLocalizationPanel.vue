@@ -96,12 +96,16 @@ function location(path: string): { nodeId: string; prop: string } | null {
 function nodeAt(
   dsl: Record<string, unknown>,
   id: string,
-): Record<string, any> | null {
-  const walk = (nodes: unknown): Record<string, any> | null => {
+): (Record<string, unknown> & { props?: Record<string, unknown> }) | null {
+  const walk = (
+    nodes: unknown,
+  ): (Record<string, unknown> & { props?: Record<string, unknown> }) | null => {
     if (!Array.isArray(nodes)) return null;
     for (const item of nodes) {
       if (!item || typeof item !== "object") continue;
-      const node = item as Record<string, any>;
+      const node = item as Record<string, unknown> & {
+        props?: Record<string, unknown>;
+      };
       if (node.id === id) return node;
       const child = walk(node.children);
       if (child) return child;
@@ -192,7 +196,7 @@ function edit(row: Row) {
     });
     if (error || !data)
       throw new Error(error?.message ?? "Unable to load layout translation.");
-    const value = data as any;
+    const value = data;
     editor.value = {
       locale: row.locale,
       label: row.label,

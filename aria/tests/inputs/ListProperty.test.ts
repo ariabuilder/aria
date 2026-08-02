@@ -3,10 +3,11 @@ import { flushPromises, mount } from "@vue/test-utils";
 import { computed, defineComponent, h, inject, provide, ref } from "vue";
 
 import ListProperty from "../../admin/features/Inspector/inputs/ListProperty.vue";
+import type { BuilderNodeFixture } from "../helpers/builderNodeFixture";
 
 const tabsSelectionKey = Symbol("tabs-selection");
 
-const selectedNodeRef = ref<any>(null);
+const selectedNodeRef = ref<BuilderNodeFixture | null>(null);
 const selectedNodeIdRef = ref<string | null>(null);
 const breakpointNameRef = ref("base");
 const isLoadingRef = ref(false);
@@ -16,7 +17,7 @@ const classEditorErrorRef = ref<string | null>(null);
 const editingModeRef = ref<"element" | "class">("element");
 const activeClassNameRef = ref<string | null>(null);
 const activeClassRef = ref<Record<string, unknown> | null>(null);
-const selectionTreeRootNodesRef = ref<any[]>([]);
+const selectionTreeRootNodesRef = ref<BuilderNodeFixture[]>([]);
 const savePropertyMock = vi.fn();
 const saveNodeUpdatesMock = vi.fn();
 const previewPropsMock = vi.fn(() => true);

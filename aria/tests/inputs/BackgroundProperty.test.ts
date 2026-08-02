@@ -454,7 +454,7 @@ describe("BackgroundProperty", () => {
 
     const BackgroundProperty = (
       await import(
-        "../../admin/features/Inspector/inputs/BackgroundProperty.vue" as any
+        "../../admin/features/Inspector/inputs/BackgroundProperty.vue"
       )
     ).default;
 
@@ -605,7 +605,7 @@ describe("BackgroundProperty", () => {
 
     const BackgroundProperty = (
       await import(
-        "../../admin/features/Inspector/inputs/BackgroundProperty.vue" as any
+        "../../admin/features/Inspector/inputs/BackgroundProperty.vue"
       )
     ).default;
 

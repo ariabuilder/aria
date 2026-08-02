@@ -117,7 +117,7 @@ describe("VisibilityProperty", () => {
 
     const VisibilityProperty = (
       await import(
-        "../../admin/features/Inspector/inputs/VisibilityProperty.vue" as any
+        "../../admin/features/Inspector/inputs/VisibilityProperty.vue"
       )
     ).default;
 

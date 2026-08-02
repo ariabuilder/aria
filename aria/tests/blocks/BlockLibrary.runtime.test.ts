@@ -3,6 +3,12 @@ import { computed, defineComponent, h, nextTick, ref } from "vue";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { useAppProvides } from "../../admin/features/Core";
+import type { AddElementPayload } from "../../admin/types/app";
+import { BuilderNodeSchema } from "../../lib/schemas/nodes";
+import {
+  LibraryDragPayloadSchema,
+  type LibraryDragPayload,
+} from "../../admin/features/Nodes/events/shared/nodeEventSchemas";
 
 vi.mock("vue", async (importOriginal) => {
   const actual = await importOriginal<typeof import("vue")>();
@@ -21,7 +27,8 @@ vi.mock("vue", async (importOriginal) => {
 
 const testState = vi.hoisted(() => ({
   dragSourceValue: "",
-  dragDropStartMock: vi.fn(),
+  dragDropStartMock:
+    vi.fn<(source: string, data: LibraryDragPayload) => void>(),
   dragDropEndMock: vi.fn(),
   canvasStartDragMock: vi.fn(),
   canvasDestroyMock: vi.fn(),
@@ -40,7 +47,7 @@ vi.mock("../../admin/composables/useDragDrop", () => ({
   useDragDrop: () => ({
     startDrag: (source: string, data: unknown) => {
       dragSourceRef.value = source;
-      testState.dragDropStartMock(source, data);
+      testState.dragDropStartMock(source, LibraryDragPayloadSchema.parse(data));
     },
     endDrag: () => {
       dragSourceRef.value = "";
@@ -108,14 +115,14 @@ describe("BlockLibrary runtime injections", () => {
     });
 
     const wrapper = mount(Provider);
-    const blockLibrary = wrapper.findComponent(BlockLibrary);
+    const blockLibrary = wrapper.findComponent({ name: "BlockLibrary" });
     const draggableItems = blockLibrary.findAll('[draggable="true"]');
 
     expect(draggableItems.length).toBeGreaterThan(0);
 
     await draggableItems[0].trigger("click");
 
-    expect((blockLibrary as any).emitted("addElement")).toEqual([
+    expect(blockLibrary.emitted("addElement")).toEqual([
       [{ type: "section", data: { type: "section" } }],
     ]);
 
@@ -163,7 +170,7 @@ describe("BlockLibrary runtime injections", () => {
     });
 
     const wrapper = mount(Provider);
-    const blockLibrary = wrapper.findComponent(BlockLibrary);
+    const blockLibrary = wrapper.findComponent({ name: "BlockLibrary" });
     const draggableItems = blockLibrary.findAll('[draggable="true"]');
 
     const dataTransfer = {
@@ -203,18 +210,20 @@ describe("BlockLibrary runtime injections", () => {
     });
 
     const wrapper = mount(Provider);
-    const blockLibrary = wrapper.findComponent(BlockLibrary);
+    const blockLibrary = wrapper.findComponent({ name: "BlockLibrary" });
     const listDraggable = blockLibrary.get('[data-block-library-id="list"]');
 
     await listDraggable.trigger("click");
 
-    const clickPayload = (blockLibrary as any).emitted("addElement")?.[0]?.[0];
+    const clickPayload = blockLibrary.emitted<[AddElementPayload]>(
+      "addElement",
+    )?.[0]?.[0];
     expect(clickPayload?.type).toBe("list");
     expect(clickPayload?.data?.type).toBe("list");
     expect(clickPayload?.data?.children).toHaveLength(3);
     expect(
       clickPayload?.data?.children?.map(
-        (child: any) => child.children?.[0]?.props?.content,
+        (child) => child.children?.[0]?.props?.content,
       ),
     ).toEqual(["First item", "Second item", "Third item"]);
 
@@ -227,12 +236,11 @@ describe("BlockLibrary runtime injections", () => {
     await listDraggable.trigger("dragstart", { dataTransfer });
 
     const dragPayload = testState.dragDropStartMock.mock.calls[0]?.[1];
+    const dragChildren = BuilderNodeSchema.array().parse(dragPayload?.children);
     expect(dragPayload?.type).toBe("list");
-    expect(dragPayload?.children).toHaveLength(3);
+    expect(dragChildren).toHaveLength(3);
     expect(
-      dragPayload?.children?.map(
-        (child: any) => child.children?.[0]?.props?.content,
-      ),
+      dragChildren.map((child) => child.children?.[0]?.props?.content),
     ).toEqual(["First item", "Second item", "Third item"]);
     expect(dragPayload?.id).not.toBe(clickPayload?.data?.id);
 
@@ -261,7 +269,7 @@ describe("BlockLibrary runtime injections", () => {
     });
 
     const wrapper = mount(Provider);
-    const blockLibrary = wrapper.findComponent(BlockLibrary);
+    const blockLibrary = wrapper.findComponent({ name: "BlockLibrary" });
 
     dragSourceRef.value = "add-elements";
 
@@ -279,7 +287,7 @@ describe("BlockLibrary runtime injections", () => {
 
     await nextTick();
 
-    expect((blockLibrary as any).emitted("addElement")).toEqual([
+    expect(blockLibrary.emitted("addElement")).toEqual([
       [
         {
           type: "text",

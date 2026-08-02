@@ -32,7 +32,11 @@ type R2BucketLike = {
     options?: { httpMetadata?: Record<string, string> },
   ): Promise<void>;
   delete(key: string): Promise<void>;
-  list(options: { prefix: string }): Promise<{ objects?: unknown[] }>;
+  list(options: { prefix: string; cursor?: string }): Promise<{
+    objects?: unknown[];
+    truncated: boolean;
+    cursor?: string;
+  }>;
 };
 
 function toArtifactKey(id: string, filename: string): string {
@@ -152,10 +156,36 @@ function createR2Store(locals?: RuntimeLocals): SiteExportStore {
   }
 
   async function listAllRecords(): Promise<SiteExportRecord[]> {
-    const listed = await r2Bucket.list({ prefix: `${EXPORT_PREFIX}/` });
+    const listedObjects: unknown[] = [];
+    let cursor: string | undefined;
+    const visitedCursors = new Set<string>();
+
+    do {
+      const listed = await r2Bucket.list({
+        prefix: `${EXPORT_PREFIX}/`,
+        ...(cursor === undefined ? {} : { cursor }),
+      });
+      listedObjects.push(...(listed.objects ?? []));
+
+      if (listed.truncated && !listed.cursor) {
+        throw new Error("R2 export listing was truncated without a cursor.");
+      }
+      if (
+        listed.truncated &&
+        listed.cursor &&
+        visitedCursors.has(listed.cursor)
+      ) {
+        throw new Error("R2 export listing returned a repeated cursor.");
+      }
+      if (listed.truncated && listed.cursor) {
+        visitedCursors.add(listed.cursor);
+      }
+      cursor = listed.truncated ? listed.cursor : undefined;
+    } while (cursor !== undefined);
+
     const parsedEntries: Array<
       z.ZodSafeParseResult<z.infer<typeof R2ObjectListSchema>>
-    > = (listed.objects ?? []).map((entry: unknown) =>
+    > = listedObjects.map((entry: unknown) =>
       R2ObjectListSchema.safeParse(entry),
     );
 
@@ -283,9 +313,7 @@ function createLocalStore(): SiteExportStore {
       );
 
       return filterAccessibleRecords(
-        records.filter(
-          (record): record is SiteExportRecord => record !== null,
-        ),
+        records.filter((record): record is SiteExportRecord => record !== null),
         user,
       );
     },

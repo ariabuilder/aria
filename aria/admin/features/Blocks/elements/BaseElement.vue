@@ -10,7 +10,7 @@ const props = defineProps<{
 }>();
 
 const slots = defineSlots<{
-  preview?: () => any;
+  preview?: () => unknown;
 }>();
 </script>
 

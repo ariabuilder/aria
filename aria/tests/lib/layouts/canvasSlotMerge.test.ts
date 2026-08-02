@@ -63,7 +63,7 @@ describe("mergePageBlocksWithLayoutSlots (canvas display)", () => {
     expect(ids).toContain("footer-node");
   });
 
-  it("uses layout defaultContent for shared slots even when page has slot roots", () => {
+  it("uses a nonempty page override before shared-slot defaultContent", () => {
     const pageNodes: BuilderNode[] = [
       {
         id: "page-header",
@@ -80,8 +80,8 @@ describe("mergePageBlocksWithLayoutSlots (canvas display)", () => {
       layout,
       resolveSlotRootsForDisplay,
     );
-    expect(merged.some((node) => node.id === "page-header")).toBe(false);
-    expect(merged.some((node) => node.id === "header-node")).toBe(true);
+    expect(merged.some((node) => node.id === "page-header")).toBe(true);
+    expect(merged.some((node) => node.id === "header-node")).toBe(false);
   });
 
   it("keeps a default-slot CMS list body root when header and footer defaults exist", () => {

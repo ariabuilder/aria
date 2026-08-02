@@ -2,7 +2,6 @@ import {
   createColumnHelper,
   getCoreRowModel,
   useVueTable,
-  type ColumnDef,
 } from "@tanstack/vue-table";
 import { computed, h, ref } from "vue";
 import { studioIcons } from "@/lib/icons";
@@ -145,7 +144,7 @@ export function useCustomBreakpointsTable(
     editingId.value = null;
   }
 
-  const columns = computed<ColumnDef<CustomBreakpointRow, any>[]>(() => [
+  const columns = computed(() => [
     columnHelper.accessor((row) => row.label, {
       id: "name",
       header: () =>

@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { flushPromises, mount } from "@vue/test-utils";
-import { defineComponent, h, ref } from "vue";
+import { defineComponent, h, ref, type Component } from "vue";
 import {
   createInspectorGlobalStyleDefaultsMock,
   createInspectorPropertySaveMock,
@@ -194,7 +194,7 @@ describe("TransformProperty", () => {
     removeClassRuleMock.mockResolvedValue(true);
   });
 
-  function createWrapper(component: any) {
+  function createWrapper(component: Component) {
     return mount(component, {
       props: {
         currentItemType: "page",

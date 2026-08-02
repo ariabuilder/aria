@@ -471,10 +471,9 @@ export const PageDSLSchema: z.ZodType<PageDSL> = z
     title: z.string().min(1, "Page title is required"),
     slug: z
       .string()
-      .min(1, "Page slug is required")
       .regex(
-        /^[a-z0-9]+(?:-[a-z0-9]+)*$/,
-        "Slug must be lowercase alphanumeric with hyphens",
+        /^(?:[a-z0-9]+(?:-[a-z0-9]+)*(?:\/[a-z0-9]+(?:-[a-z0-9]+)*)*)?$/,
+        "Slug must contain lowercase alphanumeric path segments with hyphens",
       ),
     description: z.string().optional(),
     frontmatter: JsonObjectSchema.optional(),

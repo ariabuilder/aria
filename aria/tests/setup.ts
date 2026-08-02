@@ -34,22 +34,27 @@ if (!globalThis.crypto.randomUUID) {
   };
 }
 
-global.IntersectionObserver = class IntersectionObserver {
+global.IntersectionObserver = class MockIntersectionObserver
+  implements IntersectionObserver
+{
+  readonly root = null;
+  readonly rootMargin = "";
+  readonly thresholds: readonly number[] = [];
   constructor() {}
   disconnect() {}
-  observe() {}
-  takeRecords() {
+  observe(_target: Element) {}
+  takeRecords(): IntersectionObserverEntry[] {
     return [];
   }
-  unobserve() {}
-} as any;
+  unobserve(_target: Element) {}
+};
 
-global.ResizeObserver = class ResizeObserver {
+global.ResizeObserver = class MockResizeObserver implements ResizeObserver {
   constructor() {}
   disconnect() {}
-  observe() {}
-  unobserve() {}
-} as any;
+  observe(_target: Element) {}
+  unobserve(_target: Element) {}
+};
 
 // jsdom does not implement scrollIntoView; reka-ui Listbox and Command
 // components call it when highlighting options.

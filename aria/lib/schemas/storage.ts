@@ -11,7 +11,7 @@ export const NodeSchema = z.object({
   type: z.string(),
   props: JsonObjectSchema,
   children: z.array(z.lazy(() => NodeSchema)),
-}) as unknown as z.ZodType<BuilderNode, any, any>;
+}) as unknown as z.ZodType<BuilderNode>;
 
 /**
  * Page schema

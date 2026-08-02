@@ -188,7 +188,10 @@ describe("useAppRouter", () => {
       router.initialize();
 
       expect(() => {
-        router.startEditing({ itemType: "invalid" as any, itemSlug: "test" });
+        router.startEditing({
+          itemType: "invalid" as Parameters<typeof router.startEditing>[0]["itemType"],
+          itemSlug: "test",
+        });
       }).toThrow();
     });
 
@@ -245,7 +248,9 @@ describe("useAppRouter", () => {
       router.initialize();
 
       expect(() => {
-        router.navigateToStudio("invalid" as any);
+        router.navigateToStudio(
+          "invalid" as Parameters<typeof router.navigateToStudio>[0],
+        );
       }).toThrow();
     });
   });
@@ -270,7 +275,9 @@ describe("useAppRouter", () => {
       router.initialize();
 
       expect(() => {
-        router.setEditingTab("invalid" as any);
+        router.setEditingTab(
+          "invalid" as Parameters<typeof router.setEditingTab>[0],
+        );
       }).toThrow();
     });
   });

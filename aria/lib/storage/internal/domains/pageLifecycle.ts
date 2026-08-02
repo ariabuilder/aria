@@ -42,6 +42,7 @@ import {
   normalizeSurfaceForPersistence,
   resolveStoredSemanticSourceHash,
 } from "./surfaceNormalization";
+import type { SharedVersionStorageContext } from "./contextTypes";
 
 export type PageLifecycleStorageDomain = Pick<
   StorageAdapter,
@@ -54,14 +55,17 @@ export type PageLifecycleStorageDomain = Pick<
   | "listPagesDSL"
 >;
 
-type PageLifecycleStorageContext = {
-  resolvePageIdentity: any;
-  resolveLayoutVersionState: any;
-  getStoredVersionRow: any;
-  resolveStoredVersionContentHash: any;
-  syncPageUsage: any;
-  syncMediaUsageBestEffort: any;
-  normalizeVersion: any;
+type PageLifecycleStorageContext = Pick<
+  SharedVersionStorageContext,
+  | "resolvePageIdentity"
+  | "resolveLayoutVersionState"
+  | "getStoredVersionRow"
+  | "resolveStoredVersionContentHash"
+  | "syncPageUsage"
+  | "syncMediaUsageBestEffort"
+  | "normalizeVersion"
+  | "pruneStoredVersionHistory"
+> & {
   nowIso: () => string;
   run(sql: string, args?: readonly unknown[]): Promise<void>;
   runBatch(
@@ -74,9 +78,11 @@ type PageLifecycleStorageContext = {
     sql: string,
     args?: readonly unknown[],
   ): Promise<{ changes: number }>;
-  deletePageThumbnail: any;
-  pruneStoredVersionHistory: any;
-  loadPageVersion: any;
+  deletePageThumbnail(
+    pageId: string,
+    stage?: "draft" | "published",
+  ): Promise<void>;
+  loadPageVersion(id: string, version: string): Promise<PageDSL | null>;
   queryAll<T extends Record<string, unknown>>(
     sql: string,
     args?: readonly unknown[],

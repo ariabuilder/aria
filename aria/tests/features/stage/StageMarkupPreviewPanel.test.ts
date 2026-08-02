@@ -1,11 +1,11 @@
 import { mount } from "@vue/test-utils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { nextTick } from "vue";
+import { nextTick, type Ref } from "vue";
 
 const stageMarkupPreviewState = vi.hoisted(() => ({
-  isOpen: null as any,
-  markup: null as any,
-  stylesheet: null as any,
+  isOpen: null as unknown as Ref<boolean>,
+  markup: null as unknown as Ref<string>,
+  stylesheet: null as unknown as Ref<string>,
   setOpen: vi.fn(),
   keepOpenOnHover: vi.fn(),
   scheduleCloseOnHoverLeave: vi.fn(),

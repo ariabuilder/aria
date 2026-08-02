@@ -1,8 +1,6 @@
 import {
   nodesToHtmlDocumentAsync,
   nodesToHtmlFragmentAsync,
-  nodesToHtmlWithLayoutAsync,
-  mergePageNodesIntoLayoutForRender,
   resolvePublishedHtmlRenderStyleMode,
   type NodeToHtmlDocumentOptions,
 } from "../blocks/nodesToHtml";
@@ -20,7 +18,6 @@ import {
   renderNavStylesheetTag,
 } from "../nav";
 import { prepareNavigationForRender } from "../cms/navActive";
-import { mergePageBlocksWithLayoutSlotsForPublish } from "../layouts/canvasSlotMerge";
 import { compileAnalyticsScripts } from "../analytics/compileAnalyticsScripts";
 import { analyzeCustomCode } from "../security/analyzeCustomCode";
 import {
@@ -67,6 +64,14 @@ import {
   collectRendererStyleRequirements,
   splitCompatibilityRendererBaseCss,
 } from "./canonical/rendererStyles";
+import {
+  normalizeEditableSurface,
+  parseCanonicalJsonValue,
+  resolveRenderSurface,
+  type RenderMode,
+  type RenderRegionInput,
+} from "./canonical";
+import { createStorageRenderDependencyProvider } from "./storageRenderDependencyProvider";
 
 type RenderLogger = (
   level: "debug" | "info" | "warn" | "error",
@@ -97,6 +102,8 @@ type RenderPageDslToHtmlOptions = {
   cms?: RenderCmsDataOptions;
   catalog?: MediaCatalogRepository | null;
   locals?: RuntimeLocals;
+  /** Explicit render identity; public is the compatibility default. */
+  mode?: RenderMode;
 };
 
 type RenderPageDslToHtmlResult = {
@@ -135,36 +142,6 @@ function injectIntoBody(
     (footer ? `\n${footer}\n` : "") +
     html.slice(bodyCloseIndex)
   );
-}
-
-async function loadAssignedLayoutRegionNodes(options: {
-  layout: LayoutDSL | null;
-  getComponentDSL: StorageAdapter["getComponentDSL"];
-}): Promise<{
-  headerNodes: BuilderNode[];
-  footerNodes: BuilderNode[];
-}> {
-  const { layout, getComponentDSL } = options;
-  if (!layout) {
-    return {
-      headerNodes: [],
-      footerNodes: [],
-    };
-  }
-
-  const effectiveRegions = layout.regions ?? layout.metadata?.regions;
-  const headerComponentId = effectiveRegions?.headerComponent;
-  const footerComponentId = effectiveRegions?.footerComponent;
-
-  const [headerComp, footerComp] = await Promise.all([
-    headerComponentId ? getComponentDSL(headerComponentId) : null,
-    footerComponentId ? getComponentDSL(footerComponentId) : null,
-  ]);
-
-  return {
-    headerNodes: headerComp?.nodes ?? [],
-    footerNodes: footerComp?.nodes ?? [],
-  };
 }
 
 async function renderLayoutRegionFragments(options: {
@@ -214,37 +191,10 @@ async function renderLayoutRegionFragments(options: {
   };
 }
 
-async function resolveLayoutSlotsDefaultContent(
-  layout: LayoutDSL,
-  adapter: StorageAdapter,
-  cms: RenderCmsDataOptions,
-  basePath: string,
-  catalog: MediaCatalogRepository | null | undefined,
-): Promise<LayoutDSL> {
-  if (!layout.slots?.length) {
-    return layout;
-  }
-
-  const slots = await Promise.all(
-    layout.slots.map(async (slot) => {
-      if (!slot.defaultContent?.length) {
-        return slot;
-      }
-      return {
-        ...slot,
-        defaultContent: await resolveCmsBoundNodes({
-          nodes: slot.defaultContent,
-          adapter,
-          cms,
-          basePath,
-          catalog,
-          contextLabel: `layout "${layout.id}" slot "${slot.name}" default content`,
-        }),
-      };
-    }),
-  );
-
-  return { ...layout, slots };
+function toCanonicalManifestValue(value: unknown) {
+  const serialized = JSON.stringify(value);
+  const parsed: unknown = JSON.parse(serialized);
+  return parseCanonicalJsonValue(parsed);
 }
 
 export async function renderPageDslToHtml(
@@ -349,118 +299,123 @@ export async function renderPageDslToHtml(
     siteSettings,
   );
 
-  let layout: LayoutDSL | null = null;
-  let headerNodes: BuilderNode[] = [];
-  let footerNodes: BuilderNode[] = [];
   const publicationDependencies = options.page._publicationDependencies;
-  const publishedLayout = publicationDependencies?.layout;
   const getComponentDSL: StorageAdapter["getComponentDSL"] = (id, version) =>
     options.adapter.getComponentDSL(
       id,
       version ?? publicationDependencies?.components[id],
     );
-
-  if (options.page.layout || options.layoutOverride) {
-    try {
-      layout =
-        options.layoutOverride ??
-        (await options.adapter.getLayoutDSL(
-          options.page.layout!,
-          publishedLayout && publishedLayout.id === options.page.layout
-            ? publishedLayout.version
-            : undefined,
-        ));
-      const regionNodes = await loadAssignedLayoutRegionNodes({
-        layout,
-        getComponentDSL,
-      });
-      headerNodes = regionNodes.headerNodes;
-      footerNodes = regionNodes.footerNodes;
-    } catch (error) {
-      logger(
-        "error",
-        `Layout \"${options.page.layout}\" failed to load, rendering page only`,
-        {
-          error: error instanceof Error ? error.message : String(error),
+  let iconResources: IconRenderResources | undefined;
+  const normalized = await normalizeEditableSurface(
+    { kind: "page", source: options.page },
+    { freeze: true },
+  );
+  const resolvedSurface = await resolveRenderSurface({
+    normalized,
+    mode: options.mode ?? (options.inlineCompiledCss ? "snapshot" : "public"),
+    route: {
+      path: requestPath,
+      ...((options.locale ?? cmsOptions.locale)
+        ? { locale: options.locale ?? cmsOptions.locale }
+        : {}),
+    },
+    dependencyVersions: {
+      ...(publicationDependencies?.layout
+        ? { layout: publicationDependencies.layout }
+        : {}),
+      components: publicationDependencies?.components ?? {},
+    },
+    providers: {
+      dependencies: createStorageRenderDependencyProvider(options.adapter, {
+        layoutOverride: options.layoutOverride,
+      }),
+      data: {
+        resolveData: async (input) => {
+          const regions = await Promise.all(
+            input.regions.map(
+              async (region): Promise<RenderRegionInput> => ({
+                ...region,
+                roots: await resolveCmsBoundNodes({
+                  nodes: region.roots,
+                  adapter: options.adapter,
+                  cms: cmsOptions,
+                  basePath: requestPath,
+                  catalog,
+                  contextLabel:
+                    region.role === "page"
+                      ? `page "${options.page.id}" nodes`
+                      : `${region.role} region "${region.id}"`,
+                }),
+              }),
+            ),
+          );
+          return {
+            regions,
+            records: [
+              {
+                kind: "cms-resolution",
+                id: `${options.page.id}:${cmsOptions.locale ?? "default"}`,
+                value: toCanonicalManifestValue(regions),
+              },
+            ],
+          };
         },
-      );
-    }
-  }
-
-  const pageNodes = await resolveCmsBoundNodes({
-    nodes: options.page.nodes,
-    adapter: options.adapter,
-    cms: cmsOptions,
-    basePath: requestPath,
-    catalog,
-    contextLabel: `page "${options.page.id}" nodes`,
+      },
+      resources: {
+        resolveResources: async (input) => {
+          const regions = structuredClone(input.regions);
+          for (const region of regions) {
+            prepareNavigationForRender(region.roots, requestPath);
+          }
+          const nodes = combineBuilderNodeSets(
+            ...regions.map((region) => region.roots),
+          );
+          iconResources = await resolveIconRenderResources(nodes, {
+            locals: options.locals,
+          });
+          return {
+            regions,
+            records: [...iconResources.icons.entries()].map(([id, icon]) => ({
+              kind: "icon",
+              id,
+              value: toCanonicalManifestValue(icon),
+            })),
+          };
+        },
+      },
+      styles: {
+        resolveStyleArtifact: async () => ({
+          id: "global",
+          revision:
+            designSystem.artifacts.globalCSSHash ||
+            designSystem.artifacts.lastCompiled ||
+            "uncompiled",
+          value: toCanonicalManifestValue({
+            baseCSSHash: designSystem.artifacts.baseCSSHash,
+            globalCSSHash: designSystem.artifacts.globalCSSHash,
+            utilityEngine: framework,
+          }),
+        }),
+      },
+    },
   });
-
-  if (layout?.slots?.length) {
-    layout = await resolveLayoutSlotsDefaultContent(
-      layout,
-      options.adapter,
-      cmsOptions,
-      requestPath,
-      catalog,
-    );
-  }
-
-  headerNodes = await resolveCmsBoundNodes({
-    nodes: headerNodes,
-    adapter: options.adapter,
-    cms: cmsOptions,
-    basePath: requestPath,
-    catalog,
-    contextLabel: options.page.layout
-      ? `layout "${options.page.layout}" header region`
-      : `page "${options.page.id}" header region`,
-  });
-  footerNodes = await resolveCmsBoundNodes({
-    nodes: footerNodes,
-    adapter: options.adapter,
-    cms: cmsOptions,
-    basePath: requestPath,
-    catalog,
-    contextLabel: options.page.layout
-      ? `layout "${options.page.layout}" footer region`
-      : `page "${options.page.id}" footer region`,
-  });
-
-  const slotOnlyLayout =
-    layout &&
-    (!layout.nodes || layout.nodes.length === 0) &&
-    Array.isArray(layout.slots) &&
-    layout.slots.length > 0;
-
-  const mergedSlotNodes = slotOnlyLayout
-    ? mergePageBlocksWithLayoutSlotsForPublish(pageNodes, layout)
-    : null;
-
-  // Expand every render region before one shared icon prepass. The async
-  // document/fragment helpers receive this resource and therefore do not read
-  // the manifest or shards again.
-  const { expandComponentReferencesServer } =
-    await import("../blocks/nodeUtils");
-  const expandedPageSurfaceNodes = await expandComponentReferencesServer(
-    slotOnlyLayout ? (mergedSlotNodes ?? pageNodes) : pageNodes,
-    getComponentDSL,
+  const headerNodes: BuilderNode[] = [
+    ...(resolvedSurface.regions.find((region) => region.role === "header")
+      ?.roots ?? []),
+  ];
+  const footerNodes: BuilderNode[] = [
+    ...(resolvedSurface.regions.find((region) => region.role === "footer")
+      ?.roots ?? []),
+  ];
+  const bodyRegion = resolvedSurface.regions.find(
+    (region) => region.role === "layout" || region.role === "page",
   );
-  const resolvedBodySurfaceNodes = layout?.nodes?.length
-    ? mergePageNodesIntoLayoutForRender(
-        expandedPageSurfaceNodes,
-        await expandComponentReferencesServer(layout.nodes, getComponentDSL),
-        layout.slots,
-      )
-    : expandedPageSurfaceNodes;
+  const pageNodes: BuilderNode[] = [...(bodyRegion?.roots ?? [])];
   const iconSourceNodes = combineBuilderNodeSets(
-    resolvedBodySurfaceNodes,
-    await expandComponentReferencesServer(headerNodes, getComponentDSL),
-    await expandComponentReferencesServer(footerNodes, getComponentDSL),
+    pageNodes,
+    headerNodes,
+    footerNodes,
   );
-  const iconResources = await resolveIconRenderResources(iconSourceNodes, {
-    locals: options.locals,
-  });
   const rendererBaseFragment = await buildRendererBaseStyleFragment(
     collectRendererStyleRequirements(iconSourceNodes),
   );
@@ -477,23 +432,13 @@ export async function renderPageDslToHtml(
         nodeCss: "",
       })
     : "";
-  if (iconResources.metrics) {
+  if (iconResources?.metrics) {
     logger("debug", "Icon render prepass completed", {
       slug: options.page.slug,
       ...iconResources.metrics,
       resolvedIconCount: iconResources.icons.size,
     });
   }
-
-  prepareNavigationForRender(pageNodes, requestPath);
-  if (mergedSlotNodes) {
-    prepareNavigationForRender(mergedSlotNodes, requestPath);
-  }
-  if (layout?.nodes?.length) {
-    prepareNavigationForRender(layout.nodes, requestPath);
-  }
-  prepareNavigationForRender(headerNodes, requestPath);
-  prepareNavigationForRender(footerNodes, requestPath);
 
   const assignedRegions = await renderLayoutRegionFragments({
     headerNodes,
@@ -506,24 +451,13 @@ export async function renderPageDslToHtml(
     iconResources,
   });
 
-  const iconRuntimeNodes = combineBuilderNodeSets(
-    slotOnlyLayout ? mergedSlotNodes! : pageNodes,
-    layout?.nodes,
-    headerNodes,
-    footerNodes,
-  );
+  const iconRuntimeNodes = iconSourceNodes;
 
   const needsMotionRuntime = nodeTreeRequiresMotionRuntime(
-    slotOnlyLayout ? mergedSlotNodes! : pageNodes,
-    layout?.nodes,
-    headerNodes,
-    footerNodes,
+    ...resolvedSurface.regions.map((region) => region.roots),
   );
   const needsNavRuntime = nodeTreeRequiresNavRuntime(
-    slotOnlyLayout ? mergedSlotNodes! : pageNodes,
-    layout?.nodes,
-    headerNodes,
-    footerNodes,
+    ...resolvedSurface.regions.map((region) => region.roots),
   );
   const motionScriptTag = needsMotionRuntime ? renderMotionScriptTag() : "";
   const navStylesheetTag = needsNavRuntime ? renderNavStylesheetTag() : "";
@@ -631,52 +565,12 @@ export async function renderPageDslToHtml(
     },
   };
 
-  if (layout?.nodes && layout.nodes.length > 0) {
-    logger("info", `Rendering with layout \"${options.page.layout}\"`, {
-      nodeCount: layout.nodes.length,
-    });
-
-    return {
-      html: injectIntoBody(
-        await nodesToHtmlWithLayoutAsync(
-          pageNodes,
-          layout.nodes,
-          getComponentDSL,
-          {
-            ...documentOptions,
-            layoutSlots: layout.slots ?? [],
-          },
-        ),
-        assignedRegions,
-      ),
-      cspHeaderValue,
-    };
-  }
-
-  if (slotOnlyLayout && mergedSlotNodes) {
-    logger("info", `Rendering with layout slots \"${options.page.layout}\"`, {
-      slotCount: layout?.slots?.length ?? 0,
-      mergedNodeCount: mergedSlotNodes.length,
-    });
-
-    return {
-      html: await nodesToHtmlDocumentAsync(
-        mergedSlotNodes,
-        getComponentDSL,
-        documentOptions,
-      ),
-      cspHeaderValue,
-    };
-  }
-
-  if (options.page.layout && layout) {
-    logger(
-      "info",
-      `Layout \"${options.page.layout}\" has no layout nodes; rendering page with assigned regions only`,
-    );
-  } else {
-    logger("info", "Rendering page without layout");
-  }
+  logger("info", "Rendering resolved surface", {
+    mode: resolvedSurface.mode,
+    regionCount: resolvedSurface.regions.length,
+    dependencyCount: resolvedSurface.dependencies.records.length,
+    renderInputHash: resolvedSurface.renderInputHash,
+  });
 
   return {
     html: injectIntoBody(

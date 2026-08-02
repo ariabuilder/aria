@@ -99,7 +99,7 @@ export async function ariaRenameClass(
     context,
     operationId: "styles.renameClass",
     inputSchema: AriaRenameClassInputSchema,
-    outputSchema: z.any(),
+    outputSchema: z.unknown(),
     payload: parsed.data,
     handler: (validated, actionContext) =>
       handleRenameClass(validated, actionContext),

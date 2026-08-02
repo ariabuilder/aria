@@ -1,8 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { computed, defineComponent, ref } from "vue";
 import { mount } from "@vue/test-utils";
+import type { BuilderNodeFixture } from "../../helpers/builderNodeFixture";
 
-const selectedNodeRef = ref<any>(null);
+const selectedNodeRef = ref<BuilderNodeFixture | null>(null);
 const selectedNodeIdRef = ref<string | null>("node-1");
 const hasCmsContext = ref(true);
 const isBound = ref(false);

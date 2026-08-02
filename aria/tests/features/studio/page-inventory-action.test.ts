@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
+import { getActionHandler } from "../../helpers/actionHandler";
 
 vi.mock("../../../admin/features/Studio/pages/composables/usePageRevert", () => ({
   GetPageVersionsInputSchema: z.object({ slug: z.string().min(1) }),
@@ -118,7 +119,7 @@ describe("pages.listInventory", () => {
 
     const { pages } = await import("../../../actions/pages");
 
-    const result = await (pages.listInventory as any).handler(undefined, {
+    const result = await getActionHandler(pages.listInventory)(undefined, {
       locals: {},
     });
 
@@ -180,7 +181,7 @@ describe("pages.listInventory", () => {
 
     const { pages } = await import("../../../actions/pages");
 
-    const result = await (pages.listInventory as any).handler(undefined, {
+    const result = await getActionHandler(pages.listInventory)(undefined, {
       locals: {},
     });
 
@@ -210,7 +211,7 @@ describe("pages.listInventory", () => {
     });
 
     const { pages } = await import("../../../actions/pages");
-    const result = await (pages.getDetailBundle as any).handler(
+    const result = await getActionHandler(pages.getDetailBundle)(
       { slug: "index", activityLimit: 5 },
       { locals: {} },
     );

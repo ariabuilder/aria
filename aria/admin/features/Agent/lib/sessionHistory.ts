@@ -164,10 +164,19 @@ export async function resolveSessionHistoryAdapter(
 
   try {
     // Check for D1 binding in either cfBindings or runtime.env
+    const localsRecord = locals as Record<string, unknown>;
+    const cfBindings = localsRecord.cfBindings;
+    const runtime = localsRecord.runtime;
+    const runtimeEnv =
+      runtime && typeof runtime === "object"
+        ? (runtime as Record<string, unknown>).env
+        : undefined;
     const env =
-      typeof locals === "object" && locals !== null && "cfBindings" in locals
-        ? (locals as any).cfBindings
-        : (locals as any)?.runtime?.env;
+      cfBindings && typeof cfBindings === "object"
+        ? (cfBindings as Record<string, unknown>)
+        : runtimeEnv && typeof runtimeEnv === "object"
+          ? (runtimeEnv as Record<string, unknown>)
+          : undefined;
 
     const db = env?.aria_db as D1Database | undefined;
     if (db) {

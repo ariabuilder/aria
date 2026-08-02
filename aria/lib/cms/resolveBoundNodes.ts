@@ -33,12 +33,13 @@ import type { MediaCatalogRepository } from "../media/catalog/repository";
 import { CollectionEntryContextSchema } from "../rendering/resolvePublicPageRoute";
 import type { StorageAdapter } from "../storage/adapter";
 import { isLinkableContainerNodeType } from "../blocks/containerTypes";
-import {
-  getLinkHref,
-  TEXT_LINK_PROP_NAMES,
-} from "../blocks/listItemLinks";
+import { getLinkHref, TEXT_LINK_PROP_NAMES } from "../blocks/listItemLinks";
 import { isJsonValue, type BuilderNode, type StyleMap } from "../types/nodes";
 import { formatCmsDateValue } from "./dateBindingFormats";
+import {
+  getCanonicalContentPropName,
+  isContentPropAlias,
+} from "../blocks/contentContract";
 
 export const RenderCmsDataOptionsSchema = z
   .object({
@@ -60,7 +61,9 @@ export type RenderCmsDataOptions = z.infer<typeof RenderCmsDataOptionsSchema>;
 export const ResolveCmsBoundNodesInputSchema = z
   .object({
     nodes: z.array(
-      z.custom<BuilderNode>((value) => value !== null && typeof value === "object"),
+      z.custom<BuilderNode>(
+        (value) => value !== null && typeof value === "object",
+      ),
     ),
     basePath: z.string().default("/"),
     cms: RenderCmsDataOptionsSchema.optional(),
@@ -95,7 +98,8 @@ function collectNodeDataSources(
       node.dataSource?.mode === "list" && Boolean(node.children?.length);
     if (
       node.dataSource &&
-      (node.dataSource.type === "cms" || node.dataSource.type === "collection") &&
+      (node.dataSource.type === "cms" ||
+        node.dataSource.type === "collection") &&
       node.dataSource.collection &&
       (hasBindings || isListTemplate)
     ) {
@@ -225,7 +229,9 @@ function readResolvedBindingValue(
   bindingPath: string,
 ): unknown {
   const entry = source.entry ?? source.items[0] ?? null;
-  return entry ? readResolvedEntryBindingValue(source, entry, bindingPath) : undefined;
+  return entry
+    ? readResolvedEntryBindingValue(source, entry, bindingPath)
+    : undefined;
 }
 
 const TEXT_LIKE_PROP_NAMES = new Set(["text", "content", "label", "title"]);
@@ -281,7 +287,9 @@ function isImageSourcePropName(propName: string): boolean {
 
 function isAltTextPropName(propName: string): boolean {
   const name = normalizedPropName(propName);
-  return name === "alt" || name.includes("alttext") || name.includes("alt_text");
+  return (
+    name === "alt" || name.includes("alttext") || name.includes("alt_text")
+  );
 }
 
 export function coerceCmsBindingValueForNodeProp(
@@ -364,6 +372,14 @@ function writeJsonBoundProp(
   const coerced = coerceCmsBindingValueForNodeProp(propName, resolved);
   if (isJsonValue(coerced)) {
     node.props[propName] = coerced;
+    const canonicalContentProp = getCanonicalContentPropName(node.type);
+    if (
+      canonicalContentProp &&
+      (propName === canonicalContentProp ||
+        isContentPropAlias(node.type, propName))
+    ) {
+      node.props[canonicalContentProp] = coerced;
+    }
   }
 }
 
@@ -509,7 +525,13 @@ function writeTemplateBindingsForEntry(
       node.children = fieldValue.flatMap((item, index) => {
         const clones = cloneNodesForRender(node.children);
         suffixRepeatedNodeIds(clones, `__cms_field_${index}`);
-        writeTemplateBindingsForLoopItem(clones, source, entry, item, fieldPath);
+        writeTemplateBindingsForLoopItem(
+          clones,
+          source,
+          entry,
+          item,
+          fieldPath,
+        );
         applyLoopParentLinkToClones(node, clones, source, entry);
         return clones;
       });
@@ -645,7 +667,10 @@ function materializePaginationNodes(input: {
   currentPage: number;
 }): void {
   for (const node of input.nodes) {
-    if (node.dataSource?.type === "pagination" && node.dataSource.targetNodeId) {
+    if (
+      node.dataSource?.type === "pagination" &&
+      node.dataSource.targetNodeId
+    ) {
       const pagination = PaginationDataSourceSchema.parse({
         type: "pagination",
         targetNodeId: node.dataSource.targetNodeId,

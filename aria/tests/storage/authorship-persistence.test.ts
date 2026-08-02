@@ -287,7 +287,7 @@ runAdapterParityTests("Cloudflare", async () => {
     );
   }
   const adapter = new CloudflareStorageAdapter({
-    aria_db: createD1Mock(client) as any,
+    aria_db: createD1Mock(client),
   });
 
   return {

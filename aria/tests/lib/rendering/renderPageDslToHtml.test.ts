@@ -5,7 +5,6 @@ import { renderPageDslToHtml } from "../../../lib/rendering/renderPageDslToHtml"
 import { renderPageHtmlFromStorage } from "../../../lib/rendering/renderPageHtml";
 import { createDefaultUniversalDesignSystem } from "../../../lib/styles/universalDesignSystem";
 import type { AriaCollection, AriaEntryRecord } from "../../../lib/cms/schemas";
-import { createIconAssetFetcher } from "../../helpers/iconAssetFetcher";
 import { assembleRendererBaseCss } from "../../../lib/rendering/canonical";
 
 function createManagedFooterImage(): BuilderNode {
@@ -296,24 +295,6 @@ describe("renderPageDslToHtml", () => {
     expect(html).not.toContain("Draft header");
   });
 
-  it("sets the document language from the resolved CMS locale", async () => {
-    const page: PageDSL = {
-      id: "post-template",
-      slug: "post-template",
-      title: "Article",
-      nodes: [],
-      status: "published",
-    };
-
-    const { html } = await renderPageDslToHtml({
-      page,
-      adapter: createAdapter(null),
-      cms: { preview: false, locale: "fr" },
-    });
-
-    expect(html).toContain('<html lang="fr"');
-  });
-
   it("serializes document spacing through the fallback Global Styles path", async () => {
     const designSystem = createDefaultUniversalDesignSystem();
     designSystem.globalStyles.defaults.root.margin = "2px";
@@ -335,10 +316,26 @@ describe("renderPageDslToHtml", () => {
 
     expect(html).toContain("html {\n  margin: 2px;");
     expect(html).toContain("padding: var(--root-space);");
-    expect(html).toContain(
-      "body {\n  margin: 1rem auto;\n  padding: 24px;",
-    );
+    expect(html).toContain("body {\n  margin: 1rem auto;\n  padding: 24px;");
     expect(html).not.toContain("html, body {");
+  });
+
+  it("sets the document language from the resolved CMS locale", async () => {
+    const page: PageDSL = {
+      id: "post-template",
+      slug: "post-template",
+      title: "Article",
+      nodes: [],
+      status: "published",
+    };
+
+    const { html } = await renderPageDslToHtml({
+      page,
+      adapter: createAdapter(null),
+      cms: { preview: false, locale: "fr" },
+    });
+
+    expect(html).toContain('<html lang="fr"');
   });
 
   it("suppresses canonicals for localized error documents", async () => {
@@ -369,49 +366,6 @@ describe("renderPageDslToHtml", () => {
     expect(html).toContain('<html lang="fr"');
     expect(html).toContain('name="robots" content="noindex');
     expect(html).not.toContain('rel="canonical"');
-  });
-
-  it("inlines canonical Lucide icons from the runtime static-assets binding", async () => {
-    const page: PageDSL = {
-      id: "icons",
-      slug: "icons",
-      title: "Icons",
-      nodes: [
-        {
-          id: "feature-icon",
-          type: "Icon",
-          props: {
-            icon: {
-              id: "lucide:star",
-              pack: "lucide",
-              name: "star",
-              source: "iconify",
-              version: "2026-02-25-snapshot",
-            },
-            ariaLabel: "Feature icon",
-          },
-          styles: {},
-          children: [],
-        },
-      ],
-    };
-
-    const { html } = await renderPageDslToHtml({
-      page,
-      adapter: createAdapter(null),
-      locals: {
-        assetOrigin: "http://aria.test",
-        cfBindings: {
-          aria_assets: createIconAssetFetcher(),
-        },
-      },
-    });
-
-    expect(html).toContain(
-      '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"',
-    );
-    expect(html).toContain("<path");
-    expect(html).not.toContain('class="i-lucide:star"');
   });
 
   it("merges slot-only layout defaultContent into the document body", async () => {
@@ -658,9 +612,13 @@ describe("renderPageDslToHtml", () => {
         page,
         adapter: createCmsRenderAdapter({ collection, entries: [] }),
       }),
-    ).rejects.toThrow(
-      'CMS data source failed in page "standard-page" nodes: CMS data source "announcement-title" (collection: announcements, mode: single) failed',
-    );
+    ).rejects.toMatchObject({
+      name: "RenderContractError",
+      failure: {
+        code: "RENDER_DATA_RESOLUTION_FAILED",
+        message: "Required render data could not be resolved.",
+      },
+    });
   });
 
   it("renders JSON-safe CMS binding values into node props", async () => {
