@@ -566,34 +566,7 @@ async function openSelectedPage(slug: string): Promise<void> {
             {{ localizedError(errors.label) }}
           </p>
         </div>
-      </section>
 
-      <CollectionPublishingSection
-        class=""
-        :list-page-id="draft.listPageId"
-        :template-page-id="draft.templatePageId"
-        :url-pattern="draft.urlPattern"
-        :url-pattern-source="urlPatternSource"
-        :suggested-url-pattern="suggestedUrlPattern"
-        :list-page-options="listPageOptions"
-        :entry-page-options="entryPageOptions"
-        :selected-list-page="selectedListPage"
-        :selected-template-page="selectedTemplatePage"
-        :list-path-hint="listPathHint"
-        :entry-path-hint="entryPathHint"
-        :route-warnings="routeWarnings"
-        :route-warning-load-error="routeWarningLoadError"
-        :url-pattern-error="localizedError(errors.urlPattern)"
-        :collection-kind="draft.kind"
-        :disabled="isSaving || !canUpdateCollection"
-        @update:list-page-id="handleListPageIdUpdate"
-        @update:template-page-id="handleTemplatePageIdUpdate"
-        @update:url-pattern="handleUrlPatternInput"
-        @reset-url-pattern-to-auto="handleResetUrlPatternToAuto"
-        @edit-page-in-composer="openSelectedPage"
-      />
-
-      <section class="grid gap-7">
         <div class="grid gap-2">
           <Label class="text-sm! text-muted-foreground">{{ t("collections.settings.kind") }}</Label>
           <div class="grid grid-cols-1 items-start gap-3 sm:grid-cols-4">
@@ -638,6 +611,35 @@ async function openSelectedPage(slug: string): Promise<void> {
             </button>
           </div>
         </div>
+
+      </section>
+
+      <CollectionPublishingSection
+        class=""
+        :list-page-id="draft.listPageId"
+        :template-page-id="draft.templatePageId"
+        :url-pattern="draft.urlPattern"
+        :url-pattern-source="urlPatternSource"
+        :suggested-url-pattern="suggestedUrlPattern"
+        :list-page-options="listPageOptions"
+        :entry-page-options="entryPageOptions"
+        :selected-list-page="selectedListPage"
+        :selected-template-page="selectedTemplatePage"
+        :list-path-hint="listPathHint"
+        :entry-path-hint="entryPathHint"
+        :route-warnings="routeWarnings"
+        :route-warning-load-error="routeWarningLoadError"
+        :url-pattern-error="localizedError(errors.urlPattern)"
+        :collection-kind="draft.kind"
+        :disabled="isSaving || !canUpdateCollection"
+        @update:list-page-id="handleListPageIdUpdate"
+        @update:template-page-id="handleTemplatePageIdUpdate"
+        @update:url-pattern="handleUrlPatternInput"
+        @reset-url-pattern-to-auto="handleResetUrlPatternToAuto"
+        @edit-page-in-composer="openSelectedPage"
+      />
+
+      <section class="grid gap-7">
 
         <div class="grid gap-2">
           <Label class="text-sm! text-muted-foreground">{{ t("collections.settings.scope") }}</Label>

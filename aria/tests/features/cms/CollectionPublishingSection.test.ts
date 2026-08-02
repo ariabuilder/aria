@@ -20,7 +20,7 @@ const CollectionTemplateCardStub = defineComponent({
 });
 
 describe("CollectionPublishingSection", () => {
-  it("uses tag-specific labels for tag archive routing", () => {
+  it("uses tag-specific labels with collection-focused descriptions", () => {
     const wrapper = mount(CollectionPublishingSection, {
       props: {
         collectionKind: "tags",
@@ -36,8 +36,12 @@ describe("CollectionPublishingSection", () => {
     });
 
     const cards = wrapper.findAll('[data-testid="template-card"]');
-    expect(cards[0]?.text()).toContain("Optional all-tags index page.");
+    expect(cards[0]?.text()).toContain(
+      "Optional all-tags page for your collection.",
+    );
     expect(cards[1]?.text()).toContain("Tag URL template");
-    expect(cards[1]?.text()).toContain("Template for each /tags/{slug} archive page.");
+    expect(cards[1]?.text()).toContain(
+      "Template for entry pages for your collection.",
+    );
   });
 });
