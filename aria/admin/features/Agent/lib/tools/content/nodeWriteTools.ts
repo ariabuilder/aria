@@ -14,6 +14,11 @@ import { regenerateNodeTreeIds } from "../../../../../../lib/ids/nodeId";
 import { BuilderNodeSchema } from "../../../../../../lib/schemas/nodes";
 import type { BuilderNode } from "../../../../../../lib/types/nodes";
 import {
+  preflightBuilderNodeArrayInput,
+  preflightBuilderNodeInput,
+} from "../../../../../../lib/rendering/canonical/preflight";
+import type { RenderSurfaceKind } from "../../../../../../lib/rendering/canonical";
+import {
   AriaInsertNodesInputSchema,
   AriaInsertNodesOutputSchema,
   AriaMutateNodeInputSchema,
@@ -35,6 +40,14 @@ import { denyUtilityClassesWhenDisabled } from "./utilityClassPolicy";
 
 function writeSuccessResult(): { success: true } {
   return { success: true as const };
+}
+
+function collectionSurfaceKind(
+  collection: "pages" | "layouts" | "components",
+): RenderSurfaceKind {
+  if (collection === "pages") return "page";
+  if (collection === "layouts") return "layout";
+  return "component";
 }
 
 function denyPageWrites(
@@ -71,7 +84,20 @@ export async function ariaInsertNodes(
 
   const actionContext = toToolActionContext(context);
 
-  const normalized = normalizeAgentNodeTreeForInsert(parsed.data.nodes);
+  let preflightedNodes: unknown[];
+  try {
+    preflightedNodes = preflightBuilderNodeArrayInput({
+      kind: collectionSurfaceKind(parsed.data.collection),
+      nodes: parsed.data.nodes,
+    }).source as unknown[];
+  } catch {
+    return toolErrorResult({
+      code: "RENDER_INPUT_INVALID",
+      message: "The render input is invalid.",
+    });
+  }
+
+  const normalized = normalizeAgentNodeTreeForInsert(preflightedNodes);
   if (!normalized.ok) {
     return toolErrorResult({
       code: "INVALID_INPUT",
@@ -305,15 +331,12 @@ export async function ariaUpdateNodeClasses(
     parsed.data.addUtilityClass !== undefined ||
     parsed.data.removeUtilityClass !== undefined
   ) {
-    const utilityClassesDenied = await denyUtilityClassesWhenDisabled(
-      context,
-      {
-        classNames:
-          parsed.data.classNames ??
-          parsed.data.addUtilityClass ??
-          parsed.data.removeUtilityClass,
-      },
-    );
+    const utilityClassesDenied = await denyUtilityClassesWhenDisabled(context, {
+      classNames:
+        parsed.data.classNames ??
+        parsed.data.addUtilityClass ??
+        parsed.data.removeUtilityClass,
+    });
     if (utilityClassesDenied) return utilityClassesDenied;
   }
 
@@ -429,7 +452,20 @@ export async function ariaReplaceNode(
     );
   }
 
-  const nodeParsed = BuilderNodeSchema.safeParse(parsed.data.node);
+  let preflightedNode: unknown;
+  try {
+    preflightedNode = preflightBuilderNodeInput({
+      kind: collectionSurfaceKind(parsed.data.collection),
+      node: parsed.data.node,
+    }).source;
+  } catch {
+    return toolErrorResult({
+      code: "RENDER_INPUT_INVALID",
+      message: "The render input is invalid.",
+    });
+  }
+
+  const nodeParsed = BuilderNodeSchema.safeParse(preflightedNode);
   if (!nodeParsed.success) {
     return toolErrorResult(
       toolErrorFromZod("Invalid replacement node", nodeParsed.error.issues),

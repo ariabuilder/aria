@@ -85,6 +85,13 @@ export {
   type RenderFailureContext,
 } from "./errors";
 export {
+  normalizeEditableSurface,
+  type NormalizeEditableSurfaceOptions,
+  type NormalizedRenderSurface,
+  type RenderSurfaceKind,
+  type RenderSurfaceSourceByKind,
+} from "./contract";
+export {
   CanonicalSha256Schema,
   hashCanonicalJson,
   sha256Text,

@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { createClient } from "@libsql/client/node";
+import { prepareNormalizedSurfaceVersion } from "../lib/storage/internal/domains/surfaceNormalization";
 
 const ts = Date.now().toString();
 const now = new Date().toISOString();
@@ -207,15 +208,23 @@ const client = createClient({
   url: `file:${process.cwd()}/aria/storage/aria.db`,
 });
 
+const prepared = await prepareNormalizedSurfaceVersion({
+  kind: "component",
+  source: dsl,
+  version,
+  updatedAt: now,
+});
+
 await client.execute({
-  sql: `INSERT OR REPLACE INTO aria_component_versions (id, version, name, category, dsl_json, created_at)
-        VALUES (?, ?, ?, ?, ?, ?)`,
+  sql: `INSERT OR REPLACE INTO aria_component_versions (id, version, name, category, dsl_json, content_hash, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?)`,
   args: [
     "header-01",
     version,
     "Header 01",
     "navigation",
-    JSON.stringify(dsl),
+    JSON.stringify(prepared.source),
+    prepared.sourceHash,
     now,
   ],
 });

@@ -8,7 +8,6 @@ import type {
   ComponentDSL,
   JsonObject,
   StyleMap,
-  Responsive,
   BreakpointDefinition,
 } from "../types/nodes";
 import { DEFAULT_BREAKPOINTS } from "../types/nodes";
@@ -90,6 +89,7 @@ import {
   assembleRendererBaseCss,
   collectRendererStyleRequirements,
 } from "../rendering/canonical/rendererStyles";
+import { normalizeLegacyNodeCompatibility } from "../rendering/canonical/legacyNodeCompatibility";
 
 type ComponentDSLResolver = (
   id: string,
@@ -132,65 +132,7 @@ export function resolvePublishedHtmlRenderStyleMode(
   return "inline";
 }
 
-const LEGACY_STYLE_PROP_NAMES = [
-  "borderRadius",
-  "borderTopLeftRadius",
-  "borderTopRightRadius",
-  "borderBottomRightRadius",
-  "borderBottomLeftRadius",
-] as const;
-
-const IMAGE_RENDER_STYLE_PROP_NAMES = [
-  "objectFit",
-  "objectPosition",
-  "aspectRatio",
-] as const;
-
 const SIZING_METADATA_PROPERTIES = new Set(["widthSizing", "heightSizing"]);
-
-function normalizeLegacyRenderableNode(node: BuilderNode): {
-  props: JsonObject;
-  styles: StyleMap;
-} {
-  const props = { ...(node.props ?? {}) };
-  const styles = { ...(node.styles ?? {}) } as StyleMap;
-  const styleMap = styles as Record<string, Responsive<string> | undefined>;
-
-  for (const propertyName of LEGACY_STYLE_PROP_NAMES) {
-    const value = props[propertyName];
-
-    if (typeof value !== "string" && typeof value !== "number") {
-      continue;
-    }
-
-    if (!styleMap[propertyName]) {
-      styleMap[propertyName] = { base: String(value) };
-    }
-
-    delete props[propertyName];
-  }
-
-  if (
-    (node.type ?? "").toLowerCase() === "image" ||
-    (node.type ?? "").toLowerCase() === "video"
-  ) {
-    for (const propertyName of IMAGE_RENDER_STYLE_PROP_NAMES) {
-      const value = props[propertyName];
-
-      if (typeof value !== "string" || value.trim().length === 0) {
-        continue;
-      }
-
-      if (!styleMap[propertyName]) {
-        styleMap[propertyName] = { base: value };
-      }
-
-      delete props[propertyName];
-    }
-  }
-
-  return { props, styles };
-}
 
 function resolveBreakpoints(
   breakpoints: BreakpointDefinition[] = DEFAULT_BREAKPOINTS,
@@ -263,18 +205,6 @@ type ResponsiveStyleBucket = {
 
 function getResponsiveStyleSelector(nodeId: string, tag = "div"): string {
   return `${tag}.${getResponsiveStyleClass(nodeId)}`;
-}
-
-function getRenderedStyleTag(node: BuilderNode, props: JsonObject): string {
-  const normalizedType = normalizeContainerNodeType(node.type).toLowerCase();
-  if (
-    normalizedType === "icon" &&
-    getCanonicalIconIdFromValue(props.icon)
-  ) {
-    return "svg";
-  }
-
-  return getNativeTagForRenderableNode(node, props) ?? "div";
 }
 
 function collectNodeResponsiveCssRules(
@@ -944,7 +874,7 @@ function renderNode(
   }
 
   const { props: renderProps, styles: rawStyles } =
-    normalizeLegacyRenderableNode(node);
+    normalizeLegacyNodeCompatibility(node);
   const renderStyles = mergeSizingResolutionAcrossBreakpoints(
     rawStyles,
     parent,
@@ -1289,7 +1219,7 @@ function collectResponsiveStyleRules(
 
   function traverse(node: BuilderNode, parent: BuilderNode | null) {
     const { props: renderProps, styles: rawStyles } =
-      normalizeLegacyRenderableNode(node);
+      normalizeLegacyNodeCompatibility(node);
     const renderStyles = mergeSizingResolutionAcrossBreakpoints(
       rawStyles,
       parent,
@@ -1297,7 +1227,7 @@ function collectResponsiveStyleRules(
     );
 
     if (Object.keys(renderStyles).length > 0) {
-      const tag = getRenderedStyleTag(node, renderProps);
+      const tag = getNativeTagForRenderableNode(node, renderProps) ?? "div";
       collectNodeResponsiveCssRules(
         renderStyles,
         node.id,
@@ -1377,7 +1307,7 @@ export function collectNodeStylesheet(
 
   function traverse(node: BuilderNode, parent: BuilderNode | null): void {
     const { props: renderProps, styles: rawStyles } =
-      normalizeLegacyRenderableNode(node);
+      normalizeLegacyNodeCompatibility(node);
     const resolvedStyles = mergeSizingResolutionAcrossBreakpoints(
       rawStyles,
       parent,
@@ -1385,7 +1315,7 @@ export function collectNodeStylesheet(
     );
 
     if (hasRenderableStyles(resolvedStyles)) {
-      const tag = getRenderedStyleTag(node, renderProps);
+      const tag = getNativeTagForRenderableNode(node, renderProps) ?? "div";
       collectNodeStylesheetRules(
         resolvedStyles,
         node.id,

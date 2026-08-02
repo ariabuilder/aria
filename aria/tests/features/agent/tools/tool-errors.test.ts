@@ -13,6 +13,30 @@ describe("Agent tool errors", () => {
     expect(error.code).toBe("NOT_FOUND");
   });
 
+  it("decodes render contract errors carried over Astro BAD_REQUEST", () => {
+    const error = mapActionErrorToToolError({
+      code: "BAD_REQUEST",
+      message: "RENDER_INPUT_INVALID: The render input is invalid.",
+    });
+
+    expect(error).toEqual({
+      code: "RENDER_INPUT_INVALID",
+      message: "The render input is invalid.",
+    });
+  });
+
+  it("keeps unrelated Astro BAD_REQUEST behavior", () => {
+    const error = mapActionErrorToToolError({
+      code: "BAD_REQUEST",
+      message: "The request is malformed.",
+    });
+
+    expect(error).toMatchObject({
+      code: "INVALID_INPUT",
+      message: "The request is malformed.",
+    });
+  });
+
   it("formats zod issues", () => {
     const schema = z.object({ slug: z.string().min(1) });
     const parsed = schema.safeParse({});

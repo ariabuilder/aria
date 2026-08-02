@@ -1,24 +1,24 @@
 import { z } from "zod";
 import type { $ZodIssue } from "zod/v4/core";
 import {
-ContentSyncApplyInputSchema,
-ContentSyncHistoryInputSchema,
-ContentSyncPlanInputSchema,
-ContentSyncStatusInputSchema,
+  ContentSyncApplyInputSchema,
+  ContentSyncHistoryInputSchema,
+  ContentSyncPlanInputSchema,
+  ContentSyncStatusInputSchema,
 } from "../../../../../lib/content-sync/schema";
 import { DeliveryListQuerySchema } from "../../../../../lib/email/types";
 import {
-CreateSiteExportInputSchema,
-DeleteSiteExportInputSchema,
+  CreateSiteExportInputSchema,
+  DeleteSiteExportInputSchema,
 } from "../../../../../lib/export/schema";
 import {
-SaveMediaAssetProfileInputSchema,
-SaveMediaTransformVariantInputSchema,
+  SaveMediaAssetProfileInputSchema,
+  SaveMediaTransformVariantInputSchema,
 } from "../../../../../lib/media/transforms/schemas";
 import {
-MediaSyncApplyInputSchema,
-MediaSyncHistoryInputSchema,
-MediaSyncPlanInputSchema,
+  MediaSyncApplyInputSchema,
+  MediaSyncHistoryInputSchema,
+  MediaSyncPlanInputSchema,
 } from "../../../../../lib/media/types";
 
 export const ConfirmationCategorySchema = z.enum([
@@ -57,6 +57,7 @@ export type AgentActivityLogListInput = z.infer<
 
 export const AgentToolErrorCodeSchema = z.enum([
   "INVALID_INPUT",
+  "RENDER_INPUT_INVALID",
   "FORBIDDEN",
   "NOT_FOUND",
   "CONFLICT",

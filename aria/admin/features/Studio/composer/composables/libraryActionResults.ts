@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { log } from "@/lib/utils/logger";
+import { decodeRenderActionErrorMessage } from "../../../../../lib/rendering/actionErrorMessage";
 
 export interface LibraryPackItem {
   id: string;
@@ -92,6 +93,7 @@ const LibraryPackComponentSchema = z.object({
   tier: z.enum(["free", "pro"]).optional(),
   isLocked: z.boolean().optional(),
   packId: z.string().optional(),
+  packVersion: z.string().optional(),
   version: z.string().optional(),
 });
 
@@ -164,7 +166,11 @@ function getTransportErrorMessage(
   result: LibraryActionTransportResult,
   fallback: string,
 ): string {
-  return result.error?.message ?? fallback;
+  return (
+    decodeRenderActionErrorMessage(result.error?.message)?.message ??
+    result.error?.message ??
+    fallback
+  );
 }
 
 export function toLibraryErrorMessage(

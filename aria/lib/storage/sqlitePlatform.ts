@@ -130,6 +130,7 @@ import {
   createStudioPresenceStorageDomain,
   type StudioPresenceStorageDomain,
 } from "./internal/domains/studioPresence";
+import { prepareNormalizedSurfaceVersion } from "./internal/domains/surfaceNormalization";
 import {
   createWordPressImportStorageDomain,
   type WordPressImportStorageDomain,
@@ -580,15 +581,23 @@ export class SQLiteStoragePlatform implements StorageAdapter {
         continue;
       }
 
+      const prepared = await prepareNormalizedSurfaceVersion({
+        kind: "layout",
+        source: layout.dsl,
+        version: layout.version,
+        updatedAt: layout.updatedAt,
+      });
+
       await this.runRaw(
-        `INSERT OR IGNORE INTO aria_layout_versions (id, version, name, status, dsl_json, created_at)
-         VALUES (?, ?, ?, ?, ?, ?)`,
+        `INSERT OR IGNORE INTO aria_layout_versions (id, version, name, status, dsl_json, content_hash, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
         [
           layout.id,
           layout.version,
           layout.name,
           "published",
-          serializeDslForStorage(layout.dsl),
+          serializeDslForStorage(prepared.source),
+          prepared.sourceHash,
           layout.updatedAt,
         ],
       );
@@ -622,17 +631,24 @@ export class SQLiteStoragePlatform implements StorageAdapter {
     }
 
     const starterPage = await loadStarterPage();
+    const prepared = await prepareNormalizedSurfaceVersion({
+      kind: "page",
+      source: starterPage.dsl,
+      version: starterPage.version,
+      updatedAt: starterPage.updatedAt,
+    });
 
     await this.runRaw(
-      `INSERT OR IGNORE INTO aria_page_versions (id, version, slug, title, status, dsl_json, created_at, compiler_metadata_json)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT OR IGNORE INTO aria_page_versions (id, version, slug, title, status, dsl_json, content_hash, created_at, compiler_metadata_json)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         starterPage.id,
         starterPage.version,
         starterPage.slug,
         starterPage.title,
         starterPage.status,
-        serializeDslForStorage(starterPage.dsl),
+        serializeDslForStorage(prepared.source),
+        prepared.sourceHash,
         starterPage.updatedAt,
         serializeCompilerMetadata(
           buildCurrentCompilerMetadata(starterPage.updatedAt),
@@ -667,17 +683,24 @@ export class SQLiteStoragePlatform implements StorageAdapter {
   ): Promise<void> {
     const now = this.nowIso();
     const version = "v1";
+    const prepared = await prepareNormalizedSurfaceVersion({
+      kind: "page",
+      source: page,
+      version,
+      updatedAt: now,
+    });
 
     await this.runRaw(
-      `INSERT OR IGNORE INTO aria_page_versions (id, version, slug, title, status, dsl_json, created_at, compiler_metadata_json)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT OR IGNORE INTO aria_page_versions (id, version, slug, title, status, dsl_json, content_hash, created_at, compiler_metadata_json)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         page.id,
         version,
         page.slug,
         page.title,
         "published",
-        serializeDslForStorage(page),
+        serializeDslForStorage(prepared.source),
+        prepared.sourceHash,
         now,
         serializeCompilerMetadata(buildCurrentCompilerMetadata(now)),
       ],

@@ -749,6 +749,7 @@ export interface ComponentDSL {
 
   source?: ComponentSource; // Defaults to 'custom' for existing components
   packId?: string; // Pack identifier for aria-sourced components
+  packVersion?: string; // Installed pack semantic version; independent of storage revision
   tier?: ComponentTier; // Defaults to 'free'
   isLocked?: boolean; // If true, component structure cannot be edited
 

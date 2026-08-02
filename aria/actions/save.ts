@@ -5,12 +5,7 @@
 
 import { defineAction } from "astro:actions";
 import { z } from "astro/zod";
-import type {
-  PageDSL,
-  LayoutDSL,
-  ComponentDSL,
-  BuilderNode,
-} from "../lib/types/nodes";
+import type { PageDSL, LayoutDSL, ComponentDSL } from "../lib/types/nodes";
 import {
   getResource,
   getAdapter,
@@ -20,11 +15,11 @@ import {
   consumeNonce,
 } from "./_shared";
 import { log as baseLog } from "../lib/utils/logger";
-import { normalizeNodesIcons } from "../lib/icons/action-normalizers";
+import { normalizeEditableSurface } from "../lib/rendering/canonical";
 import { savePageSnapshot } from "../lib/rendering/pageSnapshots";
 import { assertPageLayoutChangeAllowed } from "../lib/pages/layoutPolicy.server";
 import { normalizePageLayoutRef } from "../lib/pages/layoutPolicy";
-import { LayoutDSLSchema } from "../lib/schemas/nodes";
+import { throwSafeRenderContractActionError } from "./_renderContractError";
 
 type LogLevel = "debug" | "info" | "warn" | "error";
 
@@ -99,6 +94,7 @@ function formatUnknownError(error: unknown): string {
 }
 
 function handleError(error: unknown, operation: string): never {
+  throwSafeRenderContractActionError(error);
   if (error instanceof Error) {
     log("error", `${operation} failed`, { error: error.message });
     throw error;
@@ -182,27 +178,7 @@ function assertExpectedVersion(
 }
 
 const IdSchema = z.string().min(1).max(255);
-const JsonValueSchema: z.ZodType<unknown> = z.lazy(() =>
-  z.union([
-    z.string(),
-    z.number(),
-    z.boolean(),
-    z.null(),
-    z.array(JsonValueSchema),
-    z.record(z.string(), JsonValueSchema),
-  ]),
-);
-const JsonObjectSchema = z.record(z.string(), JsonValueSchema);
-
-const BuilderNodeSchema = z.looseObject({
-  id: z.string(),
-  type: z.string(),
-  slot: z.string().optional(),
-  props: JsonObjectSchema.optional(),
-  styles: z.record(z.string(), z.unknown()).optional(),
-  children: z.array(z.lazy((): z.ZodTypeAny => BuilderNodeSchema)).optional(),
-  componentRef: z.string().optional(),
-});
+const BuilderNodeArrayInputSchema = z.array(z.unknown());
 
 export const save = {
   /**
@@ -213,18 +189,18 @@ export const save = {
     accept: "json",
     input: z.object({
       id: IdSchema,
-      blocks: z.array(BuilderNodeSchema),
+      blocks: BuilderNodeArrayInputSchema,
       title: z.string().optional(),
       description: z.string().optional(),
       layout: z.string().optional(),
-      settings: JsonObjectSchema.optional(),
+      settings: z.unknown().optional(),
       nonce: z.string().optional(),
       expectedVersion: z.string().trim().min(1),
       layoutDraft: z
         .object({
           id: IdSchema,
           expectedVersion: z.string().trim().min(1),
-          dsl: LayoutDSLSchema,
+          dsl: z.unknown(),
         })
         .strict()
         .optional(),
@@ -257,9 +233,7 @@ export const save = {
           pageVersionPins?.draftVersion ?? pageVersionPins?.currentVersion,
         );
 
-        const normalizedBlocks = normalizeNodesIcons(
-          input.blocks as BuilderNode[],
-        );
+        const normalizedBlocks = input.blocks;
         const isDestructiveBlankOverwrite =
           Array.isArray(page.nodes) &&
           page.nodes.length > 0 &&
@@ -300,7 +274,7 @@ export const save = {
         // Strip server-derived tracking fields (e.g. isModifiedSincePublish)
         // that are computed on read but not part of the stored PageDSL schema.
         const { isModifiedSincePublish: _, ...pageRest } = page;
-        const updatedPage = {
+        const updatedPageProposal = {
           ...pageRest,
           title: input.title ?? page.title,
           description: input.description ?? page.description,
@@ -310,18 +284,35 @@ export const save = {
           status: page.status || ("draft" as const),
           updatedAt: new Date().toISOString(),
         };
+        const updatedPage = (
+          await normalizeEditableSurface({
+            kind: "page",
+            source: updatedPageProposal,
+          })
+        ).source;
+        const linkedLayoutDraft = input.layoutDraft
+          ? {
+              ...input.layoutDraft,
+              dsl: (
+                await normalizeEditableSurface({
+                  kind: "layout",
+                  source: input.layoutDraft.dsl,
+                })
+              ).source,
+            }
+          : undefined;
 
         const version = await saveResource(
           adapter,
           context,
           "pages",
           sanitizedId,
-          updatedPage as PageDSL,
+          updatedPage,
           authorship,
           {
             locals: context.locals,
             versionSaveOptions: { expectedVersion: input.expectedVersion },
-            linkedLayoutDraft: input.layoutDraft,
+            linkedLayoutDraft,
           },
         );
         const layoutVersion = input.layoutDraft
@@ -331,20 +322,14 @@ export const save = {
         const postCommitResults = await Promise.allSettled([
           savePageSnapshot(
             {
-              page: updatedPage as PageDSL,
+              page: updatedPage,
               stage: "draft",
             },
             adapter,
             { locals: context.locals },
           ),
           ...(isDestructiveBlankOverwrite && input.nonce
-            ? [
-                consumeComposeNonceAfterSave(
-                  context,
-                  sanitizedId,
-                  input.nonce,
-                ),
-              ]
+            ? [consumeComposeNonceAfterSave(context, sanitizedId, input.nonce)]
             : []),
         ]);
         postCommitResults.forEach((result, index) => {
@@ -384,7 +369,7 @@ export const save = {
     accept: "json",
     input: z.object({
       id: IdSchema,
-      blocks: z.array(BuilderNodeSchema),
+      blocks: BuilderNodeArrayInputSchema,
       name: z.string().optional(),
       category: z.string().optional(),
       description: z.string().optional(),
@@ -418,12 +403,10 @@ export const save = {
         );
         assertExpectedVersion(component, input.expectedVersion);
 
-        const normalizedBlocks = normalizeNodesIcons(
-          input.blocks as BuilderNode[],
-        );
+        const normalizedBlocks = input.blocks;
 
         // Update component with new blocks and metadata
-        const updatedComponent = {
+        const updatedComponentProposal = {
           ...component,
           nodes: normalizedBlocks,
           name: input.name ?? component.name,
@@ -431,6 +414,12 @@ export const save = {
           description: input.description ?? component.description,
           updatedAt: new Date().toISOString(),
         };
+        const updatedComponent = (
+          await normalizeEditableSurface({
+            kind: "component",
+            source: updatedComponentProposal,
+          })
+        ).source;
 
         const version = await saveResource(
           adapter,
@@ -469,7 +458,7 @@ export const save = {
     accept: "json",
     input: z.object({
       id: IdSchema,
-      blocks: z.array(BuilderNodeSchema),
+      blocks: BuilderNodeArrayInputSchema,
       title: z.string().optional(),
       nonce: z.string().optional(),
       expectedVersion: z.string().trim().min(1),
@@ -501,17 +490,21 @@ export const save = {
         );
         assertExpectedVersion(layout, input.expectedVersion);
 
-        const normalizedBlocks = normalizeNodesIcons(
-          input.blocks as BuilderNode[],
-        );
+        const normalizedBlocks = input.blocks;
 
         // Update layout with new blocks and metadata
-        const updatedLayout = {
+        const updatedLayoutProposal = {
           ...layout,
           nodes: normalizedBlocks,
           title: input.title ?? layout.title,
           updatedAt: new Date().toISOString(),
         };
+        const updatedLayout = (
+          await normalizeEditableSurface({
+            kind: "layout",
+            source: updatedLayoutProposal,
+          })
+        ).source;
 
         const version = await saveResource(
           adapter,

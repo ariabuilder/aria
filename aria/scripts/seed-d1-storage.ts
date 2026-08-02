@@ -7,24 +7,19 @@ import { readFileSync } from "fs";
 import { resolve } from "path";
 import { z } from "zod";
 
-import {
-  selectRetainedVersions,
-} from "../lib/storage/versioning";
+import { selectRetainedVersions } from "../lib/storage/versioning";
 import { STARTER_LAYOUT_IDS } from "../lib/storage/starterLayoutIds";
 import { loadStarterLayouts } from "../lib/storage/starterLayouts";
 import { serializeDslForStorage } from "../lib/storage/helpers";
+import { prepareNormalizedSurfaceVersion } from "../lib/storage/internal/domains/surfaceNormalization";
+import type { RenderSurfaceKind } from "../lib/rendering/canonical";
 
 const DB_PATH = resolve(process.cwd(), "aria/storage/aria.db");
 const MIGRATIONS_DIR = resolve(process.cwd(), "aria/migrations");
 import { BASELINE_MIGRATION_ID } from "../lib/storage/runStorageMigrations";
 const SeedExportConfigSchema = z
   .object({
-    keepLatestVersions: z.coerce
-      .number()
-      .int()
-      .min(1)
-      .max(100)
-      .default(1),
+    keepLatestVersions: z.coerce.number().int().min(1).max(100).default(1),
   })
   .strict();
 const CLEAR_TABLES = [
@@ -369,7 +364,10 @@ function normalizeSnapshotRows(
 }
 
 async function applyMigrations(client: ReturnType<typeof createClient>) {
-  const sql = readFileSync(resolve(MIGRATIONS_DIR, BASELINE_MIGRATION_ID), "utf-8");
+  const sql = readFileSync(
+    resolve(MIGRATIONS_DIR, BASELINE_MIGRATION_ID),
+    "utf-8",
+  );
   await client.executeMultiple(sql);
 }
 
@@ -501,15 +499,23 @@ async function ensureStarterLayouts(client: ReturnType<typeof createClient>) {
       continue;
     }
 
+    const prepared = await prepareNormalizedSurfaceVersion({
+      kind: "layout",
+      source: layout.dsl,
+      version: layout.version,
+      updatedAt: layout.updatedAt,
+    });
+
     await client.execute({
-      sql: `INSERT OR IGNORE INTO aria_layout_versions (id, version, name, status, dsl_json, created_at)
-            VALUES (?, ?, ?, ?, ?, ?)`,
+      sql: `INSERT OR IGNORE INTO aria_layout_versions (id, version, name, status, dsl_json, content_hash, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?)`,
       args: [
         layout.id,
         layout.version,
         layout.name,
         "published",
-        serializeDslForStorage(layout.dsl),
+        serializeDslForStorage(prepared.source),
+        prepared.sourceHash,
         layout.updatedAt,
       ],
     });
@@ -527,6 +533,45 @@ async function ensureStarterLayouts(client: ReturnType<typeof createClient>) {
       ],
     });
   }
+}
+
+function versionTableSurfaceKind(tableName: string): RenderSurfaceKind | null {
+  if (tableName === "aria_page_versions") return "page";
+  if (tableName === "aria_layout_versions") return "layout";
+  if (tableName === "aria_component_versions") return "component";
+  return null;
+}
+
+async function normalizeVersionRowsForExport(
+  tableName: string,
+  rows: Array<Record<string, unknown>>,
+): Promise<Array<Record<string, unknown>>> {
+  const kind = versionTableSurfaceKind(tableName);
+  if (!kind) return rows;
+
+  const normalizedRows: Array<Record<string, unknown>> = [];
+  for (const row of rows) {
+    if (typeof row.dsl_json !== "string") {
+      throw new Error(`${tableName} row is missing dsl_json`);
+    }
+    const version = String(row.version ?? "").trim();
+    const updatedAt = String(row.created_at ?? "").trim();
+    if (!version || !updatedAt) {
+      throw new Error(`${tableName} row is missing version metadata`);
+    }
+    const prepared = await prepareNormalizedSurfaceVersion({
+      kind,
+      source: JSON.parse(row.dsl_json),
+      version,
+      updatedAt,
+    });
+    normalizedRows.push({
+      ...row,
+      dsl_json: serializeDslForStorage(prepared.source),
+      content_hash: prepared.sourceHash,
+    });
+  }
+  return normalizedRows;
 }
 
 async function buildSeedSql(): Promise<string> {
@@ -624,6 +669,11 @@ async function buildSeedSql(): Promise<string> {
           pinnedVersionsById: componentPinnedVersionsById,
         });
       }
+
+      rows = await normalizeVersionRowsForExport(
+        table.name,
+        rows as Array<Record<string, unknown>>,
+      );
 
       for (const row of rows) {
         const values = table.columns.map((column) => sqlLiteral(row[column]));

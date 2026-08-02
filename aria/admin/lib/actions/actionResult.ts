@@ -1,16 +1,20 @@
 import { z } from "zod";
 
 import { log } from "@/lib/utils/logger";
+import { decodeRenderActionErrorMessage } from "../../../lib/rendering/actionErrorMessage";
 
 export type ActionTransportErrorLike = {
   message?: string;
   code?: string;
 };
 
-export type ActionTransportResult = {
-  data?: unknown;
-  error?: ActionTransportErrorLike | null;
-} | null | undefined;
+export type ActionTransportResult =
+  | {
+      data?: unknown;
+      error?: ActionTransportErrorLike | null;
+    }
+  | null
+  | undefined;
 
 export type ActionResultFailure = {
   success: false;
@@ -42,12 +46,18 @@ export function getTransportErrorMessage(
     return null;
   }
 
-  return result.error.message ?? fallbackMessage;
+  return (
+    decodeRenderActionErrorMessage(result.error.message)?.message ??
+    result.error.message ??
+    fallbackMessage
+  );
 }
 
 export function getTransportErrorCode(
   result: ActionTransportResult,
 ): string | undefined {
+  const renderError = decodeRenderActionErrorMessage(result?.error?.message);
+  if (renderError) return renderError.code;
   const code = result?.error?.code;
   return typeof code === "string" && code.trim().length > 0 ? code : undefined;
 }

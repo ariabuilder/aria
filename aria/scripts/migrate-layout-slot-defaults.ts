@@ -7,6 +7,8 @@ import { createClient } from "@libsql/client";
 import { existsSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
+import type { BuilderNode, LayoutDSL } from "../lib/types/nodes";
+import { prepareNormalizedSurfaceVersion } from "../lib/storage/internal/domains/surfaceNormalization";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const dbPath = join(__dirname, "../storage/aria.db");
@@ -16,7 +18,7 @@ if (!existsSync(dbPath)) {
   process.exit(0);
 }
 
-const HEADER_CONTENT = [
+const HEADER_CONTENT: BuilderNode[] = [
   {
     id: "header-08a9c2a4",
     type: "Component",
@@ -29,7 +31,7 @@ const HEADER_CONTENT = [
   },
 ];
 
-const FOOTER_CONTENT = [
+const FOOTER_CONTENT: BuilderNode[] = [
   {
     id: "footer-bp48lslf",
     type: "Component",
@@ -43,7 +45,7 @@ const FOOTER_CONTENT = [
 ];
 
 /** Adds default content to empty header and footer slots. */
-function withSlotDefaults(slots) {
+function withSlotDefaults(slots: LayoutDSL["slots"]): LayoutDSL["slots"] {
   return slots.map(
     /** Applies starter content to an empty named layout slot. */
     (slot) => {
@@ -77,7 +79,7 @@ try {
     const dslJson = versionRows.rows[0]?.dsl_json;
     if (typeof dslJson !== "string" || !dslJson) continue;
 
-    const dsl = JSON.parse(dslJson);
+    const dsl = JSON.parse(dslJson) as Record<string, unknown>;
     if (!Array.isArray(dsl.slots)) continue;
 
     const nextSlots = withSlotDefaults(dsl.slots);
@@ -87,7 +89,7 @@ try {
     }
 
     const nextVersion = String(Date.now());
-    const nextDsl = {
+    const proposedDsl = {
       ...dsl,
       slots: nextSlots,
       regions: {
@@ -102,18 +104,25 @@ try {
           footerComponent: "footer",
         },
       },
-      version: nextVersion,
-      updatedAt: new Date().toISOString(),
     };
+    const updatedAt = new Date().toISOString();
+    const prepared = await prepareNormalizedSurfaceVersion({
+      kind: "layout",
+      source: proposedDsl,
+      version: nextVersion,
+      updatedAt,
+    });
+    const nextDsl = prepared.source;
 
     await database.batch([
       {
-        sql: "INSERT INTO aria_layout_versions (id, version, name, status, dsl_json, content_hash, created_at) VALUES (?, ?, ?, 'published', ?, NULL, ?)",
+        sql: "INSERT INTO aria_layout_versions (id, version, name, status, dsl_json, content_hash, created_at) VALUES (?, ?, ?, 'published', ?, ?, ?)",
         args: [
           id,
           nextVersion,
           String(nextDsl.name ?? id),
           JSON.stringify(nextDsl),
+          prepared.sourceHash,
           nextDsl.updatedAt,
         ],
       },

@@ -17,6 +17,7 @@ export default defineConfig({
     include: [
       "aria/tests/rendering-foundation/browser-parity-contract.parity.test.ts",
       "aria/tests/rendering-foundation/foundation.parity.test.ts",
+      "aria/tests/rendering-foundation/normalization.parity.test.ts",
       "aria/tests/rendering-foundation/foundation.workerd.test.ts",
     ],
     testTimeout: 20_000,

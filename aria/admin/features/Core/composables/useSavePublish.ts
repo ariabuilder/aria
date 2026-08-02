@@ -8,6 +8,7 @@ import { actions } from "astro:actions";
 import { toast } from "vue-sonner";
 import { z } from "zod";
 import { log } from "@/lib/utils/logger";
+import { decodeRenderActionErrorMessage } from "../../../../lib/rendering/actionErrorMessage";
 import {
   parseSaveActionData,
   type SaveActionData,
@@ -236,9 +237,13 @@ export function useSavePublish(deps: SavePublishDeps): SavePublishReturn {
     message?: string;
     code?: string;
   }): Error {
-    return Object.assign(new Error(error.message || "Failed to save"), {
-      code: error.code,
-    });
+    const renderError = decodeRenderActionErrorMessage(error.message);
+    return Object.assign(
+      new Error(renderError?.message || error.message || "Failed to save"),
+      {
+        code: renderError?.code ?? error.code,
+      },
+    );
   }
 
   function activeComposeSlug(): string | null {

@@ -44,6 +44,7 @@ import {
   inferCodeLanguage,
 } from "../utils/codeLanguage";
 import { projectManagedImage } from "../rendering/canonical/managedImage";
+import { normalizeLegacyNodeCompatibility } from "../rendering/canonical/legacyNodeCompatibility";
 
 /**
  * Convert StyleMap to inline style attribute
@@ -260,64 +261,6 @@ interface NodesToAstroComponentOptions {
   iconLocals?: RuntimeLocals;
 }
 
-const LEGACY_STYLE_PROP_NAMES = [
-  "borderRadius",
-  "borderTopLeftRadius",
-  "borderTopRightRadius",
-  "borderBottomRightRadius",
-  "borderBottomLeftRadius",
-] as const;
-
-const IMAGE_RENDER_STYLE_PROP_NAMES = [
-  "objectFit",
-  "objectPosition",
-  "aspectRatio",
-] as const;
-
-function normalizeLegacyRenderableNode(node: BuilderNode): {
-  props: JsonObject;
-  styles: StyleMap;
-} {
-  const props = { ...(node.props ?? {}) };
-  const styles = { ...(node.styles ?? {}) } as StyleMap;
-  const styleMap = styles as Record<string, Responsive<string> | undefined>;
-
-  for (const propertyName of LEGACY_STYLE_PROP_NAMES) {
-    const value = props[propertyName];
-
-    if (typeof value !== "string" && typeof value !== "number") {
-      continue;
-    }
-
-    if (!styleMap[propertyName]) {
-      styleMap[propertyName] = { base: String(value) };
-    }
-
-    delete props[propertyName];
-  }
-
-  if (
-    (node.type ?? "").toLowerCase() === "image" ||
-    (node.type ?? "").toLowerCase() === "video"
-  ) {
-    for (const propertyName of IMAGE_RENDER_STYLE_PROP_NAMES) {
-      const value = props[propertyName];
-
-      if (typeof value !== "string" || value.trim().length === 0) {
-        continue;
-      }
-
-      if (!styleMap[propertyName]) {
-        styleMap[propertyName] = { base: value };
-      }
-
-      delete props[propertyName];
-    }
-  }
-
-  return { props, styles };
-}
-
 function propsToAstroAttributes(props: JsonObject): string {
   const attrs: string[] = [];
 
@@ -423,7 +366,7 @@ function renderNodeToAstro(
 ): string {
   const indentStr = "  ".repeat(indent);
   const { props: renderProps, styles: renderStyles } =
-    normalizeLegacyRenderableNode(node);
+    normalizeLegacyNodeCompatibility(node);
   const nativeTag = getNativeTagForRenderableNode(node, renderProps);
   const attributeProps = stripConsumedRenderPropsForNode(node, renderProps);
   const registry = getBlockRegistry();
