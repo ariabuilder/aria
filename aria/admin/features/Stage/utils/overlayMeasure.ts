@@ -22,6 +22,17 @@ const TEXT_BOUND_TAGS = new Set([
   "blockquote",
   "li",
 ]);
+const STRUCTURAL_BOX_NODE_TYPES = new Set([
+  "section",
+  "container",
+  "header",
+  "footer",
+  "main",
+  "nav",
+  "grid",
+  "columns",
+  "column",
+]);
 
 function rectToViewport(rect: DOMRect): ViewportRect {
   return {
@@ -32,7 +43,9 @@ function rectToViewport(rect: DOMRect): ViewportRect {
   };
 }
 
-function unionViewportRects(rects: readonly ViewportRect[]): ViewportRect | null {
+function unionViewportRects(
+  rects: readonly ViewportRect[],
+): ViewportRect | null {
   if (rects.length === 0) {
     return null;
   }
@@ -62,6 +75,9 @@ function unionViewportRects(rects: readonly ViewportRect[]): ViewportRect | null
  */
 export function measureElementViewportRect(element: Element): ViewportRect {
   const rect = element.getBoundingClientRect();
+  const nodeType = (
+    element.getAttribute("data-aria-type") || element.tagName
+  ).toLowerCase();
   let tagName = element.tagName.toLowerCase();
   let measuredElement: Element = element;
 
@@ -120,7 +136,11 @@ export function measureElementViewportRect(element: Element): ViewportRect {
   const view = element.ownerDocument?.defaultView ?? window;
   const computedStyle = view.getComputedStyle(element);
 
-  if (computedStyle.width === "100%" && element.children.length > 0) {
+  if (
+    !STRUCTURAL_BOX_NODE_TYPES.has(nodeType) &&
+    computedStyle.width === "100%" &&
+    element.children.length > 0
+  ) {
     let minLeft = Infinity;
     let maxRight = -Infinity;
     let minTop = rect.top;
@@ -150,7 +170,9 @@ export function measureElementViewportRect(element: Element): ViewportRect {
 export function measureChildrenUnionViewportRect(
   children: readonly HTMLElement[],
 ): ViewportRect | null {
-  return unionViewportRects(children.map((child) => measureElementViewportRect(child)));
+  return unionViewportRects(
+    children.map((child) => measureElementViewportRect(child)),
+  );
 }
 
 /** Block-level union (full element boxes) for drop column width/height. */

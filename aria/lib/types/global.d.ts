@@ -113,6 +113,7 @@ declare global {
   }
   interface D1Database {
     prepare(sql: string): D1Prepare;
+    batch<T = unknown>(statements: D1Prepare[]): Promise<T[]>;
     exec?<T = unknown>(sql: string): Promise<T>;
   }
 
@@ -125,7 +126,7 @@ declare global {
     ): Promise<Record<string, unknown>>;
   }
 
-  /* Cloudflare Durable Object namespace (loose) */
+  /* Cloudflare Durable Object namespace used by legacy Agent boundaries. */
   interface DurableObjectNamespace {
     idFromName(name: string): unknown;
     get(id: unknown): unknown;

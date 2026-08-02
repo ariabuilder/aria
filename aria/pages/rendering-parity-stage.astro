@@ -1,0 +1,68 @@
+---
+import { z } from "zod";
+import { isRenderingParityLoopbackHostname } from "./renderingParityRoute";
+
+export const prerender = false;
+
+const QuerySchema = z
+  .object({
+    runtime: z.enum(["node", "workerd"]),
+  })
+  .strict();
+
+if (!isRenderingParityLoopbackHostname(Astro.url.hostname)) {
+  return new Response("Not found", { status: 404 });
+}
+
+const query = QuerySchema.safeParse({
+  runtime: Astro.url.searchParams.get("runtime"),
+});
+if (!query.success) {
+  return new Response("Invalid parity request", { status: 400 });
+}
+
+Astro.response.headers.set("cache-control", "no-store");
+---
+
+<!doctype html>
+<html lang="en" data-parity-runtime={query.data.runtime}>
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover"
+    />
+    <title>Aria canvas parity</title>
+    <style>
+      html,
+      body,
+      #parity-public-host {
+        width: 100%;
+        height: 100%;
+        margin: 0;
+      }
+
+      *,
+      *::before,
+      *::after {
+        animation-duration: 0s !important;
+        transition-duration: 0s !important;
+      }
+    </style>
+  </head>
+  <body>
+    <main id="parity-stage-mount"></main>
+    <script>
+      import { createApp } from "vue";
+      import StageParitySurface from "../tests/rendering-parity/StageParitySurface.vue";
+      import { P0_CANVAS_PARITY_NODES } from "../tests/rendering-parity/p0CanvasFixture";
+
+      const mountTarget = document.querySelector("#parity-stage-mount");
+      if (mountTarget) {
+        createApp(StageParitySurface, {
+          blocks: P0_CANVAS_PARITY_NODES,
+        }).mount(mountTarget);
+      }
+    </script>
+  </body>
+</html>

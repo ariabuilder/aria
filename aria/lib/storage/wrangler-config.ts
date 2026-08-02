@@ -28,6 +28,11 @@ export const WRANGLER_CONFIG_CANDIDATES = [
 
 /** Finds the first supported Wrangler configuration in a directory. */
 export function resolveWranglerConfigPath(cwd = process.cwd()): string | null {
+  const configuredPath = process.env.ARIA_WRANGLER_CONFIG?.trim();
+  if (configuredPath) {
+    const candidate = resolve(cwd, configuredPath);
+    if (existsSync(candidate)) return candidate;
+  }
   for (const filename of WRANGLER_CONFIG_CANDIDATES) {
     const candidate = resolve(cwd, filename);
     if (existsSync(candidate)) {

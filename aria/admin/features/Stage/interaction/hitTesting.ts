@@ -1,7 +1,8 @@
 import { STAGE_CONTENT_ROOT_ATTR, STAGE_OVERLAY_ROOT_ATTR } from "../composables/useIframeSetup";
-import { INTERACTION_OVERLAY_ATTR } from "./iframeOverlayRenderer";
 import type { FrameViewportPoint } from "./geometry";
 import { readStageEditableNodeId } from "../utils/findStageNodeElement";
+
+export const INTERACTION_OVERLAY_ATTR = "data-aria-interaction-overlay";
 
 export interface NodeCandidate {
   element: HTMLElement;

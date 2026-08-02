@@ -24,6 +24,13 @@ import { serializeFontFamilyValue } from "../../lib/styles/fontFamily";
 import { buildGlobalStylesCss } from "../../lib/styles/globalStylesCss";
 import { readAriaMotionCss } from "../../lib/motion/css/readAriaMotionCss";
 import { nodeTreeRequiresMotionStyles } from "../../lib/motion/runtime";
+import {
+  assembleRendererStyleBands,
+  buildRendererBaseStyleFragment,
+  collectRendererStyleRequirements,
+  splitCompatibilityRendererBaseCss,
+  type RendererBaseStyleFragment,
+} from "../../lib/rendering/canonical/rendererStyles";
 import type { AuthorshipSaveContext } from "../_shared";
 import type { BuilderNode } from "../../lib/types/nodes";
 import { persistSiteSettings } from "../_designSystemPersist";
@@ -329,10 +336,26 @@ function getCssHashOrGenerate(
   return generateCSSHash(css);
 }
 
-export async function buildGeneratedDocumentCss(
-  adapter: StylesStorageAdapter,
+export type GeneratedDocumentStyleBands = {
+  rendererBaseFragment: RendererBaseStyleFragment | null;
+  generatedDocumentCss: string;
+};
+
+type GeneratedDocumentStyleAdapter = Pick<
+  StylesStorageAdapter,
+  | "listPagesDSL"
+  | "listLayoutsDSL"
+  | "listComponentsDSL"
+  | "getPageDSL"
+  | "getLayoutDSL"
+  | "getComponentDSL"
+>;
+
+export async function buildGeneratedDocumentStyleBands(
+  adapter: GeneratedDocumentStyleAdapter,
   breakpoints: NonNullable<NodeToHtmlDocumentOptions["breakpoints"]>,
-): Promise<string> {
+  additionalNodes: readonly BuilderNode[] = [],
+): Promise<GeneratedDocumentStyleBands> {
   const [pageIndex, layoutIndex, componentIndex] = await Promise.all([
     adapter.listPagesDSL(),
     adapter.listLayoutsDSL(),
@@ -352,22 +375,49 @@ export async function buildGeneratedDocumentCss(
         : [],
     ),
     ...layouts.flatMap((layout) =>
-      layout && Array.isArray(layout.nodes) && layout.nodes.length > 0
-        ? layout.nodes
+      layout
+        ? [
+            ...(Array.isArray(layout.nodes) ? layout.nodes : []),
+            ...(Array.isArray(layout.slots)
+              ? layout.slots.flatMap((slot) => slot.defaultContent ?? [])
+              : []),
+          ]
         : [],
     ),
     ...components.flatMap((component) =>
-      component && Array.isArray(component.nodes) && component.nodes.length > 0
-        ? component.nodes
+      component
+        ? [
+            ...(Array.isArray(component.nodes) ? component.nodes : []),
+            ...(Array.isArray(component.slots)
+              ? component.slots.flatMap((slot) => slot.defaultContent ?? [])
+              : []),
+          ]
         : [],
     ),
+    ...additionalNodes,
   ];
   const responsiveCss = collectNodeStylesheet(allNodes, breakpoints);
   const motionCss = nodeTreeRequiresMotionStyles(allNodes)
     ? readAriaMotionCss().trim()
     : "";
 
-  return [motionCss, responsiveCss].filter(Boolean).join("\n\n").trim();
+  return {
+    rendererBaseFragment: await buildRendererBaseStyleFragment(
+      collectRendererStyleRequirements(allNodes),
+    ),
+    generatedDocumentCss: [motionCss, responsiveCss]
+      .filter(Boolean)
+      .join("\n\n")
+      .trim(),
+  };
+}
+
+export async function buildGeneratedDocumentCss(
+  adapter: StylesStorageAdapter,
+  breakpoints: NonNullable<NodeToHtmlDocumentOptions["breakpoints"]>,
+): Promise<string> {
+  const bands = await buildGeneratedDocumentStyleBands(adapter, breakpoints);
+  return bands.generatedDocumentCss;
 }
 
 function appendGeneratedDocumentCss(
@@ -381,6 +431,7 @@ function appendGeneratedDocumentCss(
 }
 
 function assembleGlobalCss(input: {
+  rendererBaseCss?: string;
   coreBaseCss: string;
   utilityCSS: string;
   customClassesCSS?: string;
@@ -391,39 +442,49 @@ function assembleGlobalCss(input: {
     ? minifyCss(input.utilityCSS)
     : "";
 
-  return [
-    input.coreBaseCss,
-    minifiedUtilityCSS,
-    input.customClassesCSS?.trim() ?? "",
-    input.contextRulesCSS?.trim() ?? "",
-    input.generatedDocumentCss?.trim() ?? "",
-  ]
-    .map((section) => section.trim())
-    .filter(Boolean)
-    .join("\n\n")
-    .trim();
+  return assembleRendererStyleBands({
+    rendererBaseCss: input.rendererBaseCss ?? "",
+    documentCss: input.coreBaseCss,
+    utilityCss: minifiedUtilityCSS,
+    customClassesCss: input.customClassesCSS ?? "",
+    contextRulesCss: input.contextRulesCSS ?? "",
+    nodeCss: input.generatedDocumentCss ?? "",
+  });
 }
 
 export function buildStageRenderStylesData(input: {
   storedRenderStyles: RenderStylesData;
   generatedDocumentCss: string;
+  rendererBaseFragment?: RendererBaseStyleFragment | null;
 }): RenderStylesData {
   const stored = input.storedRenderStyles;
-  const coreBaseCss = (stored.baseCSS || "").trim();
+  const storedBaseBands = splitCompatibilityRendererBaseCss(
+    (stored.baseCSS || "").trim(),
+  );
+  const rendererBaseCss =
+    input.rendererBaseFragment === undefined
+      ? storedBaseBands.rendererBaseCss
+      : (input.rendererBaseFragment?.css ?? "");
+  const coreBaseCss = storedBaseBands.remainingCss;
   const utilityCSS = stored.utilityCSS || "";
   const customClassesCSS = stored.customClassesCSS || "";
   const generatedDocumentCss = input.generatedDocumentCss.trim();
   const stageGlobalCSS = assembleGlobalCss({
+    rendererBaseCss,
     coreBaseCss,
     utilityCSS,
     customClassesCSS,
     contextRulesCSS: stored.contextRulesCSS || "",
     generatedDocumentCss,
   });
-  const stageBaseCSS = appendGeneratedDocumentCss(
-    coreBaseCss,
-    generatedDocumentCss,
-  );
+  const stageBaseCSS = assembleRendererStyleBands({
+    rendererBaseCss,
+    documentCss: coreBaseCss,
+    utilityCss: "",
+    customClassesCss: "",
+    contextRulesCss: "",
+    nodeCss: generatedDocumentCss,
+  });
 
   return {
     ...stored,
@@ -590,6 +651,7 @@ function finalizeGlobalCSSArtifactsSnapshot(input: {
   siteSettings: SiteSettings | null;
   framework: ReturnType<typeof getSiteSettingsUtilityEngine>;
   rawBaseCss: string;
+  rendererBaseCss?: string;
   generatedDocumentCss?: string;
   utilityCSS: string;
   utilityClasses: string[];
@@ -602,6 +664,7 @@ function finalizeGlobalCSSArtifactsSnapshot(input: {
     siteSettings,
     framework,
     rawBaseCss,
+    rendererBaseCss = "",
     generatedDocumentCss = "",
     utilityCSS,
     utilityClasses,
@@ -610,11 +673,16 @@ function finalizeGlobalCSSArtifactsSnapshot(input: {
     customFontsCSS,
   } = input;
 
-  const resolvedCoreBaseCss = rawBaseCss.trim();
+  const resolvedRendererBaseCss = rendererBaseCss.trim();
+  const resolvedDocumentBaseCss = rawBaseCss.trim();
+  const resolvedCoreBaseCss = [resolvedRendererBaseCss, resolvedDocumentBaseCss]
+    .filter(Boolean)
+    .join("\n\n");
   const resolvedDocumentCss = generatedDocumentCss.trim();
 
   const globalCSS = assembleGlobalCss({
-    coreBaseCss: resolvedCoreBaseCss,
+    rendererBaseCss: resolvedRendererBaseCss,
+    coreBaseCss: resolvedDocumentBaseCss,
     utilityCSS,
     customClassesCSS,
     contextRulesCSS,
@@ -700,8 +768,12 @@ export async function buildGlobalCSSArtifactsSnapshot(
       return buildGlobalCSSArtifactsSnapshot(adapter, {});
     }
 
+    const existingBands = splitCompatibilityRendererBaseCss(existingBaseCss);
     const rootColorsCss = buildRootColorsCss(designSystem, siteSettings);
-    const rawBaseCss = patchBaseCssColorSection(existingBaseCss, rootColorsCss);
+    const rawBaseCss = patchBaseCssColorSection(
+      existingBands.remainingCss,
+      rootColorsCss,
+    );
     const utilityCSS =
       designSystem.artifacts.utilityCSS ||
       designSystem.artifacts.compiledUnoCSS ||
@@ -716,6 +788,7 @@ export async function buildGlobalCSSArtifactsSnapshot(
       siteSettings,
       framework,
       rawBaseCss,
+      rendererBaseCss: existingBands.rendererBaseCss,
       utilityCSS,
       utilityClasses: designSystem.artifacts.unocssClasses ?? [],
       customClassesCSS: designSystem.artifacts.customClassesCSS ?? "",
@@ -747,10 +820,13 @@ export async function buildGlobalCSSArtifactsSnapshot(
     designSystem.contextRules,
     breakpointWidths,
   );
-  const generatedDocumentCss = await buildGeneratedDocumentCss(
+  const generatedStyleBands = await buildGeneratedDocumentStyleBands(
     adapter,
     canonicalBreakpoints,
+    options.utilityNodes,
   );
+  const { rendererBaseFragment, generatedDocumentCss } = generatedStyleBands;
+  const rendererBaseCss = rendererBaseFragment?.css ?? "";
 
   const rawBaseCss = buildBaseCssArtifact({
     googleFontsCss,
@@ -818,6 +894,7 @@ export async function buildGlobalCSSArtifactsSnapshot(
     siteSettings,
     framework,
     rawBaseCss,
+    rendererBaseCss,
     generatedDocumentCss,
     utilityCSS,
     utilityClasses,

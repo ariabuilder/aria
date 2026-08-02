@@ -16,6 +16,10 @@ import {
   resolveSelectionAtPoint,
   resolveSelectionFromEventTarget,
 } from "../interaction";
+import {
+  isFormLifecycleEvent,
+  shouldSuppressStageDefaultAction,
+} from "../interaction/stageActionSafety";
 
 export interface UseOverlayListenersOptions {
   iframeRef: Ref<HTMLIFrameElement | null>;
@@ -188,61 +192,76 @@ export function useOverlayListeners(options: UseOverlayListenersOptions) {
       true,
     );
 
-    iframeDoc.addEventListener(
-      "click",
-      (e: MouseEvent) => {
-        const target = resolveEventTargetElement(e.target);
-        if (!target) {
-          return;
-        }
+    const selectFromPointer = (event: MouseEvent | PointerEvent): void => {
+      const target = resolveEventTargetElement(event.target);
+      if (!target) {
+        return;
+      }
 
-        if (target.closest("a[href]")) {
-          e.preventDefault();
-        }
+      if (shouldSuppressStageDefaultAction(target)) {
+        event.preventDefault();
+      }
 
-        const selectionOptions = {
-          isTextContent,
-          semanticPriority,
-        };
-        const selection =
-          resolveSelectionAtPoint(
-            iframeDoc,
-            createFrameViewportPoint(e.clientX, e.clientY),
-            selectionOptions,
-          ) ?? resolveSelectionFromEventTarget(e.target, selectionOptions);
+      const selectionOptions = {
+        isTextContent,
+        semanticPriority,
+      };
+      const selection =
+        resolveSelectionAtPoint(
+          iframeDoc,
+          createFrameViewportPoint(event.clientX, event.clientY),
+          selectionOptions,
+        ) ?? resolveSelectionFromEventTarget(event.target, selectionOptions);
 
-        if (!selection) {
-          currentSelectedNodeId = null;
-          emit("selectBlock", null);
-          broadcastSelectNode({ nodeId: null });
-          canvasOverlays.hideHover();
-          canvasOverlays.hideSelection();
-          return;
-        }
-
-        const blockElement = selection.element;
-        e.stopPropagation();
-
+      if (!selection) {
+        currentSelectedNodeId = null;
+        emit("selectBlock", null);
+        broadcastSelectNode({ nodeId: null });
         canvasOverlays.hideHover();
+        canvasOverlays.hideSelection();
+        return;
+      }
 
-        currentSelectedNodeId = selection.nodeId;
-        canvasOverlays.showSelection(
-          blockElement,
-          selection.nodeId,
-          selection.nodeType,
-        );
-        syncSelectionToolbar(selection.nodeId);
-        emit("selectBlock", {
-          nodeId: selection.nodeId,
-          triggerGesture: {
-            metaKey: e.metaKey,
-            ctrlKey: e.ctrlKey,
-            shiftKey: e.shiftKey,
-          },
-        });
+      event.stopPropagation();
+      canvasOverlays.hideHover();
+
+      currentSelectedNodeId = selection.nodeId;
+      canvasOverlays.showSelection(
+        selection.element,
+        selection.nodeId,
+        selection.nodeType,
+      );
+      syncSelectionToolbar(selection.nodeId);
+      emit("selectBlock", {
+        nodeId: selection.nodeId,
+        triggerGesture: {
+          metaKey: event.metaKey,
+          ctrlKey: event.ctrlKey,
+          shiftKey: event.shiftKey,
+        },
+      });
+    };
+
+    iframeDoc.addEventListener("click", selectFromPointer, true);
+    iframeDoc.addEventListener(
+      "pointerdown",
+      (event: PointerEvent) => {
+        const target = resolveEventTargetElement(event.target);
+        if (target?.closest(":disabled")) {
+          selectFromPointer(event);
+        }
       },
       true,
     );
+
+    const suppressFormLifecycle = (event: Event): void => {
+      if (isFormLifecycleEvent(event)) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
+    };
+    iframeDoc.addEventListener("submit", suppressFormLifecycle, true);
+    iframeDoc.addEventListener("reset", suppressFormLifecycle, true);
 
     // Hide overlay when dragging starts
     watch(isDragging, (dragging) => {

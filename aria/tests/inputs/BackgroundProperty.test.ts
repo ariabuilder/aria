@@ -22,6 +22,7 @@ const editingModeRef = ref<"element" | "class">("element");
 const activeClassNameRef = ref<string | null>(null);
 const activeClassRef = ref<Record<string, unknown> | null>(null);
 const savePropertiesMock = vi.fn();
+const previewStylePropertiesMock = vi.fn();
 const setClassRuleMock = vi.fn();
 const setClassRulesMock = vi.fn();
 const removeClassRuleMock = vi.fn();
@@ -31,6 +32,7 @@ const getClassRuleMock = vi.fn();
 vi.mock("../../admin/features/Core", () => ({
   usePropertySave: createInspectorPropertySaveMock({
     saveProperties: savePropertiesMock,
+    previewStyleProperties: previewStylePropertiesMock,
   }),
   useSelectedNodeState: createInspectorSelectedNodeStateMock(),
   useSelectionTreeState: createInspectorSelectionTreeStateMock(),
@@ -173,30 +175,34 @@ vi.mock("../../admin/features/Inspector/composables/usePropertySchema", () => ({
   }),
 }));
 
-vi.mock("../../admin/features/Studio/media/components/MediaPickerDialog.vue", () => ({
-  default: defineComponent({
-    emits: ["select", "update:open"],
-    setup(_, { emit }) {
-      return () =>
-        h(
-          "button",
-          {
-            type: "button",
-            "data-testid": "background-media-select",
-            onClick: () => {
-              emit("update:open", true);
-              emit("select", {
-                id: "media-1",
-                url: "https://cdn.example.com/background.png",
-                deliveryUrl: "https://cdn.example.com/background-delivery.png",
-              });
+vi.mock(
+  "../../admin/features/Studio/media/components/MediaPickerDialog.vue",
+  () => ({
+    default: defineComponent({
+      emits: ["select", "update:open"],
+      setup(_, { emit }) {
+        return () =>
+          h(
+            "button",
+            {
+              type: "button",
+              "data-testid": "background-media-select",
+              onClick: () => {
+                emit("update:open", true);
+                emit("select", {
+                  id: "media-1",
+                  url: "https://cdn.example.com/background.png",
+                  deliveryUrl:
+                    "https://cdn.example.com/background-delivery.png",
+                });
+              },
             },
-          },
-          "select-media",
-        );
-    },
+            "select-media",
+          );
+      },
+    }),
   }),
-}));
+);
 
 const { ColorFieldStub } = vi.hoisted(() => {
   const { defineComponent, h } = require("vue") as typeof import("vue");
@@ -392,6 +398,7 @@ describe("BackgroundProperty", () => {
     activeClassNameRef.value = null;
     activeClassRef.value = null;
     savePropertiesMock.mockResolvedValue(true);
+    previewStylePropertiesMock.mockReturnValue(true);
     setClassRuleMock.mockResolvedValue(true);
     setClassRulesMock.mockResolvedValue(true);
     previewClassRulesMock.mockReturnValue(true);
@@ -447,7 +454,7 @@ describe("BackgroundProperty", () => {
 
     const BackgroundProperty = (
       await import(
-        "../../admin/features/Inspector/inputs/BackgroundProperty.vue" as any,
+        "../../admin/features/Inspector/inputs/BackgroundProperty.vue" as any
       )
     ).default;
 
@@ -509,8 +516,10 @@ describe("BackgroundProperty", () => {
     await flushPromises();
 
     expect(
-      (wrapper.find('input[data-testid="background-color-input"]').element as HTMLInputElement)
-        .value,
+      (
+        wrapper.find('input[data-testid="background-color-input"]')
+          .element as HTMLInputElement
+      ).value,
     ).toBe("#112233");
 
     await wrapper
@@ -521,6 +530,52 @@ describe("BackgroundProperty", () => {
       backgroundColor: "#00FF00",
     });
     expect(savePropertiesMock).not.toHaveBeenCalled();
+
+    wrapper.unmount();
+  });
+
+  it("restores the authored background when an element save fails", async () => {
+    selectedNodeIdRef.value = "node-failed-background";
+    selectedNodeRef.value = {
+      id: "node-failed-background",
+      type: "section",
+      props: {},
+      styles: {
+        backgroundColor: {
+          base: "#112233",
+        },
+      },
+      children: [],
+    };
+    savePropertiesMock.mockResolvedValue(false);
+
+    const BackgroundProperty = (
+      await import("../../admin/features/Inspector/inputs/BackgroundProperty.vue")
+    ).default;
+
+    const wrapper = mount(BackgroundProperty, {
+      props: {
+        currentItemType: "page",
+        currentItemSlug: "home",
+      },
+    });
+    await flushPromises();
+
+    await wrapper
+      .get('[data-testid="background-color-picker"]')
+      .trigger("click");
+    await flushPromises();
+    await nextTick();
+
+    expect(savePropertiesMock).toHaveBeenCalled();
+    const colorInput = wrapper.find(
+      'input[data-testid="background-color-input"]',
+    ).element;
+    expect(colorInput).toBeInstanceOf(HTMLInputElement);
+    if (!(colorInput instanceof HTMLInputElement)) {
+      throw new Error("Background color input must be an HTMLInputElement");
+    }
+    expect(colorInput.value).toBe("#112233");
 
     wrapper.unmount();
   });
@@ -550,7 +605,7 @@ describe("BackgroundProperty", () => {
 
     const BackgroundProperty = (
       await import(
-        "../../admin/features/Inspector/inputs/BackgroundProperty.vue" as any,
+        "../../admin/features/Inspector/inputs/BackgroundProperty.vue" as any
       )
     ).default;
 

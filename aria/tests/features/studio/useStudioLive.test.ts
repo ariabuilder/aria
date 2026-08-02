@@ -1,14 +1,37 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const { invalidateComponentClientCachesMock } = vi.hoisted(() => ({
+const {
+  clearPagePolicyCacheMock,
+  invalidateAllPageResourcesMock,
+  invalidateComponentClientCachesMock,
+  invalidatePageResourceByIdMock,
+} = vi.hoisted(() => ({
+  clearPagePolicyCacheMock: vi.fn(),
+  invalidateAllPageResourcesMock: vi.fn(),
   invalidateComponentClientCachesMock: vi.fn(),
+  invalidatePageResourceByIdMock: vi.fn(),
 }));
 
 vi.mock("@/features/Core/composables/componentCacheCoherence", () => ({
   invalidateComponentClientCaches: invalidateComponentClientCachesMock,
 }));
+vi.mock("@/features/Studio/pages/composables/usePageResourceBank", () => ({
+  invalidateAllPageResources: invalidateAllPageResourcesMock,
+  invalidatePageResourceById: invalidatePageResourceByIdMock,
+}));
+vi.mock("@/features/Studio/pages/composables/usePageAccessState", () => ({
+  clearPagePolicyCache: clearPagePolicyCacheMock,
+}));
 
 describe("Studio Live availability", () => {
+  function studioSyncResponse(): Response {
+    return Response.json({
+      checkpoint: null,
+      sessions: [],
+      serverTime: Date.now(),
+    });
+  }
+
   beforeEach(() => {
     vi.clearAllMocks();
     vi.resetModules();
@@ -21,27 +44,35 @@ describe("Studio Live availability", () => {
     vi.useRealTimers();
   });
 
-  it("does not probe the Cloudflare live service in the local Node runtime", async () => {
+  it("uses storage reconciliation without probing Cloudflare push in Node", async () => {
     vi.stubEnv("PUBLIC_ARIA_RUNTIME", "node");
-    const fetchMock = vi.fn();
+    const fetchMock = vi.fn().mockImplementation(async () =>
+      studioSyncResponse(),
+    );
     vi.stubGlobal("fetch", fetchMock);
 
     const { connectStudioLive, disconnectStudioLive } =
       await import("../../../admin/features/Studio/realtime/useStudioLive");
 
     connectStudioLive();
-    await Promise.resolve();
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalled());
 
-    expect(fetchMock).not.toHaveBeenCalled();
+    expect(
+      fetchMock.mock.calls.every(([input]) =>
+        String(input).startsWith("/admin/api/studio-sync"),
+      ),
+    ).toBe(true);
     disconnectStudioLive();
   });
 
   it("disables retries when the local runtime reports no live-service binding", async () => {
-    const fetchMock = vi.fn().mockResolvedValue(
-      new Response(null, {
-        status: 503,
-        headers: { "X-Aria-Studio-Live": "unavailable" },
-      }),
+    const fetchMock = vi.fn().mockImplementation(async (input: RequestInfo | URL) =>
+      String(input).startsWith("/admin/api/studio-live")
+        ? new Response(null, {
+            status: 503,
+            headers: { "X-Aria-Studio-Live": "unavailable" },
+          })
+        : studioSyncResponse(),
     );
     vi.stubGlobal("fetch", fetchMock);
 
@@ -49,13 +80,85 @@ describe("Studio Live availability", () => {
       await import("../../../admin/features/Studio/realtime/useStudioLive");
 
     connectStudioLive();
-    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    await vi.waitFor(() =>
+      expect(
+        fetchMock.mock.calls.filter(([input]) =>
+          String(input).startsWith("/admin/api/studio-live"),
+        ),
+      ).toHaveLength(1),
+    );
     await Promise.resolve();
 
     await vi.advanceTimersByTimeAsync(60_000);
 
-    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(
+      fetchMock.mock.calls.filter(([input]) =>
+        String(input).startsWith("/admin/api/studio-live"),
+      ),
+    ).toHaveLength(1);
+    expect(
+      fetchMock.mock.calls.filter(([input]) =>
+        String(input).startsWith("/admin/api/studio-sync"),
+      ).length,
+    ).toBeGreaterThan(1);
     expect(useStudioLive().reconnectAttempt.value).toBe(0);
+    disconnectStudioLive();
+  });
+
+  it("reconciles exact revisions and fails safe across missed checkpoints", async () => {
+    vi.stubEnv("PUBLIC_ARIA_RUNTIME", "node");
+    let revisionSeq = 10;
+    const warning = vi
+      .spyOn(console, "warn")
+      .mockImplementation(() => undefined);
+    const fetchMock = vi.fn().mockImplementation(async () =>
+      Response.json({
+        checkpoint: {
+          revisionSeq,
+          currentRevisionId: `revision-${revisionSeq}`,
+          lastMutationKind: "save-page",
+          lastMutationTarget: "home",
+          updatedAt: new Date(revisionSeq).toISOString(),
+        },
+        sessions: [],
+        serverTime: revisionSeq,
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { connectStudioLive, disconnectStudioLive, useStudioLive } =
+      await import("../../../admin/features/Studio/realtime/useStudioLive");
+    connectStudioLive();
+    await vi.waitFor(() =>
+      expect(useStudioLive().lastSiteRevision.value).toBe(10),
+    );
+
+    revisionSeq = 11;
+    await vi.advanceTimersByTimeAsync(5_000);
+    await vi.waitFor(() =>
+      expect(invalidatePageResourceByIdMock).toHaveBeenCalledWith(
+        "home",
+        "realtime",
+      ),
+    );
+
+    revisionSeq = 13;
+    await vi.advanceTimersByTimeAsync(5_000);
+    await vi.waitFor(() =>
+      expect(invalidateAllPageResourcesMock).toHaveBeenCalledWith(
+        "realtime-reconcile",
+      ),
+    );
+
+    revisionSeq = 12;
+    await vi.advanceTimersByTimeAsync(5_000);
+    await vi.waitFor(() =>
+      expect(warning).toHaveBeenCalledWith(
+        "[Studio Sync] Stale revision checkpoint ignored",
+        expect.objectContaining({ code: "STUDIO_REVISION_STALE" }),
+      ),
+    );
+    expect(useStudioLive().lastSiteRevision.value).toBe(13);
     disconnectStudioLive();
   });
 

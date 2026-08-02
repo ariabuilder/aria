@@ -376,7 +376,10 @@ export function useCanonicalBreakpoints(
   }
 
   if (autoLoad && !hasLoaded && typeof window !== "undefined") {
-    void loadBreakpoints();
+    void loadBreakpoints().catch(() => {
+      // `loadBreakpoints` stores the typed failure in `error`; prevent an
+      // optional background refresh from becoming an unhandled rejection.
+    });
   }
 
   return {

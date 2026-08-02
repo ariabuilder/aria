@@ -3,12 +3,43 @@ import { describe, expect, it, vi } from "vitest";
 import {
   buildRenderStylesCacheKey,
   buildRenderStylesContentSignature,
+  buildGeneratedDocumentStyleBands,
   buildStageRenderStylesData,
   buildGlobalCSSArtifactsSnapshot,
   regenerateGlobalCSSArtifacts,
 } from "../../actions/styles";
 import { buildStarterDesignSystem } from "../../lib/storage/starterContent";
 import { createDefaultUniversalDesignSystem } from "../../lib/styles/universalDesignSystem";
+import { LayoutDSLSchema, ComponentDSLSchema } from "../../lib/schemas/nodes";
+import { DEFAULT_BREAKPOINTS, type BuilderNode } from "../../lib/types/nodes";
+import {
+  assembleRendererBaseCss,
+  buildRendererBaseStyleFragment,
+} from "../../lib/rendering/canonical";
+
+function createManagedImageNode(id: string): BuilderNode {
+  return {
+    id,
+    type: "Image",
+    props: { src: `/media/source/current/${id}.png`, alt: id },
+    classNames: { base: ["h-8"] },
+    styles: {},
+    children: [],
+    metadata: {
+      responsiveImage: {
+        sizes: "100vw",
+        default: {
+          url: `/media/source/current/${id}.png`,
+          reference: { mediaId: id, variantId: null },
+          width: 727,
+          height: 621,
+          allowDerivatives: true,
+        },
+        sources: {},
+      },
+    },
+  };
+}
 
 vi.mock("../../lib/motion/css/readAriaMotionCss", () => ({
   readAriaMotionCss: () =>
@@ -16,6 +47,52 @@ vi.mock("../../lib/motion/css/readAriaMotionCss", () => ({
 }));
 
 describe("buildGlobalCSSArtifactsSnapshot", () => {
+  it("discovers renderer requirements in layout and component slot defaults", async () => {
+    const layout = LayoutDSLSchema.parse({
+      id: "site-layout",
+      name: "Site layout",
+      nodes: [],
+      slots: [
+        {
+          name: "footer",
+          defaultContent: [createManagedImageNode("layout-logo")],
+        },
+      ],
+    });
+    const component = ComponentDSLSchema.parse({
+      id: "card",
+      name: "Card",
+      nodes: [],
+      slots: [
+        {
+          name: "media",
+          defaultContent: [createManagedImageNode("component-image")],
+        },
+      ],
+    });
+    const adapter = {
+      listPagesDSL: vi.fn(async () => []),
+      listLayoutsDSL: vi.fn(async () => [layout]),
+      listComponentsDSL: vi.fn(async () => [component]),
+      getPageDSL: vi.fn(async () => null),
+      getLayoutDSL: vi.fn(async (id: string) =>
+        id === layout.id ? layout : null,
+      ),
+      getComponentDSL: vi.fn(async (id: string) =>
+        id === component.id ? component : null,
+      ),
+    };
+
+    const bands = await buildGeneratedDocumentStyleBands(
+      adapter,
+      DEFAULT_BREAKPOINTS,
+    );
+
+    expect(bands.rendererBaseFragment?.requirements).toEqual([
+      "managed-image-intrinsic-ratio",
+    ]);
+  });
+
   it("changes the render styles cache key when saved content metadata changes", async () => {
     const createAdapter = (updatedAt: string) =>
       ({
@@ -547,7 +624,11 @@ describe("buildGlobalCSSArtifactsSnapshot", () => {
     const designSystem = createDefaultUniversalDesignSystem();
     designSystem.tokens.colors.palette.primary = "#111111";
     designSystem.tokens.colors.palette["primary-500"] = "#111111";
+    const rendererCss = assembleRendererBaseCss([
+      "managed-image-intrinsic-ratio",
+    ]);
     designSystem.artifacts.baseCSS = [
+      rendererCss,
       "/* Design System Colors */",
       ":root {",
       "  /* Palette Tokens */",
@@ -589,6 +670,17 @@ describe("buildGlobalCSSArtifactsSnapshot", () => {
     expect(result.designSystem.artifacts.utilityCSS).toBe(
       ".text-primary{color:var(--primary);}",
     );
+    expect(result.designSystem.artifacts.baseCSS.startsWith(rendererCss)).toBe(
+      true,
+    );
+    expect(result.designSystem.artifacts.globalCSS.indexOf(rendererCss)).toBe(
+      0,
+    );
+    expect(
+      result.designSystem.artifacts.baseCSS.match(
+        /:where\(img\.aria-managed-image\)/g,
+      ),
+    ).toHaveLength(1);
     expect(adapter.listPagesDSL).not.toHaveBeenCalled();
   });
 
@@ -660,9 +752,7 @@ describe("buildGlobalCSSArtifactsSnapshot", () => {
     });
 
     const savedDesignSystem = adapter.saveDesignSystem.mock.calls[0]?.[0];
-    expect(savedDesignSystem.artifacts.globalCSS).toContain(
-      ".bg-fuchsia-500",
-    );
+    expect(savedDesignSystem.artifacts.globalCSS).toContain(".bg-fuchsia-500");
   });
 });
 
@@ -700,5 +790,54 @@ describe("buildStageRenderStylesData", () => {
     expect(result.baseCSS).toContain(
       "div.aria-n_hero { background-color: var(--accent-500); }",
     );
+  });
+
+  it("replaces or removes a stale stored renderer band explicitly", async () => {
+    const rendererCss = assembleRendererBaseCss([
+      "managed-image-intrinsic-ratio",
+    ]);
+    const rendererBaseFragment = await buildRendererBaseStyleFragment([
+      "managed-image-intrinsic-ratio",
+    ]);
+    const storedRenderStyles = {
+      baseCSS: `${rendererCss}\n\n:root { --brand: red; }`,
+      baseCSSHash: "base-hash",
+      customClassesCSS: "",
+      customFontsCSS: "",
+      globalCSS: `${rendererCss}\n\n:root { --brand: red; }`,
+      globalCSSHash: "global-hash",
+      lastCompiled: "2026-07-31T00:00:00.000Z",
+      styleRevision: "style-1",
+      utilityCSS: ".h-8{height:2rem;}",
+      utilityCSSHash: "utility-hash",
+      utilityEngine: "custom" as const,
+    };
+
+    const preserved = buildStageRenderStylesData({
+      storedRenderStyles,
+      generatedDocumentCss: "",
+    });
+    expect(preserved.globalCSS.startsWith(rendererCss)).toBe(true);
+
+    const removed = buildStageRenderStylesData({
+      storedRenderStyles,
+      generatedDocumentCss: "",
+      rendererBaseFragment: null,
+    });
+    expect(removed.globalCSS).not.toContain("aria-managed-image");
+    expect(removed.baseCSS).not.toContain("aria-managed-image");
+
+    const replaced = buildStageRenderStylesData({
+      storedRenderStyles: {
+        ...storedRenderStyles,
+        baseCSS: ":root { --brand: red; }",
+      },
+      generatedDocumentCss: "",
+      rendererBaseFragment,
+    });
+    expect(replaced.globalCSS.startsWith(rendererCss)).toBe(true);
+    expect(
+      replaced.globalCSS.match(/:where\(img\.aria-managed-image\)/g),
+    ).toHaveLength(1);
   });
 });

@@ -85,8 +85,11 @@ import {
 } from "../nav/navRenderAttributes";
 import { parseNavigationProps } from "./navigationSchema";
 import type { RuntimeLocals } from "../cloudflare/env";
-import { readComposerResponsiveImage } from "../media/composerReference";
-import { buildResponsiveSrcSet } from "../media/transforms/responsive";
+import { projectManagedImage } from "../rendering/canonical/managedImage";
+import {
+  assembleRendererBaseCss,
+  collectRendererStyleRequirements,
+} from "../rendering/canonical/rendererStyles";
 
 type ComponentDSLResolver = (
   id: string,
@@ -591,26 +594,6 @@ function selfClosingTag(tag: string, attrs: string): string {
   return attrs ? `<${tag} ${attrs} />` : `<${tag} />`;
 }
 
-function comparePictureSourceQueries(left: string, right: string): number {
-  const readQuery = (query: string) => {
-    const match = query.match(/(min|max)-width:\s*([\d.]+)px/u);
-    return match
-      ? { kind: match[1], width: Number.parseFloat(match[2]) }
-      : { kind: "unknown", width: 0 };
-  };
-  const leftQuery = readQuery(left);
-  const rightQuery = readQuery(right);
-
-  if (leftQuery.kind === rightQuery.kind) {
-    return leftQuery.kind === "min"
-      ? rightQuery.width - leftQuery.width
-      : leftQuery.width - rightQuery.width;
-  }
-  if (leftQuery.kind === "max") return -1;
-  if (rightQuery.kind === "max") return 1;
-  return left.localeCompare(right);
-}
-
 function renderResponsivePicture(input: {
   node: BuilderNode;
   imageAttrs: string;
@@ -618,54 +601,30 @@ function renderResponsivePicture(input: {
   breakpoints: BreakpointDefinition[];
   indent: number;
 }): string | null {
-  const responsive = readComposerResponsiveImage(input.node.metadata);
-  if (!responsive) return null;
-
-  const defaultSrcSet = buildResponsiveSrcSet({
-    url: responsive.default.url,
-    maxWidth: responsive.default.width,
-    allowDerivatives: responsive.default.allowDerivatives,
+  const projection = projectManagedImage({
+    node: input.node,
+    breakpoints: input.breakpoints,
   });
-  if (!defaultSrcSet) return null;
+  if (!projection) return null;
 
   const indentStr = "  ".repeat(input.indent);
   const childIndent = "  ".repeat(input.indent + 1);
-  const sources = Object.entries(responsive.sources)
-    .map(([breakpointName, source]) => {
-      const media = createResponsiveMediaQuery(
-        input.breakpoints,
-        breakpointName,
-      );
-      const srcset = buildResponsiveSrcSet({
-        url: source.url,
-        maxWidth: source.width,
-        allowDerivatives: source.allowDerivatives,
-      });
-      return media && srcset ? { media, srcset } : null;
-    })
-    .filter((source): source is { media: string; srcset: string } =>
-      Boolean(source),
-    )
-    .sort((left, right) =>
-      comparePictureSourceQueries(left.media, right.media),
-    );
-
-  const sourceMarkup = sources.map(({ media, srcset }) =>
+  const sourceMarkup = projection.sources.map(({ media, srcSet, sizes }) =>
     selfClosingTag(
       "source",
-      `media="${escapeHTML(media)}" srcset="${escapeHTML(srcset)}" sizes="${escapeHTML(responsive.sizes)}"`,
+      `media="${escapeHTML(media)}" srcset="${escapeHTML(srcSet)}" sizes="${escapeHTML(sizes)}"`,
     ),
   );
   const imageAttrs = [
     input.imageAttrs,
     !/(?:^|\s)width=/u.test(input.imageAttrs)
-      ? `width="${responsive.default.width}"`
+      ? `width="${projection.width}"`
       : "",
-    responsive.default.height && !/(?:^|\s)height=/u.test(input.imageAttrs)
-      ? `height="${responsive.default.height}"`
+    projection.height && !/(?:^|\s)height=/u.test(input.imageAttrs)
+      ? `height="${projection.height}"`
       : "",
-    `srcset="${escapeHTML(defaultSrcSet)}"`,
-    `sizes="${escapeHTML(responsive.sizes)}"`,
+    `srcset="${escapeHTML(projection.srcSet)}"`,
+    `sizes="${escapeHTML(projection.sizes)}"`,
   ]
     .filter(Boolean)
     .join(" ");
@@ -712,10 +671,9 @@ function renderButtonIconMarkup(
     "display: inline-flex; align-items: center",
     "display: block",
   );
-  const iconClassName = [
-    canonicalId ? "" : iconClass,
-    iconHostClass,
-  ].filter(Boolean).join(" ");
+  const iconClassName = [canonicalId ? "" : iconClass, iconHostClass]
+    .filter(Boolean)
+    .join(" ");
   const iconClassAttr = iconClassName
     ? ` class="${escapeHTML(iconClassName)}"`
     : "";
@@ -1028,7 +986,11 @@ function renderNode(
   const attrs: string[] = [];
 
   // Include class attribute from canonical class fields and internal responsive scope when needed.
+  const managedImage = projectManagedImage({ node, breakpoints });
   const classNames = [getNodeClassName(node, breakpoints)];
+  if (managedImage) {
+    classNames.push(managedImage.classToken.name);
+  }
   const shouldIncludeStyleScopeClass =
     styleMode === "stylesheet"
       ? hasRenderableStyles(renderStyles)
@@ -1223,7 +1185,11 @@ function renderNode(
     const iconAttrs = attrsWithoutClass.join(" ");
 
     if (canonicalId) {
-      const svg = renderIconFromResources(iconResources, canonicalId, iconAttrs);
+      const svg = renderIconFromResources(
+        iconResources,
+        canonicalId,
+        iconAttrs,
+      );
       if (svg) {
         return `${indentStr}${svg}`;
       }
@@ -1392,15 +1358,7 @@ export function nodesToHtmlFragment(
 ): string {
   return nodes
     .map((node) =>
-      renderNode(
-        node,
-        indent,
-        breakpoints,
-        styleMode,
-        null,
-        {},
-        iconResources,
-      ),
+      renderNode(node, indent, breakpoints, styleMode, null, {}, iconResources),
     )
     .join("\n");
 }
@@ -1495,20 +1453,14 @@ export async function nodesToHtmlFragmentAsync(
     nodes,
     getComponentDSL,
   );
-  const resolvedIcons = iconResources ?? await (
-    await import("../icons/resolveIconResources")
-  ).resolveIconRenderResources(expandedNodes, { locals: iconLocals });
+  const resolvedIcons =
+    iconResources ??
+    (await (
+      await import("../icons/resolveIconResources")
+    ).resolveIconRenderResources(expandedNodes, { locals: iconLocals }));
   return expandedNodes
     .map((node) =>
-      renderNode(
-        node,
-        indent,
-        breakpoints,
-        styleMode,
-        null,
-        {},
-        resolvedIcons,
-      ),
+      renderNode(node, indent, breakpoints, styleMode, null, {}, resolvedIcons),
     )
     .join("\n");
 }
@@ -1579,6 +1531,12 @@ export interface NodeToHtmlDocumentOptions {
   /** Serialized Global Styles CSS used by fallback document rendering. */
   inlineGlobalStylesCSS?: string;
 
+  /**
+   * Renderer-owned semantic CSS for this resolved surface. When omitted,
+   * standalone fallback rendering derives it from `nodes`.
+   */
+  rendererBaseCss?: string;
+
   customFonts?: {
     fonts?: Record<string, CustomFontDefinition>;
     googleFonts?: Record<string, GoogleFontDefinition>;
@@ -1628,6 +1586,7 @@ export function nodesToHtmlDocument(
     suppressFrameworkTags = false,
     inlineGeneratedDocumentCss = true,
     inlineGlobalStylesCSS = "",
+    rendererBaseCss,
     customFonts,
     darkMode = "media",
     siteSettings,
@@ -1669,6 +1628,10 @@ export function nodesToHtmlDocument(
   // Collect all styles from nodes when embedding document CSS in-page.
   const nodeStyles = inlineGeneratedDocumentCss
     ? collectNodeStylesheet(nodes, breakpoints)
+    : "";
+  const resolvedRendererBaseCss = inlineGeneratedDocumentCss
+    ? (rendererBaseCss ??
+      assembleRendererBaseCss(collectRendererStyleRequirements(nodes)))
     : "";
 
   const cssVarsArray: string[] = [];
@@ -1774,9 +1737,13 @@ export function nodesToHtmlDocument(
       globalCSSHref,
       suppressFrameworkTags,
     ),
-    documentBaseStyles || cssVarsString || nodeStyles || inlineCustomFontsCSS
+    resolvedRendererBaseCss ||
+    documentBaseStyles ||
+    cssVarsString ||
+    nodeStyles ||
+    inlineCustomFontsCSS
       ? `<style>
-${documentBaseStyles}${inlineCustomFontsCSS ? "\n\n" + inlineCustomFontsCSS : ""}${cssVarsString ? "\n\n" + cssVarsString : ""}${nodeStyles ? "\n\n" + nodeStyles : ""}
+${resolvedRendererBaseCss}${documentBaseStyles ? "\n\n" + documentBaseStyles : ""}${inlineCustomFontsCSS ? "\n\n" + inlineCustomFontsCSS : ""}${cssVarsString ? "\n\n" + cssVarsString : ""}${nodeStyles ? "\n\n" + nodeStyles : ""}
   </style>`
       : "",
     scriptTags,
@@ -1809,9 +1776,13 @@ export async function nodesToHtmlDocumentAsync(
     nodes,
     getComponentDSL,
   );
-  const iconResources = options?.iconResources ?? await (
-    await import("../icons/resolveIconResources")
-  ).resolveIconRenderResources(expandedNodes, { locals: options?.iconLocals });
+  const iconResources =
+    options?.iconResources ??
+    (await (
+      await import("../icons/resolveIconResources")
+    ).resolveIconRenderResources(expandedNodes, {
+      locals: options?.iconLocals,
+    }));
   return nodesToHtmlDocument(expandedNodes, { ...options, iconResources });
 }
 
@@ -1820,10 +1791,11 @@ export function nodesToHtmlWithLayout(
   layoutNodes: BuilderNode[],
   options?: NodeToHtmlDocumentOptions,
 ): string {
-  // Merge page nodes into layout slots
-  const mergedNodes = layoutNodes.map((layoutNode) => {
-    return mergeNodesIntoSlots(layoutNode, pageNodes, options?.layoutSlots);
-  });
+  const mergedNodes = mergePageNodesIntoLayoutForRender(
+    pageNodes,
+    layoutNodes,
+    options?.layoutSlots,
+  );
 
   return nodesToHtmlDocument(mergedNodes, options);
 }
@@ -1848,13 +1820,27 @@ export async function nodesToHtmlWithLayoutAsync(
     layoutNodes,
     getComponentDSL,
   );
-  const mergedNodes = expandedLayoutNodes.map((layoutNode) =>
-    mergeNodesIntoSlots(layoutNode, expandedPageNodes, options?.layoutSlots),
+  const mergedNodes = mergePageNodesIntoLayoutForRender(
+    expandedPageNodes,
+    expandedLayoutNodes,
+    options?.layoutSlots,
   );
-  const iconResources = options?.iconResources ?? await (
-    await import("../icons/resolveIconResources")
-  ).resolveIconRenderResources(mergedNodes, { locals: options?.iconLocals });
+  const iconResources =
+    options?.iconResources ??
+    (await (
+      await import("../icons/resolveIconResources")
+    ).resolveIconRenderResources(mergedNodes, { locals: options?.iconLocals }));
   return nodesToHtmlDocument(mergedNodes, { ...options, iconResources });
+}
+
+export function mergePageNodesIntoLayoutForRender(
+  pageNodes: BuilderNode[],
+  layoutNodes: BuilderNode[],
+  layoutSlots?: LayoutSlotDefinitionLike[],
+): BuilderNode[] {
+  return layoutNodes.map((layoutNode) =>
+    mergeNodesIntoSlots(layoutNode, pageNodes, layoutSlots),
+  );
 }
 
 function mergeNodesIntoSlots(

@@ -15,9 +15,10 @@ import type {
   UpdateRedirectInput,
 } from "../redirects/schemas";
 import type { AdapterInfo, AdapterMetrics } from "./adapterMetricsSchemas";
-import type {
-  PageInventoryAuthorship,
-  PageVersionAuthorshipEntry,
+import {
+  PageVersionAuthorshipEntrySchema,
+  type PageInventoryAuthorship,
+  type PageVersionAuthorshipEntry,
 } from "../authorship/schemas";
 import type { VersionSaveOptions } from "./versioning";
 import type {
@@ -101,6 +102,10 @@ import type {
   MoveMediaInput,
   UpsertUploadedMediaInput,
 } from "../media/catalog/repository";
+import {
+  StudioPresenceAttachmentSchema,
+  type StudioPresenceAttachment,
+} from "../realtime/studioLive";
 
 export type { StylesData } from "../types/classes";
 export type { UniversalDesignSystem } from "../styles/universalDesignSystem";
@@ -564,10 +569,7 @@ export const PagePublicationDependenciesSchema: z.ZodType<PagePublicationDepende
         })
         .strict()
         .optional(),
-      components: z.record(
-        z.string().trim().min(1),
-        z.string().trim().min(1),
-      ),
+      components: z.record(z.string().trim().min(1), z.string().trim().min(1)),
     })
     .strict();
 
@@ -618,6 +620,36 @@ export const ContentSiteStateSchema = z.object({
 });
 
 export type ContentSiteState = z.infer<typeof ContentSiteStateSchema>;
+
+export const PageActivityPageRequestSchema = z
+  .object({
+    pageId: z.string().trim().min(1),
+    limit: z.number().int().min(1).max(100),
+    offset: z.number().int().nonnegative(),
+  })
+  .strict();
+
+export type PageActivityPageRequest = z.infer<
+  typeof PageActivityPageRequestSchema
+>;
+
+export const PageActivityPageSchema = z
+  .object({
+    items: z.array(PageVersionAuthorshipEntrySchema),
+    total: z.number().int().nonnegative(),
+  })
+  .strict();
+
+export type PageActivityPage = z.infer<typeof PageActivityPageSchema>;
+
+export const StoredStudioPresenceSessionSchema =
+  StudioPresenceAttachmentSchema.extend({
+    expiresAt: z.number().int().nonnegative(),
+  }).strict();
+
+export type StoredStudioPresenceSession = z.infer<
+  typeof StoredStudioPresenceSessionSchema
+>;
 
 export interface TouchContentRevisionInput {
   scope?: string;
@@ -836,6 +868,9 @@ export interface StorageAdapter {
   deletePageAccessSession(tokenHash: string): Promise<void>;
   deletePageAccessSessionsForPage(pageId: string): Promise<void>;
   getPageVersions(id: string): Promise<PageVersionAuthorshipEntry[]>;
+  getPageActivityPage(
+    request: PageActivityPageRequest,
+  ): Promise<PageActivityPage>;
   getPageVersionPins(idOrSlug: string): Promise<{
     draftVersion: string | null;
     publishedVersion: string | null;
@@ -1156,6 +1191,11 @@ export interface StorageAdapter {
   touchContentRevision(
     input: TouchContentRevisionInput,
   ): Promise<ContentSiteState>;
+  upsertStudioPresenceSession(
+    session: StoredStudioPresenceSession,
+  ): Promise<StudioPresenceAttachment | null>;
+  listStudioPresenceSessions(now: number): Promise<StudioPresenceAttachment[]>;
+  deleteStudioPresenceSession(sessionId: string, userId: string): Promise<void>;
 
   // Atomic, database-backed rate limiting (shared across Worker instances).
   consumeRateLimit(input: ConsumeRateLimitInput): Promise<RateLimitResult>;

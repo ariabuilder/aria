@@ -2,6 +2,7 @@ import type { Ref } from "vue";
 import type { BuilderNode } from "../../../../lib/types/nodes";
 import type { LayerSelectRequest } from "../types";
 import { useCanvasInteractionBridge } from "../../Core";
+import { findNodeById, updateNodeById } from "../utils/nodeHelpers";
 
 function isLayerSelectRequest(
   selection: BuilderNode | LayerSelectRequest,
@@ -37,6 +38,7 @@ export interface UseLayerUiActionsOptions {
     newBlocks: BuilderNode[],
     description: string,
   ) => void;
+  commitNodeRename?: (nodeId: string, newLabel: string) => void;
   emitOpenPicker: (slotName: string) => void;
   activeSlotName?: Ref<string>;
   onBeforeSelectNode?: (nodeId: string) => LayerNodeSelectSyncResult;
@@ -66,6 +68,7 @@ export function useLayerUiActions(options: UseLayerUiActionsOptions) {
     toggleExpand,
     blocks,
     updateBlocksWithHistory,
+    commitNodeRename,
     emitOpenPicker,
     activeSlotName,
     onBeforeSelectNode,
@@ -160,15 +163,25 @@ export function useLayerUiActions(options: UseLayerUiActionsOptions) {
   };
 
   const handleRenameNode = (node: BuilderNode, newLabel: string): void => {
-    if (!node.metadata) {
-      node.metadata = {};
-    }
-
-    node.metadata.label = newLabel;
     editingNodeId.value = null;
 
-    if (blocks.value) {
-      updateBlocksWithHistory(blocks.value, `Rename node to "${newLabel}"`);
+    if (commitNodeRename) {
+      commitNodeRename(node.id, newLabel);
+      return;
+    }
+
+    const currentBlocks = blocks.value ?? [];
+    if (findNodeById(currentBlocks, node.id)) {
+      updateBlocksWithHistory(
+        updateNodeById(currentBlocks, node.id, (currentNode) => ({
+          ...currentNode,
+          metadata: {
+            ...currentNode.metadata,
+            label: newLabel,
+          },
+        })),
+        `Rename node to "${newLabel}"`,
+      );
     }
   };
 

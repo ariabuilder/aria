@@ -4,6 +4,7 @@
 
 import { z } from "zod";
 import { ActorRefSchema, AssetAuthorshipSchema } from "../auth/types";
+import { ActivityMetadataSchema } from "../schemas/activity";
 import { formatActorDisplayName } from "./reads";
 
 /** Inventory/list summary — subset of AssetAuthorship plus display helper. */
@@ -28,15 +29,7 @@ export const PageVersionAuthorshipEntrySchema = z
     version: z.string().min(1),
     createdAt: z.string().min(1),
     createdBy: ActorRefSchema.optional(),
-    activity: z
-      .object({
-        action: z.string(),
-        userId: z.string(),
-        userName: z.string(),
-        target: z.string(),
-      })
-      .nullable()
-      .optional(),
+    activity: ActivityMetadataSchema.nullable().optional(),
   })
   .strict();
 

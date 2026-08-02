@@ -50,6 +50,8 @@ describe("nodesToAstro", () => {
     ]);
 
     expect(astro).toContain('<picture style="display: contents">');
+    expect(astro).toContain('class="aria-managed-image"');
+    expect(astro).toContain("width={1600} height={900}");
     expect(astro).toContain(
       'srcset="/media/source/current/hero.jpg?width=320 320w',
     );

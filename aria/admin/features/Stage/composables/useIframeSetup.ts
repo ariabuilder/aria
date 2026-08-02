@@ -8,10 +8,7 @@ import {
   getSiteSettingsUtilityEngine,
   type SiteSettings,
 } from "../../../../lib/storage/adapter";
-import { CANVAS_DISABLED_ATTRIBUTE } from "../utils/canvasRenderAttributes";
 import { IFRAME_Z_INDEX } from "@/lib/zIndex";
-import { getStageDropFeedbackCss } from "../styles/stageDropFeedback";
-import { getStageImageDefaultsCss } from "../styles/stageImageDefaults";
 import interFontUrl from "../../../assets/fonts/inter.ttf";
 import outfitFontUrl from "../../../assets/fonts/outfit-variable.woff2";
 
@@ -255,33 +252,9 @@ export function useIframeSetup(
       transition: opacity 120ms ease-out;
     }
 
-    [${STAGE_CONTENT_ROOT_ATTR}] button[data-aria-type="Button"],
-    [${STAGE_CONTENT_ROOT_ATTR}] button[data-aria-type="button"] {
-      -webkit-appearance: none !important;
-      appearance: none !important;
-      background-image: none !important;
-      box-shadow: none;
-      border: 0 solid transparent;
-      font: inherit;
-      color: inherit;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      text-align: inherit;
-    }
-
     [${STAGE_CONTENT_ROOT_ATTR}] {
       position: relative;
       min-height: 100%;
-    }
-
-    [${STAGE_CONTENT_ROOT_ATTR}] [${CANVAS_DISABLED_ATTRIBUTE}="true"] {
-      cursor: not-allowed;
-      opacity: 0.5;
-    }
-
-    [${STAGE_CONTENT_ROOT_ATTR}] [${CANVAS_DISABLED_ATTRIBUTE}="true"] * {
-      cursor: inherit;
     }
 
     [${STAGE_OVERLAY_ROOT_ATTR}] {
@@ -292,10 +265,6 @@ export function useIframeSetup(
       overflow: visible;
     }
     
-    ${getStageDropFeedbackCss()}
-
-    ${getStageImageDefaultsCss()}
-
     ${STAGE_SCREEN_READER_UTILITY_CSS}
   <\/style>
 </head>

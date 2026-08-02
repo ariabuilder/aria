@@ -109,10 +109,17 @@ const SSR_OPTIMIZE_DEPS_EXCLUDES = [
 ];
 
 const SSR_ENVIRONMENT_OPTIMIZE_DEPS_EXCLUDES = [
-  // Loaded during save-triggered preview CSS compilation. Keeping this preset
-  // out of deps_ssr prevents workerd from retaining a discarded hashed URL
-  // after Vite refreshes its dependency cache.
+  // Save/publish loads this compiler graph on demand. Keep the entire graph as
+  // source in dev SSR so the first compile cannot replace deps_ssr and strand
+  // the active Node or workerd runner on discarded hashed dependency URLs.
+  "@unocss/core",
+  "@unocss/extractor-arbitrary-variants",
+  "@unocss/preset-mini",
   "@unocss/preset-typography",
+  "@unocss/preset-wind3",
+  "@unocss/rule-utils",
+  "@unocss/transformer-directives",
+  "@unocss/transformer-variant-group",
 ] as const;
 
 const SSR_ENVIRONMENT_OPTIMIZE_DEPS_INCLUDES = [

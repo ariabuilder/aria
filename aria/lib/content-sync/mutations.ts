@@ -8,11 +8,35 @@ import {
   type ParsedTouchContentRevisionInput,
 } from "./types";
 import { publishStudioInvalidation } from "../realtime/publishStudioInvalidation";
+import { log } from "../utils/logger";
+import type { StudioInvalidationDelivery } from "../realtime/studioLive";
 
 type ActionContextLike = {
   locals?: App.Locals;
   request?: Request;
 };
+
+function assertNeverDelivery(value: never): never {
+  throw new Error(`Unhandled Studio invalidation delivery: ${String(value)}`);
+}
+
+function recordStudioDelivery(delivery: StudioInvalidationDelivery): void {
+  switch (delivery.status) {
+    case "delivered":
+      return;
+    case "unavailable":
+      log("debug", "Studio Live push unavailable; revision fallback active", {
+        code: "STUDIO_LIVE_UNAVAILABLE",
+        eventId: delivery.eventId,
+        siteRevision: delivery.siteRevision,
+      });
+      return;
+    case "failed":
+      return;
+    default:
+      assertNeverDelivery(delivery);
+  }
+}
 
 function liveResourceTypeForMutation(
   mutationKind: TouchContentRevisionInput["mutationKind"],
@@ -87,7 +111,7 @@ export async function touchContentRevisionForAction(
 
   const resourceType = liveResourceTypeForMutation(mutation.mutationKind);
   if (resourceType && mutation.mutationTarget) {
-    await publishStudioInvalidation(context ?? {}, {
+    const delivery = await publishStudioInvalidation(context ?? {}, {
       siteRevision: revision.revisionSeq,
       resourceType,
       resourceId: mutation.mutationTarget,
@@ -96,6 +120,7 @@ export async function touchContentRevisionForAction(
           ? ["metadata", "policy", "render"]
           : ["content", "metadata", "render", "history"],
     });
+    recordStudioDelivery(delivery);
   }
 
   return revision;

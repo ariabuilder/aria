@@ -20,10 +20,7 @@ import {
   getButtonIconHostClassName,
   getButtonIconPosition,
 } from "./buttonContent";
-import {
-  createResponsiveMediaQuery,
-  DESKTOP_BASE_BREAKPOINT,
-} from "../styles/responsiveBreakpoints";
+import { DESKTOP_BASE_BREAKPOINT } from "../styles/responsiveBreakpoints";
 import {
   getCanonicalIconIdFromValue,
   getIconClassFromValue,
@@ -46,8 +43,7 @@ import {
   getCodeBlockRenderMode,
   inferCodeLanguage,
 } from "../utils/codeLanguage";
-import { readComposerResponsiveImage } from "../media/composerReference";
-import { buildResponsiveSrcSet } from "../media/transforms/responsive";
+import { projectManagedImage } from "../rendering/canonical/managedImage";
 
 /**
  * Convert StyleMap to inline style attribute
@@ -99,57 +95,26 @@ function renderResponsiveAstroPicture(input: {
   breakpoints: BreakpointDefinition[];
   indent: number;
 }): string | null {
-  const responsive = readComposerResponsiveImage(input.node.metadata);
-  if (!responsive) return null;
-  const defaultSrcSet = buildResponsiveSrcSet({
-    url: responsive.default.url,
-    maxWidth: responsive.default.width,
-    allowDerivatives: responsive.default.allowDerivatives,
+  const projection = projectManagedImage({
+    node: input.node,
+    breakpoints: input.breakpoints,
   });
-  if (!defaultSrcSet) return null;
+  if (!projection) return null;
 
-  const queryWidth = (query: string): number =>
-    Number.parseFloat(query.match(/[\d.]+/u)?.[0] ?? "0");
-  const sourceRows = Object.entries(responsive.sources)
-    .map(([breakpointName, source]) => {
-      const media = createResponsiveMediaQuery(
-        input.breakpoints,
-        breakpointName,
-      );
-      const srcset = buildResponsiveSrcSet({
-        url: source.url,
-        maxWidth: source.width,
-        allowDerivatives: source.allowDerivatives,
-      });
-      return media && srcset ? { media, srcset } : null;
-    })
-    .filter((source): source is { media: string; srcset: string } =>
-      Boolean(source),
-    )
-    .sort((left, right) => {
-      const leftMin = left.media.includes("min-width");
-      const rightMin = right.media.includes("min-width");
-      if (leftMin === rightMin) {
-        return leftMin
-          ? queryWidth(right.media) - queryWidth(left.media)
-          : queryWidth(left.media) - queryWidth(right.media);
-      }
-      return leftMin ? 1 : -1;
-    });
   const indentStr = "  ".repeat(input.indent);
   const childIndent = "  ".repeat(input.indent + 1);
-  const sources = sourceRows.map(
-    ({ media, srcset }) =>
-      `${childIndent}<source media="${escapeString(media)}" srcset="${escapeString(srcset)}" sizes="${escapeString(responsive.sizes)}" />`,
+  const sources = projection.sources.map(
+    ({ media, srcSet, sizes }) =>
+      `${childIndent}<source media="${escapeString(media)}" srcset="${escapeString(srcSet)}" sizes="${escapeString(sizes)}" />`,
   );
   const intrinsicWidth = /(?:^|\s)width=/u.test(input.imageAttrs)
     ? ""
-    : ` width={${responsive.default.width}}`;
+    : ` width={${projection.width}}`;
   const intrinsicHeight =
-    responsive.default.height && !/(?:^|\s)height=/u.test(input.imageAttrs)
-      ? ` height={${responsive.default.height}}`
+    projection.height && !/(?:^|\s)height=/u.test(input.imageAttrs)
+      ? ` height={${projection.height}}`
       : "";
-  const imageAttrs = `${input.imageAttrs}${intrinsicWidth}${intrinsicHeight} srcset="${escapeString(defaultSrcSet)}" sizes="${escapeString(responsive.sizes)}"`;
+  const imageAttrs = `${input.imageAttrs}${intrinsicWidth}${intrinsicHeight} srcset="${escapeString(projection.srcSet)}" sizes="${escapeString(projection.sizes)}"`;
   if (sources.length === 0) {
     return `${indentStr}<img${imageAttrs} />`;
   }
@@ -183,10 +148,9 @@ function renderButtonIconMarkup(
     "display: inline-flex; align-items: center",
     "display: block",
   );
-  const iconClassName = [
-    canonicalId ? "" : iconClass,
-    iconHostClass,
-  ].filter(Boolean).join(" ");
+  const iconClassName = [canonicalId ? "" : iconClass, iconHostClass]
+    .filter(Boolean)
+    .join(" ");
   const iconClassAttr = iconClassName
     ? ` class="${escapeString(iconClassName)}"`
     : "";
@@ -467,7 +431,13 @@ function renderNodeToAstro(
 
   if (nativeTag) {
     const attrs: string[] = [];
-    const className = resolveNodeClasses(node);
+    const managedImage = projectManagedImage({ node, breakpoints });
+    const className = [
+      resolveNodeClasses(node),
+      managedImage?.classToken.name ?? "",
+    ]
+      .filter(Boolean)
+      .join(" ");
     if (className) {
       attrs.push(`class="${escapeString(className)}"`);
     }
@@ -868,9 +838,13 @@ export async function nodesToAstroAsync(
     nodes,
     getComponentDSL,
   );
-  const iconResources = options?.iconResources ?? await (
+  const iconResources =
+    options?.iconResources ??
+    (await (
       await import("../icons/resolveIconResources")
-  ).resolveIconRenderResources(expandedNodes, { locals: options?.iconLocals });
+    ).resolveIconRenderResources(expandedNodes, {
+      locals: options?.iconLocals,
+    }));
   return nodesToAstro(expandedNodes, { ...options, iconResources });
 }
 
@@ -1104,8 +1078,12 @@ export async function nodesToAstroComponentAsync(
     nodes,
     getComponentDSL,
   );
-  const iconResources = options?.iconResources ?? await (
+  const iconResources =
+    options?.iconResources ??
+    (await (
       await import("../icons/resolveIconResources")
-  ).resolveIconRenderResources(expandedNodes, { locals: options?.iconLocals });
+    ).resolveIconRenderResources(expandedNodes, {
+      locals: options?.iconLocals,
+    }));
   return nodesToAstroComponent(expandedNodes, { ...options, iconResources });
 }

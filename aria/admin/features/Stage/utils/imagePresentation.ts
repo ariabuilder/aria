@@ -1,30 +1,34 @@
 import type { BuilderNode } from "../../../../lib/types/nodes";
 import { normalizeDirectCmsMediaReference } from "../../../../lib/cms/directMediaReference";
 import { parseCmsImageFieldValue } from "../../../../lib/cms/styleBindings";
-import { DEFAULT_IMAGE_OBJECT_FIT } from "../../Inspector/schemas/image.schema";
-import { DEFAULT_POSITION_VALUE } from "../../Inspector/constants/positionOptions";
 
-export { DEFAULT_IMAGE_OBJECT_FIT };
+function isUnknownRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
 
-function readResponsiveStyleScalar(
-  value: unknown,
-  fallback?: string,
-): string | undefined {
+function readResponsiveStyleScalar(value: unknown): string | undefined {
   if (typeof value === "string" && value.trim().length > 0) {
     return value;
   }
 
-  if (!value || typeof value !== "object") {
-    return fallback;
+  if (!isUnknownRecord(value)) {
+    return undefined;
   }
 
-  const map = value as Record<string, string | undefined>;
-  return map.base ?? Object.values(map).find((entry) => typeof entry === "string");
+  const base = value.base;
+  if (typeof base === "string" && base.trim().length > 0) {
+    return base;
+  }
+
+  return Object.values(value).find(
+    (entry): entry is string =>
+      typeof entry === "string" && entry.trim().length > 0,
+  );
 }
 
 export function resolveImageObjectFit(
   block: Pick<BuilderNode, "props" | "styles">,
-): string {
+): string | undefined {
   const fromStyles = readResponsiveStyleScalar(block.styles?.objectFit);
   if (fromStyles) {
     return fromStyles;
@@ -35,12 +39,12 @@ export function resolveImageObjectFit(
     return fromProps;
   }
 
-  return DEFAULT_IMAGE_OBJECT_FIT;
+  return undefined;
 }
 
 export function resolveImageObjectPosition(
   block: Pick<BuilderNode, "props" | "styles">,
-): string {
+): string | undefined {
   const fromStyles = readResponsiveStyleScalar(block.styles?.objectPosition);
   if (fromStyles) {
     return fromStyles;
@@ -51,7 +55,7 @@ export function resolveImageObjectPosition(
     return fromProps;
   }
 
-  return DEFAULT_POSITION_VALUE;
+  return undefined;
 }
 
 export function resolveStageMediaSrc(
@@ -95,48 +99,29 @@ export function resolveStageMediaSrc(
   return candidate;
 }
 
-export function applyImagePresentationToElement(
-  img: HTMLImageElement,
-  options: {
-    objectFit?: string;
-    objectPosition?: string;
-  } = {},
-): void {
-  img.style.display = "block";
-  img.style.objectFit = options.objectFit ?? DEFAULT_IMAGE_OBJECT_FIT;
-  img.style.objectPosition = options.objectPosition ?? DEFAULT_POSITION_VALUE;
-}
-
-export function syncImageEmptyStateAttribute(
-  img: HTMLImageElement,
-  src: string,
-): void {
-  if (src.trim().length > 0) {
-    img.removeAttribute("data-aria-image-empty");
-    return;
-  }
-
-  img.setAttribute("data-aria-image-empty", "true");
-}
-
-export function handleBrokenMediaElement(
-  element: HTMLImageElement | HTMLVideoElement,
-): void {
-  if (element instanceof HTMLImageElement) {
-    element.removeAttribute("src");
-    syncImageEmptyStateAttribute(element, "");
-    return;
-  }
-
-  element.removeAttribute("src");
-  element.removeAttribute("poster");
-  element.setAttribute("data-aria-image-empty", "true");
-}
+export type StageMediaFailure = Readonly<{
+  kind: "media-load-failed";
+  media: "image" | "video";
+  source: string;
+}>;
 
 export function attachBrokenMediaFallback(
   element: HTMLImageElement | HTMLVideoElement,
-): void {
-  element.addEventListener("error", () => {
-    handleBrokenMediaElement(element);
-  });
+  onFailure: (failure: StageMediaFailure) => void,
+): () => void {
+  const handleError = (): void => {
+    onFailure({
+      kind: "media-load-failed",
+      media: element.tagName.toLowerCase() === "video" ? "video" : "image",
+      source:
+        element.currentSrc ||
+        element.getAttribute("src") ||
+        (element.tagName.toLowerCase() === "video"
+          ? element.getAttribute("poster") || ""
+          : ""),
+    });
+  };
+
+  element.addEventListener("error", handleError);
+  return () => element.removeEventListener("error", handleError);
 }

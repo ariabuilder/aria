@@ -1,0 +1,27 @@
+{
+  "name": "aria-runtime-stability-test",
+  "main": "./worker.ts",
+  "compatibility_date": "2026-07-29",
+  "compatibility_flags": ["nodejs_compat"],
+  "d1_databases": [
+    {
+      "binding": "aria_db",
+      "database_name": "aria-runtime-stability",
+      "database_id": "00000000-0000-0000-0000-000000000001"
+    }
+  ],
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "aria_studio_live",
+        "class_name": "AriaStudioLive",
+      },
+    ],
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": ["AriaStudioLive"],
+    },
+  ],
+}

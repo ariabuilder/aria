@@ -29,6 +29,7 @@ import { useStageSignalBridge } from "./useStageSignalBridge";
 import { useShellSignalBridge } from "./useShellSignalBridge";
 import { useSettingsDialog } from "@/features/Studio/settings/composables/useSettingsDialog";
 import { useBeacon } from "../../Beacon";
+import { useNodeIdentityIntegrity } from "./useNodeIdentityIntegrity";
 
 interface AppInitializationNodeEventHandlers {
   handleDropComponent: (payload: DropComponentPayload) => void;
@@ -320,6 +321,16 @@ export function useAppInitialization(deps: AppInitializationDeps): void {
     layoutSlotsSnapshot,
     loadingState,
     createSnapshot,
+  });
+
+  useNodeIdentityIntegrity({
+    pageBlocks,
+    currentPage,
+    currentLayout,
+    currentComponent,
+    currentItemType,
+    hasUnsavedChanges,
+    clearSelection: handleClearSelection,
   });
 
   onMounted(async () => {

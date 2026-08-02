@@ -1,4 +1,4 @@
-import { createClient, type Client } from "@libsql/client";
+import { createClient, type Client, type InValue } from "@libsql/client";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import fs from "fs/promises";
 import os from "os";
@@ -170,6 +170,123 @@ describe("SQLiteStorageAdapter", () => {
     expect(byId?.title).toBe(samplePage.title);
     expect(bySlug?.slug).toBe(samplePage.slug);
     expect(bySlug?.layout).toBe(samplePage.layout);
+  });
+
+  it("persists lease-bounded Studio presence and rejects stale heartbeats", async () => {
+    const sessionId = "11111111-1111-4111-8111-111111111111";
+    const userId = "22222222-2222-4222-8222-222222222222";
+    const current = await adapter.upsertStudioPresenceSession({
+      sessionId,
+      userId,
+      displayName: "Editor",
+      avatarUrl: null,
+      surface: "composer",
+      resourceType: "page",
+      resourceId: samplePage.id,
+      state: "editing",
+      dirty: true,
+      connectedAt: 100,
+      lastActivityAt: 200,
+      leaseExpiresAt: 300,
+      expiresAt: 400,
+    });
+    expect(current?.state).toBe("editing");
+    expect(await adapter.listStudioPresenceSessions(250)).toHaveLength(1);
+
+    const stale = await adapter.upsertStudioPresenceSession({
+      sessionId,
+      userId,
+      displayName: "Editor",
+      avatarUrl: null,
+      surface: "composer",
+      resourceType: "page",
+      resourceId: samplePage.id,
+      state: "away",
+      dirty: false,
+      connectedAt: 100,
+      lastActivityAt: 150,
+      leaseExpiresAt: null,
+      expiresAt: 500,
+    });
+    expect(stale).toBeNull();
+    expect((await adapter.listStudioPresenceSessions(350))[0]?.state).toBe(
+      "viewing",
+    );
+
+    const replayed = await adapter.upsertStudioPresenceSession({
+      sessionId,
+      userId,
+      displayName: "Editor",
+      avatarUrl: null,
+      surface: "composer",
+      resourceType: "page",
+      resourceId: samplePage.id,
+      state: "editing",
+      dirty: true,
+      connectedAt: 100,
+      lastActivityAt: 200,
+      leaseExpiresAt: 450,
+      expiresAt: 500,
+    });
+    expect(replayed).toBeNull();
+    expect(await adapter.listStudioPresenceSessions(450)).toEqual([]);
+  });
+
+  it("paginates 10,000 page activity rows in storage", async () => {
+    await adapter.savePageDSL(samplePage.id, samplePage);
+    const totalRows = 10_000;
+    const statements = Array.from({ length: totalRows }, (_, index) => {
+      const isSystem = index % 10 === 0;
+      const isMalformed = index % 15 === 0;
+      const version = String(1_000_000 + index).padStart(16, "0");
+      return {
+        sql: `INSERT INTO aria_page_versions (
+                id, version, slug, title, status, dsl_json, created_at,
+                created_by_id, created_by_username, created_by_email,
+                activity_metadata
+              ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        args: [
+          samplePage.id,
+          version,
+          samplePage.slug,
+          samplePage.title,
+          "draft",
+          JSON.stringify(samplePage),
+          new Date(index).toISOString(),
+          isSystem && !isMalformed ? "system" : "activity-user",
+          isSystem && !isMalformed ? "System" : "Activity User",
+          "activity@example.com",
+          isMalformed
+            ? "{malformed"
+            : JSON.stringify({
+                action: "page_updated",
+                userId: isSystem ? "system" : "activity-user",
+                userName: isSystem ? "System" : "Activity User",
+                target: "this page",
+              }),
+        ],
+      } satisfies { sql: string; args: InValue[] };
+    });
+    for (let index = 0; index < statements.length; index += 500) {
+      await client.batch(statements.slice(index, index + 500), "write");
+    }
+
+    const startedAt = performance.now();
+    const page = await adapter.getPageActivityPage({
+      pageId: samplePage.id,
+      limit: 20,
+      offset: 4_000,
+    });
+    const durationMs = performance.now() - startedAt;
+
+    expect(page.items).toHaveLength(20);
+    expect(page.total).toBe(9_334);
+    expect(
+      (page.items[0]?.version ?? "").localeCompare(
+        page.items[19]?.version ?? "",
+      ),
+    ).toBeGreaterThan(0);
+    expect(durationMs).toBeLessThan(1_000);
   });
 
   it("hydrates page DSL policy fields from metadata instead of stale DSL", async () => {
@@ -367,7 +484,8 @@ describe("SQLiteStorageAdapter", () => {
       "Atomic layout update",
     );
 
-    const layoutVersion = (await adapter.getLayoutDSL(sampleLayout.id))?.version;
+    const layoutVersion = (await adapter.getLayoutDSL(sampleLayout.id))
+      ?.version;
     await expect(
       adapter.savePageDSL(
         samplePage.id,
@@ -438,9 +556,9 @@ describe("SQLiteStorageAdapter", () => {
       ),
     ).rejects.toBeInstanceOf(VersionConflictError);
 
-    expect((await adapter.getPageVersionPins(samplePage.id))?.draftVersion).toBe(
-      "page-race-v2",
-    );
+    expect(
+      (await adapter.getPageVersionPins(samplePage.id))?.draftVersion,
+    ).toBe("page-race-v2");
     expect((await adapter.getLayoutDSL(sampleLayout.id))?.version).toBe(
       "layout-race-v1",
     );
@@ -524,11 +642,7 @@ describe("SQLiteStorageAdapter", () => {
           sql: `UPDATE aria_page_meta
                 SET draft_version = ?, current_version = ?
                 WHERE id = ?`,
-          args: [
-            "publish-pin-race-v2",
-            "publish-pin-race-v2",
-            samplePage.id,
-          ],
+          args: ["publish-pin-race-v2", "publish-pin-race-v2", samplePage.id],
         });
       }
       return originalBatch(...args);

@@ -127,6 +127,10 @@ import {
   type RedirectStorageDomain,
 } from "./internal/domains/redirects";
 import {
+  createStudioPresenceStorageDomain,
+  type StudioPresenceStorageDomain,
+} from "./internal/domains/studioPresence";
+import {
   createWordPressImportStorageDomain,
   type WordPressImportStorageDomain,
 } from "./internal/domains/wordpressImport";
@@ -472,6 +476,16 @@ export class SQLiteStoragePlatform implements StorageAdapter {
         run: (sql: string, args = []) => this.run(sql, asSqlArgs(args)),
         now: () => this.nowIso(),
         getContentSiteState: (scope) => this.getContentSiteState(scope),
+      }),
+    );
+    Object.assign(
+      this,
+      createStudioPresenceStorageDomain({
+        queryFirst: (sql: string, args = []) =>
+          this.queryFirst(sql, asSqlArgs(args)),
+        queryAll: (sql: string, args = []) =>
+          this.queryAll(sql, asSqlArgs(args)),
+        run: (sql: string, args = []) => this.run(sql, asSqlArgs(args)),
       }),
     );
     Object.assign(
@@ -2015,4 +2029,5 @@ export interface SQLiteStoragePlatform extends DslAssetStorageDomain {}
 export interface SQLiteStoragePlatform extends MediaCatalogStorageDomain {}
 export interface SQLiteStoragePlatform extends PageMetadataStorageDomain {}
 export interface SQLiteStoragePlatform extends ContentStateStorageDomain {}
+export interface SQLiteStoragePlatform extends StudioPresenceStorageDomain {}
 export interface SQLiteStoragePlatform extends RateLimitStorageDomain {}

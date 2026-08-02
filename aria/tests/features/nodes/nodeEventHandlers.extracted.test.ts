@@ -283,6 +283,51 @@ describe("extracted node event handlers", () => {
     );
   });
 
+  it("regenerates colliding subtree IDs before insertion", async () => {
+    const existingSection = createNode("existing-section", "Section");
+    existingSection.children = [createNode("shared-container", "Container")];
+    const pageBlocks = pageBlocksRef([existingSection]);
+    const executeNodeEventOperation = createNodeEventExecutorMock({
+      runRedo: true,
+    });
+    const { handleAddElement } = createComponentHandlersForTest({
+      pageBlocks,
+      currentPage: ref(null),
+      currentLayout: ref(null),
+      currentComponent: ref(null),
+      executeNodeEventOperation,
+      setSelectedBlock: vi.fn(),
+      resolveMutationPath: () => ({ collection: "pages", id: "page-1" }),
+      getDefaultSlotName: () => "main",
+    });
+
+    const nextSection = createNode("next-section", "Section");
+    nextSection.children = [createNode("shared-container", "Container")];
+    await handleAddElement({
+      type: "section",
+      data: nextSection,
+      insertionMode: "root",
+    });
+
+    const firstContainerId = pageBlocks.value[0]?.children?.[0]?.id;
+    const secondContainerId = pageBlocks.value[1]?.children?.[0]?.id;
+    expect(firstContainerId).toBe("shared-container");
+    expect(secondContainerId).toBeTruthy();
+    expect(secondContainerId).not.toBe(firstContainerId);
+
+    await handleAddElement({
+      type: "heading",
+      data: createNode("new-heading", "Heading"),
+      parentId: secondContainerId,
+      insertionMode: "parent",
+    });
+
+    expect(pageBlocks.value[0]?.children?.[0]?.children).toHaveLength(0);
+    expect(pageBlocks.value[1]?.children?.[0]?.children?.[0]?.id).toBe(
+      "new-heading",
+    );
+  });
+
   it("does not advance structural insertion context when insertion fails", async () => {
     const handleElementAdded = vi.fn(() => null);
     const executeNodeEventOperation = vi.fn(async () => ({
@@ -401,7 +446,10 @@ describe("extracted node event handlers", () => {
       id: "layout-1",
       slots: [
         { name: "main", isDefault: true },
-        { name: "footer", defaultContent: [createNode("default-footer", "Text")] },
+        {
+          name: "footer",
+          defaultContent: [createNode("default-footer", "Text")],
+        },
       ],
     } as LayoutDSL);
     const activeSlot = ref({ name: "footer", scope: "page" as const });

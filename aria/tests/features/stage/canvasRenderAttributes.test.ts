@@ -1,9 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  CANVAS_DISABLED_ATTRIBUTE,
-  normalizeCanvasAttributeProps,
-} from "../../../admin/features/Stage/utils/canvasRenderAttributes";
+import { normalizeCanvasAttributeProps } from "../../../admin/features/Stage/utils/canvasRenderAttributes";
 
 describe("canvasRenderAttributes", () => {
   it("keeps non-button props unchanged", () => {
@@ -18,26 +15,26 @@ describe("canvasRenderAttributes", () => {
     });
   });
 
-  it("replaces native disabled with a stage-only attribute for buttons", () => {
+  it("preserves native disabled state for buttons", () => {
     expect(
       normalizeCanvasAttributeProps(
         { type: "Button" },
         { disabled: true, href: "/pricing" },
       ),
     ).toEqual({
+      disabled: true,
       href: "/pricing",
-      [CANVAS_DISABLED_ATTRIBUTE]: "true",
     });
   });
 
-  it("clears the stage-only disabled attribute when buttons become enabled", () => {
+  it("preserves an explicit enabled state without introducing editor attributes", () => {
     expect(
       normalizeCanvasAttributeProps(
         { type: "Button" },
-        { disabled: false, [CANVAS_DISABLED_ATTRIBUTE]: "true" },
+        { disabled: false },
       ),
     ).toEqual({
-      [CANVAS_DISABLED_ATTRIBUTE]: undefined,
+      disabled: false,
     });
   });
 });

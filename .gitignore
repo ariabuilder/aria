@@ -66,6 +66,8 @@ pnpm-debug.log*
 coverage/
 .nyc_output/
 *.lcov
+playwright-report/
+test-results/
 aria/tests/.check-errors.txt
 
 # OS/editor files

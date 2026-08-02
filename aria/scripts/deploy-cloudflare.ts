@@ -1,7 +1,7 @@
 import { randomBytes } from "node:crypto";
 import { chmod, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 
 import {
   readWorkerNameFromWranglerConfig,
@@ -182,11 +182,13 @@ export function repairDeadLetterQueueRenames(
 }
 
 /** Reads queue names expected by the generated deployment configuration. */
-async function readDeployQueueExpectations(): Promise<
+async function readDeployQueueExpectations(
+  configPath: string,
+): Promise<
   QueueExpectation[] | null
 > {
   try {
-    return parseQueueExpectations(await readFile(DEPLOY_CONFIG, "utf8"));
+    return parseQueueExpectations(await readFile(configPath, "utf8"));
   } catch {
     return null;
   }
@@ -862,10 +864,18 @@ export async function deployCloudflare(
   // After the build, dist/server/wrangler.json is the config wrangler deploy
   // uses — read queue expectations from it so Deploy-button resource renames
   // are honored. Falls back to the committed template's queue names.
-  const parsedQueueExpectations = await readDeployQueueExpectations();
+  // Tests and explicit orchestration can pin the source config. Normal deploys
+  // continue to read the freshly generated config that Wrangler will consume.
+  const configuredSource = process.env.ARIA_WRANGLER_CONFIG?.trim();
+  const queueExpectationConfig = configuredSource
+    ? resolve(process.cwd(), configuredSource)
+    : DEPLOY_CONFIG;
+  const parsedQueueExpectations = await readDeployQueueExpectations(
+    queueExpectationConfig,
+  );
   if (!parsedQueueExpectations) {
     console.warn(
-      `Could not read queue expectations from ${DEPLOY_CONFIG}; falling back to the template queue names.`,
+      `Could not read queue expectations from ${queueExpectationConfig}; falling back to the template queue names.`,
     );
   }
   const queueExpectations = parsedQueueExpectations ?? QUEUE_ENSURE_LIST;

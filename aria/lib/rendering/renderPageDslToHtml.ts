@@ -2,6 +2,7 @@ import {
   nodesToHtmlDocumentAsync,
   nodesToHtmlFragmentAsync,
   nodesToHtmlWithLayoutAsync,
+  mergePageNodesIntoLayoutForRender,
   resolvePublishedHtmlRenderStyleMode,
   type NodeToHtmlDocumentOptions,
 } from "../blocks/nodesToHtml";
@@ -60,6 +61,12 @@ import type { RuntimeLocals } from "../cloudflare/env";
 import { MediaCatalogRepository } from "../media/catalog/repository";
 import { resolveIconRenderResources } from "../icons/resolveIconResources";
 import type { IconRenderResources } from "../icons/iconRenderResources";
+import {
+  assembleRendererStyleBands,
+  buildRendererBaseStyleFragment,
+  collectRendererStyleRequirements,
+  splitCompatibilityRendererBaseCss,
+} from "./canonical/rendererStyles";
 
 type RenderLogger = (
   level: "debug" | "info" | "warn" | "error",
@@ -333,7 +340,7 @@ export async function renderPageDslToHtml(
   const globalCSSEnabled = hasCompiledCSS;
   const inlineGeneratedDocumentCss = !hasCompiledCSS;
   const inlineCompiledCss = options.inlineCompiledCss === true;
-  const inlineSnapshotCss =
+  const storedInlineSnapshotCss =
     inlineCompiledCss && hasCompiledCSS
       ? designSystem.artifacts.globalCSS.trim()
       : "";
@@ -435,20 +442,41 @@ export async function renderPageDslToHtml(
   // the manifest or shards again.
   const { expandComponentReferencesServer } =
     await import("../blocks/nodeUtils");
+  const expandedPageSurfaceNodes = await expandComponentReferencesServer(
+    slotOnlyLayout ? (mergedSlotNodes ?? pageNodes) : pageNodes,
+    getComponentDSL,
+  );
+  const resolvedBodySurfaceNodes = layout?.nodes?.length
+    ? mergePageNodesIntoLayoutForRender(
+        expandedPageSurfaceNodes,
+        await expandComponentReferencesServer(layout.nodes, getComponentDSL),
+        layout.slots,
+      )
+    : expandedPageSurfaceNodes;
   const iconSourceNodes = combineBuilderNodeSets(
-    await expandComponentReferencesServer(
-      slotOnlyLayout ? (mergedSlotNodes ?? pageNodes) : pageNodes,
-      getComponentDSL,
-    ),
-    layout?.nodes?.length
-      ? await expandComponentReferencesServer(layout.nodes, getComponentDSL)
-      : [],
+    resolvedBodySurfaceNodes,
     await expandComponentReferencesServer(headerNodes, getComponentDSL),
     await expandComponentReferencesServer(footerNodes, getComponentDSL),
   );
   const iconResources = await resolveIconRenderResources(iconSourceNodes, {
     locals: options.locals,
   });
+  const rendererBaseFragment = await buildRendererBaseStyleFragment(
+    collectRendererStyleRequirements(iconSourceNodes),
+  );
+  const storedSnapshotBands = splitCompatibilityRendererBaseCss(
+    storedInlineSnapshotCss,
+  );
+  const inlineSnapshotCss = storedInlineSnapshotCss
+    ? assembleRendererStyleBands({
+        rendererBaseCss: rendererBaseFragment?.css ?? "",
+        documentCss: storedSnapshotBands.remainingCss,
+        utilityCss: "",
+        customClassesCss: "",
+        contextRulesCss: "",
+        nodeCss: "",
+      })
+    : "";
   if (iconResources.metrics) {
     logger("debug", "Icon render prepass completed", {
       slug: options.page.slug,
@@ -586,6 +614,10 @@ export async function renderPageDslToHtml(
     globalCSSHref: options.globalCSSHref,
     inlineGeneratedDocumentCss,
     inlineGlobalStylesCSS: buildGlobalStylesCss(designSystem),
+    rendererBaseCss:
+      inlineGeneratedDocumentCss && !inlineSnapshotCss
+        ? (rendererBaseFragment?.css ?? "")
+        : "",
     suppressFrameworkTags: inlineSnapshotCss.length > 0,
     customFonts,
     darkMode: darkMode === "disabled" ? undefined : darkMode,

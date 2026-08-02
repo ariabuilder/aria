@@ -5,6 +5,7 @@
 
 import { reactive, onUnmounted, watch, type Ref } from "vue";
 import type { BuilderNode } from "../../lib/types/nodes";
+import type { CanvasAffordanceDescriptor } from "../../lib/rendering/canonical";
 import type { CanvasSelectionGesture } from "../features/Core/composables/useCanvasInteractionBridge";
 import { useCanvasInteractionBridge } from "../features/Core";
 import {
@@ -16,7 +17,6 @@ import {
   findStageNodeElement,
 } from "../features/Stage/utils/findStageNodeElement";
 import { resolveAdminPrimaryColor } from "../features/Stage/styles/stageDropFeedback";
-import { frameViewportRectToIframeDocument } from "../features/Stage/utils/overlayMeasure";
 import { toolbarIcons } from "../lib/icons";
 import { IFRAME_Z_INDEX, Z_INDEX } from "@/lib/zIndex";
 import {
@@ -91,6 +91,8 @@ export interface AddElementsDropState {
   target: OverlayPosition | null;
   orientation: "horizontal" | "vertical";
 }
+
+export type { CanvasAffordanceDescriptor };
 
 export interface ToolbarAction {
   name: string;
@@ -188,11 +190,13 @@ const dropZoneState = reactive<DropZoneState>({
   zones: [],
 });
 
+const canvasAffordanceState = reactive<CanvasAffordanceDescriptor[]>([]);
+let frameAffordanceDescriptors: CanvasAffordanceDescriptor[] = [];
+let frameAffordanceCaptureScroll = { left: 0, top: 0 };
+
 let iframeHoverOverlayEl: HTMLElement | null = null;
 let iframeSelectionOverlayEl: HTMLElement | null = null;
 let iframeSelectionGhostOverlayEl: HTMLElement | null = null;
-let iframeAddElementsLineEl: HTMLElement | null = null;
-let iframeAddElementsTargetEl: HTMLElement | null = null;
 let iframeSecondarySelectionOverlayEls: HTMLElement[] = [];
 
 const secondarySelectionStates = reactive<SecondarySelectionState[]>([]);
@@ -236,6 +240,17 @@ const INLINE_TEXT_MEASUREMENT_NODE_TYPES = new Set([
   "text",
   "paragraph",
 ]);
+const STRUCTURAL_BOX_NODE_TYPES = new Set([
+  "section",
+  "container",
+  "header",
+  "footer",
+  "main",
+  "nav",
+  "grid",
+  "columns",
+  "column",
+]);
 const CONTENTFUL_TAGS = new Set([
   "a",
   "button",
@@ -277,8 +292,7 @@ function getIframeViewportMapping(
   }
 
   const rect = iframe.getBoundingClientRect();
-  const scaleX =
-    iframe.clientWidth > 0 ? rect.width / iframe.clientWidth : 1;
+  const scaleX = iframe.clientWidth > 0 ? rect.width / iframe.clientWidth : 1;
   const scaleY =
     iframe.clientHeight > 0 ? rect.height / iframe.clientHeight : 1;
 
@@ -306,6 +320,9 @@ function calculatePosition(
   mapping: IframeViewportMapping,
 ): OverlayPosition {
   let rect = element.getBoundingClientRect();
+  const nodeType = (
+    element.getAttribute("data-aria-type") || element.tagName
+  ).toLowerCase();
 
   if (
     element.hasAttribute("data-component-ref") &&
@@ -392,7 +409,11 @@ function calculatePosition(
   ).getComputedStyle(element);
 
   // If element claims 100% width but has narrower content, find actual content bounds
-  if (computedStyle.width === "100%" && element.children.length > 0) {
+  if (
+    !STRUCTURAL_BOX_NODE_TYPES.has(nodeType) &&
+    computedStyle.width === "100%" &&
+    element.children.length > 0
+  ) {
     let minLeft = Infinity;
     let maxRight = -Infinity;
     let minTop = rect.top;
@@ -763,83 +784,9 @@ function applyIframeOverlayTheme(): void {
     iframeSelectionGhostOverlayEl.style.border = `1px dashed ${colors.ghostBorder}`;
     iframeSelectionGhostOverlayEl.style.background = colors.ghostBackground;
   }
-
-  applyAddElementsDropOverlayTheme();
 }
 
-function applyAddElementsDropOverlayTheme(): void {
-  const primary = resolveAdminPrimaryColor();
-
-  if (iframeAddElementsTargetEl) {
-    iframeAddElementsTargetEl.style.border = `2px dashed color-mix(in srgb, ${primary} 70%, transparent)`;
-    iframeAddElementsTargetEl.style.background = "transparent";
-  }
-
-  if (iframeAddElementsLineEl) {
-    iframeAddElementsLineEl.style.background = primary;
-    iframeAddElementsLineEl.style.boxShadow = `0 0 4px color-mix(in srgb, ${primary} 35%, transparent)`;
-  }
-}
-
-function ensureAddElementsDropOverlays(contentDocument: Document): void {
-  ensureIframeSelectionOverlay(contentDocument);
-
-  if (
-    iframeAddElementsLineEl?.ownerDocument === contentDocument &&
-    iframeAddElementsTargetEl?.ownerDocument === contentDocument
-  ) {
-    return;
-  }
-
-  iframeAddElementsLineEl?.remove();
-  iframeAddElementsTargetEl?.remove();
-
-  const overlayRoot = contentDocument.body?.querySelector<HTMLElement>(
-    `[${IFRAME_OVERLAY_ROOT_ATTR}]`,
-  );
-  if (!overlayRoot) {
-    return;
-  }
-
-  const targetEl = contentDocument.createElement("div");
-  targetEl.setAttribute("data-aria-add-elements-target", "true");
-  targetEl.setAttribute("aria-hidden", "true");
-  Object.assign(targetEl.style, {
-    position: "absolute",
-    left: "0",
-    top: "0",
-    display: "none",
-    pointerEvents: "none",
-    zIndex: String(IFRAME_Z_INDEX.secondary),
-    boxSizing: "border-box",
-    willChange: "transform",
-  } satisfies Partial<CSSStyleDeclaration>);
-  overlayRoot.appendChild(targetEl);
-  iframeAddElementsTargetEl = targetEl;
-
-  const lineEl = contentDocument.createElement("div");
-  lineEl.setAttribute("data-aria-add-elements-line", "true");
-  lineEl.setAttribute("aria-hidden", "true");
-  Object.assign(lineEl.style, {
-    position: "absolute",
-    left: "0",
-    top: "0",
-    display: "none",
-    pointerEvents: "none",
-    zIndex: String(IFRAME_Z_INDEX.insertion),
-    boxSizing: "border-box",
-    borderRadius: "2px",
-    willChange: "transform",
-  } satisfies Partial<CSSStyleDeclaration>);
-  overlayRoot.appendChild(lineEl);
-  iframeAddElementsLineEl = lineEl;
-
-  applyAddElementsDropOverlayTheme();
-}
-
-function syncHoverPosition(
-  getOffset: () => IframeViewportMapping,
-): void {
+function syncHoverPosition(getOffset: () => IframeViewportMapping): void {
   if (
     !hoverState.visible ||
     !hoverState.element ||
@@ -1145,10 +1092,6 @@ function ensureIframeSelectionOverlay(contentDocument: Document): void {
   iframeHoverOverlayEl?.remove();
   iframeSelectionOverlayEl?.remove();
   iframeSelectionGhostOverlayEl?.remove();
-  iframeAddElementsLineEl?.remove();
-  iframeAddElementsTargetEl?.remove();
-  iframeAddElementsLineEl = null;
-  iframeAddElementsTargetEl = null;
   iframeSecondarySelectionOverlayEls.forEach((overlayElement) =>
     overlayElement.remove(),
   );
@@ -1263,6 +1206,7 @@ export interface UseCanvasOverlaysReturn {
   insertion: Readonly<InsertionState>;
   dropZones: Readonly<DropZoneState>;
   addElementsDrop: Readonly<AddElementsDropState>;
+  affordances: Readonly<CanvasAffordanceDescriptor[]>;
 
   showHover: (
     element: Element,
@@ -1288,6 +1232,10 @@ export interface UseCanvasOverlaysReturn {
     position: OverlayPosition,
     orientation?: "horizontal" | "vertical",
   ) => void;
+  showFrameInsertion: (
+    position: OverlayPosition,
+    orientation?: "horizontal" | "vertical",
+  ) => void;
   hideInsertion: () => void;
   showAddElementsDropFeedback: (
     placeholder: OverlayPosition,
@@ -1295,6 +1243,10 @@ export interface UseCanvasOverlaysReturn {
     orientation?: "horizontal" | "vertical",
   ) => void;
   hideAddElementsDropFeedback: () => void;
+  showFrameAffordances: (
+    descriptors: readonly CanvasAffordanceDescriptor[],
+  ) => void;
+  hideAffordances: () => void;
 
   showDropZones: (
     zones: Array<{ id: string; position: OverlayPosition }>,
@@ -1387,12 +1339,11 @@ export function useCanvasOverlays(
     );
 
     selectionState.element = measurementTarget;
-    selectionState.hasParent =
-      Boolean(
-        (nextElement as HTMLElement).parentElement?.closest(
-          "[data-aria-id], [data-aria-template-id]",
-        ),
-      );
+    selectionState.hasParent = Boolean(
+      (nextElement as HTMLElement).parentElement?.closest(
+        "[data-aria-id], [data-aria-template-id]",
+      ),
+    );
 
     return measurementTarget;
   };
@@ -1485,12 +1436,9 @@ export function useCanvasOverlays(
     const offset = getOffset();
     const position = remeasureSelectionPosition(measurementTarget, offset);
 
-    const hasParent =
-      Boolean(
-        element.parentElement?.closest(
-          "[data-aria-id], [data-aria-template-id]",
-        ),
-      );
+    const hasParent = Boolean(
+      element.parentElement?.closest("[data-aria-id], [data-aria-template-id]"),
+    );
     const isComponent = nodeType === "Component";
 
     selectionState.visible = true;
@@ -1613,6 +1561,16 @@ export function useCanvasOverlays(
     }
   }
 
+  function showFrameInsertion(
+    position: OverlayPosition,
+    orientation: "horizontal" | "vertical" = "horizontal",
+  ): void {
+    showInsertion(
+      mapLocalOverlayToHostViewport(position, getOffset()),
+      orientation,
+    );
+  }
+
   function hideInsertion(): void {
     insertionState.visible = false;
     insertionState.position = null;
@@ -1627,35 +1585,68 @@ export function useCanvasOverlays(
     target: OverlayPosition | null = null,
     orientation: "horizontal" | "vertical" = "vertical",
   ): void {
+    const mapping = getOffset();
     addElementsDropState.visible = true;
-    addElementsDropState.placeholder = placeholder;
-    addElementsDropState.target = target;
-    addElementsDropState.orientation = orientation;
-
-    const iframe = iframeRef?.value ?? null;
-    const contentDocument = iframe?.contentDocument ?? null;
-    if (!iframe || !contentDocument) {
-      return;
-    }
-
-    ensureAddElementsDropOverlays(contentDocument);
-
-    const linePosition = frameViewportRectToIframeDocument(placeholder, iframe);
-    const targetPosition = target
-      ? frameViewportRectToIframeDocument(target, iframe)
+    addElementsDropState.placeholder = mapLocalOverlayToHostViewport(
+      placeholder,
+      mapping,
+    );
+    addElementsDropState.target = target
+      ? mapLocalOverlayToHostViewport(target, mapping)
       : null;
-
-    writeOverlayPosition(iframeAddElementsLineEl, linePosition);
-    writeOverlayPosition(iframeAddElementsTargetEl, targetPosition);
+    addElementsDropState.orientation = orientation;
   }
 
   function hideAddElementsDropFeedback(): void {
     addElementsDropState.visible = false;
     addElementsDropState.placeholder = null;
     addElementsDropState.target = null;
+  }
 
-    writeOverlayPosition(iframeAddElementsLineEl, null);
-    writeOverlayPosition(iframeAddElementsTargetEl, null);
+  function showFrameAffordances(
+    descriptors: readonly CanvasAffordanceDescriptor[],
+  ): void {
+    const contentWindow = iframeRef?.value?.contentWindow;
+    frameAffordanceDescriptors = descriptors.map((descriptor) => ({
+      ...descriptor,
+      position: { ...descriptor.position },
+    }));
+    frameAffordanceCaptureScroll = {
+      left: contentWindow?.scrollX ?? 0,
+      top: contentWindow?.scrollY ?? 0,
+    };
+    syncFrameAffordancePositions();
+  }
+
+  function syncFrameAffordancePositions(): void {
+    const mapping = getOffset();
+    const contentWindow = iframeRef?.value?.contentWindow;
+    const scrollDeltaLeft =
+      (contentWindow?.scrollX ?? 0) - frameAffordanceCaptureScroll.left;
+    const scrollDeltaTop =
+      (contentWindow?.scrollY ?? 0) - frameAffordanceCaptureScroll.top;
+
+    canvasAffordanceState.splice(
+      0,
+      canvasAffordanceState.length,
+      ...frameAffordanceDescriptors.map((descriptor) => ({
+        ...descriptor,
+        position: mapLocalOverlayToHostViewport(
+          {
+            ...descriptor.position,
+            left: descriptor.position.left - scrollDeltaLeft,
+            top: descriptor.position.top - scrollDeltaTop,
+          },
+          mapping,
+        ),
+      })),
+    );
+  }
+
+  function hideAffordances(): void {
+    frameAffordanceDescriptors = [];
+    frameAffordanceCaptureScroll = { left: 0, top: 0 };
+    canvasAffordanceState.splice(0, canvasAffordanceState.length);
   }
 
   function showDropZones(
@@ -1689,6 +1680,7 @@ export function useCanvasOverlays(
 
     rafId = requestAnimationFrame(() => {
       rafId = null;
+      syncFrameAffordancePositions();
 
       if (mode === "translate") {
         syncHoverPosition(getOffset);
@@ -1728,6 +1720,7 @@ export function useCanvasOverlays(
           lastScrollActivityTime = Date.now();
           syncSelectionPosition("translate");
           syncHoverPosition(getOffset);
+          syncFrameAffordancePositions();
 
           if (scrollFollowRafId === null) {
             scrollFollowRafId = requestAnimationFrame(followScroll);
@@ -1875,6 +1868,7 @@ export function useCanvasOverlays(
     hideSecondarySelections();
     hideInsertion();
     hideAddElementsDropFeedback();
+    hideAffordances();
     hideDropZones();
     toolbarCallbacks.clear();
 
@@ -1902,6 +1896,7 @@ export function useCanvasOverlays(
     insertion: insertionState,
     dropZones: dropZoneState,
     addElementsDrop: addElementsDropState,
+    affordances: canvasAffordanceState,
 
     showHover,
     hideHover,
@@ -1915,9 +1910,12 @@ export function useCanvasOverlays(
     updateSelectionPosition,
 
     showInsertion,
+    showFrameInsertion,
     hideInsertion,
     showAddElementsDropFeedback,
     hideAddElementsDropFeedback,
+    showFrameAffordances,
+    hideAffordances,
 
     showDropZones,
     activateDropZone,
@@ -1931,13 +1929,7 @@ export function useCanvasOverlays(
   };
 }
 
-export {
-  Z_INDEX,
-  IFRAME_Z_INDEX,
-  ICON_MAP,
-  TOOLBAR_ICONS,
-  createSvgIcon,
-};
+export { Z_INDEX, IFRAME_Z_INDEX, ICON_MAP, TOOLBAR_ICONS, createSvgIcon };
 
 // LIGHT SUBSCRIPTION (like useBeacon's onFocusChange)
 

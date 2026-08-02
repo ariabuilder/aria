@@ -15,7 +15,7 @@ import {
 } from "../lib/styles/universalDesignSystem";
 
 export async function getDesignSystem(
-  adapter: StorageAdapter,
+  adapter: Pick<StorageAdapter, "getDesignSystem">,
 ): Promise<UniversalDesignSystem> {
   return (
     (await adapter.getDesignSystem()) ?? createDefaultUniversalDesignSystem()

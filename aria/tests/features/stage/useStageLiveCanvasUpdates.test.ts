@@ -87,7 +87,6 @@ vi.mock("../../../admin/features/Core", () => ({
 }));
 
 import { useStageLiveCanvasUpdates } from "../../../admin/features/Stage/composables/useStageLiveCanvasUpdates";
-import { CANVAS_DISABLED_ATTRIBUTE } from "../../../admin/features/Stage/utils/canvasRenderAttributes";
 import { hydrateIconHost } from "../../../admin/features/Stage/utils/canvasIconHydration";
 
 function createImageNode(id = "image-1"): BuilderNode {
@@ -792,7 +791,7 @@ describe("useStageLiveCanvasUpdates", () => {
     wrapper.unmount();
   });
 
-  it("keeps disabled canvas buttons selectable during live prop updates", () => {
+  it("preserves native disabled canvas button state during live prop updates", () => {
     const stageDocument = createButtonStageDocument();
     const iframeRef = {
       value: { contentDocument: stageDocument } as HTMLIFrameElement,
@@ -815,8 +814,7 @@ describe("useStageLiveCanvasUpdates", () => {
       '[data-aria-id="button-1"]',
     ) as HTMLElement | null;
 
-    expect(element?.hasAttribute("disabled")).toBe(false);
-    expect(element?.getAttribute(CANVAS_DISABLED_ATTRIBUTE)).toBe("true");
+    expect(element?.hasAttribute("disabled")).toBe(true);
 
     bridgeCallbacks.propsUpdate?.({
       nodeId: "button-1",
@@ -827,7 +825,6 @@ describe("useStageLiveCanvasUpdates", () => {
     });
 
     expect(element?.hasAttribute("disabled")).toBe(false);
-    expect(element?.hasAttribute(CANVAS_DISABLED_ATTRIBUTE)).toBe(false);
 
     wrapper.unmount();
   });

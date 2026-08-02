@@ -1,5 +1,5 @@
 import {
-  buildGeneratedDocumentCss,
+  buildGeneratedDocumentStyleBands,
   buildStageRenderStylesData,
   buildStoredRenderStylesData,
 } from "./styles";
@@ -8,13 +8,30 @@ import type { ComponentSnapshotInput } from "../lib/rendering/componentSnapshots
 import { resolveBreakpointDefinitionsFromDesignSystem } from "../lib/styles/universalDesignSystem";
 import type { BuilderNode } from "../lib/types/nodes";
 import type { StorageAdapter } from "../lib/storage/adapter";
+import {
+  buildRendererBaseStyleFragment,
+  collectRendererStyleRequirements,
+} from "../lib/rendering/canonical";
+
+type ComponentSnapshotStorageAdapter = Pick<
+  StorageAdapter,
+  | "getComponentDSL"
+  | "getSiteSettings"
+  | "getDesignSystem"
+  | "listPagesDSL"
+  | "listLayoutsDSL"
+  | "listComponentsDSL"
+  | "getPageDSL"
+  | "getLayoutDSL"
+>;
 
 async function resolveComponentRenderStyles(
-  adapter: StorageAdapter,
+  adapter: ComponentSnapshotStorageAdapter,
+  rendererNodes: readonly BuilderNode[],
 ): Promise<ComponentSnapshotInput["renderStyles"]> {
   const designSystem = await getDesignSystem(adapter);
   const siteSettings = await adapter.getSiteSettings();
-  const generatedDocumentCss = await buildGeneratedDocumentCss(
+  const generatedStyleBands = await buildGeneratedDocumentStyleBands(
     adapter,
     resolveBreakpointDefinitionsFromDesignSystem(designSystem),
   );
@@ -24,7 +41,10 @@ async function resolveComponentRenderStyles(
   );
   const renderStyles = buildStageRenderStylesData({
     storedRenderStyles,
-    generatedDocumentCss,
+    generatedDocumentCss: generatedStyleBands.generatedDocumentCss,
+    rendererBaseFragment: await buildRendererBaseStyleFragment(
+      collectRendererStyleRequirements(rendererNodes),
+    ),
   });
 
   return {
@@ -36,7 +56,7 @@ async function resolveComponentRenderStyles(
 
 export async function buildComponentSnapshotInput(
   componentId: string,
-  adapter: StorageAdapter,
+  adapter: ComponentSnapshotStorageAdapter,
 ): Promise<ComponentSnapshotInput | null> {
   const component = await adapter.getComponentDSL(componentId);
   if (!component) {
@@ -44,7 +64,13 @@ export async function buildComponentSnapshotInput(
   }
 
   const siteSettings = await adapter.getSiteSettings();
-  const renderStyles = await resolveComponentRenderStyles(adapter);
+  const componentNodes = component.nodes ?? [];
+  const componentSlotDefaultNodes =
+    component.slots?.flatMap((slot) => slot.defaultContent ?? []) ?? [];
+  const renderStyles = await resolveComponentRenderStyles(adapter, [
+    ...componentNodes,
+    ...componentSlotDefaultNodes,
+  ]);
   const pageCssVariables =
     component.settings &&
     typeof component.settings === "object" &&
@@ -56,7 +82,7 @@ export async function buildComponentSnapshotInput(
 
   return {
     componentId: component.id,
-    nodes: (component.nodes || []) as BuilderNode[],
+    nodes: componentNodes,
     settings: siteSettings,
     renderStyles,
     pageCssVariables,

@@ -52,6 +52,72 @@ export type StudioLiveInvalidation = z.infer<
   typeof StudioLiveInvalidationSchema
 >;
 
+export const StudioInvalidationDeliverySchema = z.discriminatedUnion("status", [
+  z
+    .object({
+      status: z.literal("delivered"),
+      eventId: z.uuid(),
+      siteRevision: z.number().int().nonnegative(),
+    })
+    .strict(),
+  z
+    .object({
+      status: z.literal("unavailable"),
+      eventId: z.uuid(),
+      siteRevision: z.number().int().nonnegative(),
+    })
+    .strict(),
+  z
+    .object({
+      status: z.literal("failed"),
+      eventId: z.uuid(),
+      siteRevision: z.number().int().nonnegative(),
+      code: z.literal("STUDIO_LIVE_RPC_FAILED"),
+    })
+    .strict(),
+]);
+
+export type StudioInvalidationDelivery = z.infer<
+  typeof StudioInvalidationDeliverySchema
+>;
+
+export const StudioRevisionCheckpointSchema = z
+  .object({
+    revisionSeq: z.number().int().nonnegative(),
+    currentRevisionId: z.string().trim().min(1),
+    lastMutationKind: z.string().trim().min(1),
+    lastMutationTarget: z.string().trim().min(1).optional(),
+    updatedAt: z.string().trim().min(1),
+  })
+  .strict();
+
+export type StudioRevisionCheckpoint = z.infer<
+  typeof StudioRevisionCheckpointSchema
+>;
+
+export const StudioPresenceHeartbeatSchema = z
+  .object({
+    sessionId: z.uuid(),
+    connectedAt: z.number().int().nonnegative(),
+    lastActivityAt: z.number().int().nonnegative(),
+    presence: StudioPresenceUpdateSchema.omit({ type: true }),
+  })
+  .strict();
+
+export type StudioPresenceHeartbeat = z.infer<
+  typeof StudioPresenceHeartbeatSchema
+>;
+
+export const StudioSyncSnapshotSchema = z
+  .object({
+    checkpoint: StudioRevisionCheckpointSchema.nullable(),
+    sessions: z.array(StudioPresenceAttachmentSchema),
+    serverTime: z.number().int().nonnegative(),
+  })
+  .strict();
+
+export type StudioSyncSnapshot = z.infer<typeof StudioSyncSnapshotSchema>;
+
 export type StudioLiveServerMessage =
   | {
       type: "presence.snapshot";

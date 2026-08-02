@@ -346,7 +346,8 @@ describe("useSavePublish", () => {
     expect(composeMock).toHaveBeenCalledTimes(2);
     expect(loadResult?.pageData.title).toBe("Published Home");
     expect(refreshPagesNowMock).toHaveBeenCalledTimes(2);
-    expect(toastSuccessMock).not.toHaveBeenCalled();
+    expect(toastSuccessMock).toHaveBeenCalledTimes(1);
+    expect(toastSuccessMock).toHaveBeenCalledWith("Page published");
   });
 
   it("shows a success toast for explicit save-and-publish actions", async () => {
@@ -361,6 +362,26 @@ describe("useSavePublish", () => {
     expect(savePageMock).toHaveBeenCalledTimes(1);
     expect(publishMock).toHaveBeenCalledTimes(1);
     expect(toastSuccessMock).toHaveBeenCalledWith("Page published");
+    expect(toastSuccessMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("reports a malformed publish response instead of failing silently", async () => {
+    const { useSavePublish } =
+      await import("../../admin/features/Core/composables/useSavePublish");
+
+    publishMock.mockResolvedValueOnce({
+      data: null,
+      error: null,
+    });
+
+    const deps = createSaveDeps();
+    const { handlePublish } = useSavePublish(deps);
+
+    await expect(handlePublish()).resolves.toBe(false);
+
+    expect(toastSuccessMock).not.toHaveBeenCalled();
+    expect(toastErrorMock).toHaveBeenCalledTimes(1);
+    expect(toastErrorMock).toHaveBeenCalledWith("Invalid publish response");
   });
 
   it("saves once before publishing and uses the replacement nonce", async () => {

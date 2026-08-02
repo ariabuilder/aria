@@ -216,6 +216,10 @@ import {
   type RedirectStorageDomain,
 } from "./internal/domains/redirects";
 import {
+  createStudioPresenceStorageDomain,
+  type StudioPresenceStorageDomain,
+} from "./internal/domains/studioPresence";
+import {
   createWordPressImportStorageDomain,
   type WordPressImportStorageDomain,
 } from "./internal/domains/wordpressImport";
@@ -468,6 +472,14 @@ export class CloudflareStoragePlatform implements StorageAdapter {
     );
     Object.assign(
       this,
+      createStudioPresenceStorageDomain({
+        queryFirst: (sql: string, args = []) => this.queryFirst(sql, [...args]),
+        queryAll: (sql: string, args = []) => this.queryAll(sql, [...args]),
+        run: (sql: string, args = []) => this.run(sql, [...args]),
+      }),
+    );
+    Object.assign(
+      this,
       createRateLimitStorageDomain({
         queryFirst: (sql: string, args = []) => this.queryFirst(sql, [...args]),
         now: () => Date.now(),
@@ -590,7 +602,10 @@ export class CloudflareStoragePlatform implements StorageAdapter {
     args: unknown[] = [],
   ): Promise<{ changes: number }> {
     await this.ensureCanonicalTables();
-    const result = await this.requireDb().prepare(sql).bind(...args).run();
+    const result = await this.requireDb()
+      .prepare(sql)
+      .bind(...args)
+      .run();
     return { changes: Number(result.meta?.changes ?? 0) };
   }
 
@@ -1952,4 +1967,5 @@ export interface CloudflareStoragePlatform extends DslAssetStorageDomain {}
 export interface CloudflareStoragePlatform extends MediaCatalogStorageDomain {}
 export interface CloudflareStoragePlatform extends PageMetadataStorageDomain {}
 export interface CloudflareStoragePlatform extends ContentStateStorageDomain {}
+export interface CloudflareStoragePlatform extends StudioPresenceStorageDomain {}
 export interface CloudflareStoragePlatform extends RateLimitStorageDomain {}
