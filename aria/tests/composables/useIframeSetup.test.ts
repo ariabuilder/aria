@@ -88,8 +88,10 @@ describe("useIframeSetup", () => {
     expect(iframeHtml.value).toContain(":root{--accent:red;}");
     expect(iframeHtml.value).toContain("data-aria-utility-css");
     expect(iframeHtml.value).toContain(".bg-primary{background:red}");
-    expect(iframeHtml.value).toContain('button[data-aria-type="Button"]');
-    expect(iframeHtml.value).toContain("appearance: none !important");
+    expect(iframeHtml.value).not.toContain(
+      'button[data-aria-type="Button"]',
+    );
+    expect(iframeHtml.value).not.toContain("appearance: none !important");
   });
 
   it("inlines compiled global CSS instead of reloading the preview stylesheet link", () => {

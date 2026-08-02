@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import BaseElement from "../BaseElement.vue";
-import { generateNodeId } from "../../../../../lib/ids/nodeId";
 import { studioIcons } from "@/lib/icons";
 
 const props = defineProps<{
@@ -23,7 +22,6 @@ const elementData = {
   customClasses: [],
   children: [
     {
-      id: generateNodeId(),
       type: "Container",
       props: {
         element: "div",

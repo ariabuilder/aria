@@ -56,6 +56,14 @@ export async function buildCloudflare(): Promise<void> {
   await runScript("aria/scripts/check-cloudflare-free-limits.ts");
 }
 
+/** Builds the production Astro Node bundle with the same source tree. */
+export async function buildNode(): Promise<void> {
+  await runScript("aria/scripts/generate-icon-assets.ts");
+  await runScript("aria/scripts/check-icon-worker-boundary.ts");
+  await rm(resolve(workspaceRoot, "dist"), { recursive: true, force: true });
+  await runAstro(["build"], "node");
+}
+
 /** Dispatches a cross-platform project command to its underlying toolchain. */
 export async function runProjectCommand(
   command: string,
@@ -71,7 +79,11 @@ export async function runProjectCommand(
       await runAstro(["dev", ...args], "cloudflare");
       return;
     case "build":
+    case "build:cloudflare":
       await buildCloudflare();
+      return;
+    case "build:node":
+      await buildNode();
       return;
     case "preview":
       await runAstro(["preview", ...args], "cloudflare");

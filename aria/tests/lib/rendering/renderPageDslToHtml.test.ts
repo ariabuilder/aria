@@ -1,11 +1,40 @@
 import { describe, expect, it } from "vitest";
 import type { StorageAdapter } from "../../../lib/storage/adapter";
-import type { LayoutDSL, PageDSL } from "../../../lib/types/nodes";
+import type { BuilderNode, LayoutDSL, PageDSL } from "../../../lib/types/nodes";
 import { renderPageDslToHtml } from "../../../lib/rendering/renderPageDslToHtml";
 import { renderPageHtmlFromStorage } from "../../../lib/rendering/renderPageHtml";
 import { createDefaultUniversalDesignSystem } from "../../../lib/styles/universalDesignSystem";
 import type { AriaCollection, AriaEntryRecord } from "../../../lib/cms/schemas";
 import { createIconAssetFetcher } from "../../helpers/iconAssetFetcher";
+import { assembleRendererBaseCss } from "../../../lib/rendering/canonical";
+
+function createManagedFooterImage(): BuilderNode {
+  return {
+    id: "footer-managed-image",
+    type: "Image",
+    slot: "footer",
+    props: {
+      src: "/media/source/current/footer-logo.png",
+      alt: "Footer logo",
+    },
+    classNames: { base: ["h-8"] },
+    styles: {},
+    children: [],
+    metadata: {
+      responsiveImage: {
+        sizes: "100vw",
+        default: {
+          url: "/media/source/current/footer-logo.png",
+          reference: { mediaId: "footer-logo", variantId: null },
+          width: 727,
+          height: 621,
+          allowDerivatives: true,
+        },
+        sources: {},
+      },
+    },
+  };
+}
 
 const fullWidthLayout: LayoutDSL = {
   id: "full-width",
@@ -92,6 +121,124 @@ function createCmsRenderAdapter(input: {
 }
 
 describe("renderPageDslToHtml", () => {
+  it("derives fallback renderer CSS from a managed layout slot default", async () => {
+    const layout: LayoutDSL = {
+      ...fullWidthLayout,
+      slots: fullWidthLayout.slots.map((slot) =>
+        slot.name === "footer"
+          ? { ...slot, defaultContent: [createManagedFooterImage()] }
+          : slot,
+      ),
+    };
+    const page: PageDSL = {
+      id: "managed-footer",
+      slug: "managed-footer",
+      title: "Managed footer",
+      layout: layout.id,
+      nodes: [],
+    };
+
+    const { html } = await renderPageDslToHtml({
+      page,
+      adapter: createAdapter(layout),
+    });
+
+    expect(html).toContain("h-8 aria-managed-image");
+    expect(html.match(/:where\(img\.aria-managed-image\)/g)).toHaveLength(1);
+  });
+
+  it("derives renderer CSS from the resolved nonempty layout slot only", async () => {
+    const layout: LayoutDSL = {
+      id: "slot-layout",
+      name: "Slot layout",
+      nodes: [
+        {
+          id: "footer-slot",
+          type: "Slot",
+          props: { name: "footer" },
+          styles: {},
+          children: [],
+        },
+      ],
+      slots: [
+        {
+          name: "footer",
+          defaultContent: [createManagedFooterImage()],
+        },
+      ],
+    };
+    const page: PageDSL = {
+      id: "slot-page",
+      slug: "slot-page",
+      title: "Slot page",
+      layout: layout.id,
+      nodes: [],
+    };
+    const adapter = createAdapter(null);
+    adapter.getLayoutDSL = async (id) => (id === layout.id ? layout : null);
+
+    const fallback = await renderPageDslToHtml({ page, adapter });
+    expect(fallback.html).toContain("h-8 aria-managed-image");
+    expect(
+      fallback.html.match(/:where\(img\.aria-managed-image\)/g),
+    ).toHaveLength(1);
+
+    const overridden = await renderPageDslToHtml({
+      page: {
+        ...page,
+        nodes: [
+          {
+            id: "footer-override",
+            type: "Text",
+            slot: "footer",
+            props: { text: "Footer override" },
+            styles: {},
+            children: [],
+          },
+        ],
+      },
+      adapter,
+    });
+    expect(overridden.html).toContain("Footer override");
+    expect(overridden.html).not.toContain("aria-managed-image");
+  });
+
+  it("replaces stale snapshot renderer CSS with the current resolved surface", async () => {
+    const rendererCss = assembleRendererBaseCss([
+      "managed-image-intrinsic-ratio",
+    ]);
+    const page: PageDSL = {
+      id: "plain-page",
+      slug: "plain-page",
+      title: "Plain page",
+      nodes: [],
+    };
+
+    const stale = await renderPageDslToHtml({
+      page,
+      adapter: createAdapter(null, `${rendererCss}\n\n:root { --x: 1; }`),
+      inlineCompiledCss: true,
+    });
+    expect(stale.html).not.toContain("aria-managed-image");
+
+    const managedLayout: LayoutDSL = {
+      ...fullWidthLayout,
+      slots: fullWidthLayout.slots.map((slot) =>
+        slot.name === "footer"
+          ? { ...slot, defaultContent: [createManagedFooterImage()] }
+          : slot,
+      ),
+    };
+    const current = await renderPageDslToHtml({
+      page: { ...page, layout: managedLayout.id },
+      adapter: createAdapter(managedLayout, ":root { --x: 1; }"),
+      inlineCompiledCss: true,
+    });
+    expect(
+      current.html.match(/:where\(img\.aria-managed-image\)/g),
+    ).toHaveLength(1);
+  });
+
   it("renders published component and layout dependency pins", async () => {
     const page: PageDSL = {
       id: "home",
@@ -134,7 +281,8 @@ describe("renderPageDslToHtml", () => {
           id: "header-text",
           type: "Text",
           props: {
-            text: version === "component-v1" ? "Published header" : "Draft header",
+            text:
+              version === "component-v1" ? "Published header" : "Draft header",
           },
           styles: {},
           children: [],

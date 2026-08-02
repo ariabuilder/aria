@@ -113,7 +113,14 @@ async function smokeRuntime(input: {
   const completion = runPackageBin(
     "astro",
     "astro",
-    ["dev", "--host", HOST, "--port", String(input.port)],
+    [
+      "dev",
+      "--ignore-lock",
+      "--host",
+      HOST,
+      "--port",
+      String(input.port),
+    ],
     {
       allowFailure: true,
       env: {

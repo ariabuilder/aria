@@ -15,7 +15,7 @@ import {
   type StylesStorageAdapter,
 } from "./_shared";
 import {
-  buildGeneratedDocumentCss,
+  buildGeneratedDocumentStyleBands,
   buildStageRenderStylesData,
   buildStoredRenderStylesData,
 } from "./globalCssArtifacts";
@@ -217,7 +217,7 @@ export const getRenderStylesAction = defineAction({
       }
 
       const designSystem = await getDesignSystem(adapter);
-      const generatedDocumentCss = await buildGeneratedDocumentCss(
+      const generatedStyleBands = await buildGeneratedDocumentStyleBands(
         adapter,
         resolveBreakpointDefinitionsFromDesignSystem(designSystem),
       );
@@ -227,7 +227,8 @@ export const getRenderStylesAction = defineAction({
       );
       const renderStyles = buildStageRenderStylesData({
         storedRenderStyles,
-        generatedDocumentCss,
+        generatedDocumentCss: generatedStyleBands.generatedDocumentCss,
+        rendererBaseFragment: generatedStyleBands.rendererBaseFragment,
       });
 
       const parsed = RenderStylesDataSchema.parse(renderStyles);

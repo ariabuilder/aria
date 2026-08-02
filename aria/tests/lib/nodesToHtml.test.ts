@@ -138,6 +138,8 @@ describe("nodesToHtml", () => {
     ]);
 
     expect(html).toContain('<picture style="display: contents">');
+    expect(html).toContain('class="aria-managed-image"');
+    expect(html).toContain('width="2400" height="1600"');
     expect(html).toContain(
       'media="(max-width: 767.98px)" srcset="/media/transform/hero-mobile/1-mobile/320 320w',
     );
@@ -149,6 +151,7 @@ describe("nodesToHtml", () => {
       'srcset="/media/source/current/hero.jpg?width=320 320w',
     );
     expect(html).toContain('sizes="(max-width: 767px) 100vw, 50vw"');
+    expect(html).not.toContain("w-auto");
   });
 
   it("renders structured text content props as semantic HTML", () => {

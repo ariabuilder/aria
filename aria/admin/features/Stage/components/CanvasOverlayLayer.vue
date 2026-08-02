@@ -4,13 +4,14 @@
  * all visual overlays for the canvas.
  */
 
-import { computed, toRef, type CSSProperties } from "vue";
+import { computed, onMounted, toRef, type CSSProperties } from "vue";
 import { Button } from "@/components/ui/button";
 import { ColorField } from "@/components/ui/color-picker";
 import { useToolbarTextColorContext } from "../composables/useToolbarTextColorContext";
 import {
   useCanvasOverlays,
   TOOLBAR_ICONS,
+  type CanvasAffordanceDescriptor,
   type ToolbarActionName,
 } from "../../../composables/useCanvasOverlays";
 import { OVERLAY_Z_INDEX } from "@/lib/zIndex";
@@ -22,6 +23,8 @@ import ToolbarHeadingLevelPicker from "./ToolbarHeadingLevelPicker.vue";
 import SelectionToolbarCmsControls from "./SelectionToolbarCmsControls.vue";
 import SelectionToolbarMotionControl from "./SelectionToolbarMotionControl.vue";
 import { useStudioI18n } from "@/i18n";
+import { resolveCanvasAffordanceVisualLayout } from "../utils/canvasAffordanceLayout";
+import { shouldHideSelectionToolbar } from "../utils/selectionToolbarVisibility";
 
 // PROPS & EMITS
 
@@ -42,16 +45,17 @@ const emit = defineEmits<{
     updates: Record<string, unknown>,
     nodeId: string,
   ): void;
+  (e: "select-affordance", descriptor: CanvasAffordanceDescriptor): void;
+  (e: "ready"): void;
 }>();
 const { t } = useStudioI18n();
 
 const { selectedNode } = useSelectedNodeState();
 const { signalStyleUpdate } = useCanvasSignalBridge();
-const { dragSource } = useDragDrop();
+const { isDragging, dragSource } = useDragDrop();
 
-const hideToolbarDuringLibraryDrag = computed(
-  () =>
-    dragSource.value === "add-elements" || dragSource.value === "components",
+const hideToolbarDuringLibraryDrag = computed(() =>
+  shouldHideSelectionToolbar(isDragging.value, dragSource.value),
 );
 
 const TEXT_NODE_TYPES = new Set([
@@ -168,6 +172,10 @@ const toolbarStyle = computed((): CSSProperties => {
   };
 });
 
+onMounted(() => {
+  emit("ready");
+});
+
 defineExpose({
   showHover: overlays.showHover,
   hideHover: overlays.hideHover,
@@ -175,9 +183,12 @@ defineExpose({
   hideSelection: overlays.hideSelection,
   updateSelectionPosition: overlays.updateSelectionPosition,
   showInsertion: overlays.showInsertion,
+  showFrameInsertion: overlays.showFrameInsertion,
   hideInsertion: overlays.hideInsertion,
   showAddElementsDropFeedback: overlays.showAddElementsDropFeedback,
   hideAddElementsDropFeedback: overlays.hideAddElementsDropFeedback,
+  showFrameAffordances: overlays.showFrameAffordances,
+  hideAffordances: overlays.hideAffordances,
   showDropZones: overlays.showDropZones,
   activateDropZone: overlays.activateDropZone,
   hideDropZones: overlays.hideDropZones,
@@ -212,6 +223,79 @@ const insertionStyle = computed(() => {
   };
   return style;
 });
+
+const addElementsInsertionStyle = computed((): CSSProperties => {
+  const position = overlays.addElementsDrop.placeholder;
+  if (!overlays.addElementsDrop.visible || !position) {
+    return { display: "none" };
+  }
+
+  const isVertical = overlays.addElementsDrop.orientation === "vertical";
+  return {
+    display: "block",
+    position: "fixed",
+    left: "0",
+    top: "0",
+    translate: `${position.left}px ${position.top}px`,
+    width: isVertical ? "3px" : `${position.width}px`,
+    height: isVertical ? `${position.height}px` : "3px",
+    zIndex: OVERLAY_Z_INDEX.insertion,
+  };
+});
+
+const addElementsTargetStyle = computed((): CSSProperties => {
+  const position = overlays.addElementsDrop.target;
+  if (!overlays.addElementsDrop.visible || !position) {
+    return { display: "none" };
+  }
+
+  return {
+    display: "block",
+    position: "fixed",
+    left: "0",
+    top: "0",
+    translate: `${position.left}px ${position.top}px`,
+    width: `${position.width}px`,
+    height: `${position.height}px`,
+    zIndex: OVERLAY_Z_INDEX.dropZone,
+  };
+});
+
+function getAffordanceStyle(
+  descriptor: CanvasAffordanceDescriptor,
+): CSSProperties {
+  const layout = resolveCanvasAffordanceVisualLayout(descriptor);
+  return {
+    position: "fixed",
+    left: "0",
+    top: "0",
+    translate: `${layout.left}px ${layout.top}px`,
+    width: `${layout.width}px`,
+    height: `${layout.height}px`,
+    zIndex: OVERLAY_Z_INDEX.dropZone + Math.min(descriptor.depth, 20),
+  };
+}
+
+function isCollapsedAffordance(
+  descriptor: CanvasAffordanceDescriptor,
+): boolean {
+  return descriptor.presentation === "collapsed-rail";
+}
+
+function getAffordanceLabel(descriptor: CanvasAffordanceDescriptor): string {
+  switch (descriptor.kind) {
+    case "empty-node":
+      return `Empty ${descriptor.nodeType}`;
+    case "empty-component":
+      return `Empty ${descriptor.nodeType} component`;
+    case "missing-media":
+      return `Missing ${descriptor.nodeType}`;
+    default: {
+      const exhaustive: never = descriptor;
+      return exhaustive;
+    }
+  }
+}
 
 interface ToolbarButton {
   action: ToolbarActionName;
@@ -297,22 +381,18 @@ const nodeTypeLabel = computed(() => {
 </script>
 
 <template>
-  <div
-    class="pointer-events-none"
-    :style="{
-      position: 'absolute',
-      inset: 0,
-      pointerEvents: 'none',
-      zIndex: OVERLAY_Z_INDEX.hover,
-      overflow: 'visible',
-    }"
-  >
-    <Teleport to="body">
+  <Teleport to="body">
+    <div
+      class="pointer-events-none fixed inset-0 overflow-visible"
+      :style="{ zIndex: OVERLAY_Z_INDEX.hover }"
+      data-aria-canvas-overlay-root="true"
+    >
       <div
         v-if="overlays.selection.visible"
         class="selection-toolbar fixed pointer-events-auto flex h-9 max-w-[calc(100vw-16px)] select-none items-center whitespace-nowrap rounded border-solid border-border bg-background px-1 text-xs text-foreground"
         :style="toolbarStyle"
         data-overlay="toolbar"
+        :data-node-id="overlays.selection.nodeId"
       >
         <div class="flex min-w-0 items-center gap-1 px-1">
           <Button
@@ -324,7 +404,9 @@ const nodeTypeLabel = computed(() => {
             :title="t('composer.toolbar.selectParent')"
             @click.stop.prevent="handleToolbarAction('select-parent')"
           >
-            <span :class="[TOOLBAR_ICONS['select-parent'], 'size-3.5 shrink-0']" />
+            <span
+              :class="[TOOLBAR_ICONS['select-parent'], 'size-3.5 shrink-0']"
+            />
           </Button>
           <span
             class="max-w-28 truncate px-1 text-xs font-medium text-muted-foreground capitalize"
@@ -370,7 +452,10 @@ const nodeTypeLabel = computed(() => {
               @click.stop.prevent="handleToolbarAction('open-media-picker')"
             >
               <span
-                :class="[TOOLBAR_ICONS['open-media-picker'], 'size-3.5 shrink-0']"
+                :class="[
+                  TOOLBAR_ICONS['open-media-picker'],
+                  'size-3.5 shrink-0',
+                ]"
               />
             </Button>
           </div>
@@ -380,8 +465,9 @@ const nodeTypeLabel = computed(() => {
         <SelectionToolbarMotionControl />
 
         <div
-            class="mx-1.5 h-3 shrink-0 border-l border-solid border-border/70"
-            aria-hidden="true" />
+          class="mx-1.5 h-3 shrink-0 border-l border-solid border-border/70"
+          aria-hidden="true"
+        />
 
         <div class="flex items-center gap-0.5 px-0.5">
           <Button
@@ -389,7 +475,11 @@ const nodeTypeLabel = computed(() => {
             :key="btn.action"
             variant="sidebar-action"
             size="icon-sm"
-            :class="[btn.isDanger ? 'hover:border-destructive/50 hover:text-destructive' : '']"
+            :class="[
+              btn.isDanger
+                ? 'hover:border-destructive/50 hover:text-destructive'
+                : '',
+            ]"
             :data-action="btn.action"
             :title="btn.title"
             @click.stop.prevent="handleToolbarAction(btn.action)"
@@ -398,34 +488,81 @@ const nodeTypeLabel = computed(() => {
           </Button>
         </div>
       </div>
-    </Teleport>
 
-    <div
-      class="pointer-events-none fixed bg-primary will-change-transform"
-      :style="insertionStyle"
-      data-overlay="insertion"
-    />
-
-    <template v-if="overlays.dropZones.visible">
       <div
-        v-for="zone in overlays.dropZones.zones"
-        :key="zone.id"
-        class="pointer-events-none fixed border-2 border-dashed border-primary bg-background transition-all duration-150"
-        :class="{
-          'shadow-[inset_0_0_8px_color-mix(in_srgb,var(--primary)_15%,transparent)]':
-            zone.isActive,
-        }"
-        :style="{
-          position: 'fixed',
-          zIndex: OVERLAY_Z_INDEX.dropZone,
-          left: `${zone.position.left}px`,
-          top: `${zone.position.top}px`,
-          width: `${zone.position.width}px`,
-          height: `${zone.position.height}px`,
-        }"
-        data-overlay="drop-zone"
-        :data-zone-id="zone.id"
+        class="pointer-events-none fixed bg-primary will-change-transform"
+        :style="insertionStyle"
+        data-overlay="insertion"
       />
-    </template>
-  </div>
+
+      <div
+        class="pointer-events-none fixed rounded-sm border-2 border-dashed border-primary/70 bg-transparent will-change-transform"
+        :style="addElementsTargetStyle"
+        data-overlay="add-elements-target"
+      />
+
+      <div
+        class="pointer-events-none fixed rounded-sm bg-primary shadow-[0_0_4px_color-mix(in_srgb,var(--primary)_35%,transparent)] will-change-transform"
+        :style="addElementsInsertionStyle"
+        data-overlay="add-elements-insertion"
+      />
+
+      <button
+        v-for="affordance in overlays.affordances"
+        :key="`${affordance.kind}:${affordance.nodeId}`"
+        type="button"
+        class="pointer-events-auto fixed flex min-h-6 min-w-6 items-center justify-center overflow-visible p-0 text-[10px] font-medium text-primary"
+        :class="
+          isCollapsedAffordance(affordance)
+            ? 'bg-transparent'
+            : 'overflow-hidden rounded-sm border border-dashed border-primary/70 bg-primary/10 p-1'
+        "
+        :style="getAffordanceStyle(affordance)"
+        :aria-label="getAffordanceLabel(affordance)"
+        :data-overlay="affordance.kind"
+        :data-node-id="affordance.nodeId"
+        :data-presentation="affordance.presentation"
+        @pointerdown.stop.prevent="emit('select-affordance', affordance)"
+      >
+        <span
+          v-if="isCollapsedAffordance(affordance)"
+          class="pointer-events-none absolute inset-x-0 top-1/2 border-t border-dashed border-primary/70"
+          aria-hidden="true"
+        />
+        <span
+          class="rounded-sm bg-background px-2 py-0.5"
+          :class="
+            isCollapsedAffordance(affordance)
+              ? 'pointer-events-auto absolute right-1 top-1/2 -translate-y-1/2'
+              : 'pointer-events-none relative'
+          "
+          aria-hidden="true"
+        >
+          {{ getAffordanceLabel(affordance) }}
+        </span>
+      </button>
+
+      <template v-if="overlays.dropZones.visible">
+        <div
+          v-for="zone in overlays.dropZones.zones"
+          :key="zone.id"
+          class="pointer-events-none fixed border-2 border-dashed border-primary bg-background transition-all duration-150"
+          :class="{
+            'shadow-[inset_0_0_8px_color-mix(in_srgb,var(--primary)_15%,transparent)]':
+              zone.isActive,
+          }"
+          :style="{
+            position: 'fixed',
+            zIndex: OVERLAY_Z_INDEX.dropZone,
+            left: `${zone.position.left}px`,
+            top: `${zone.position.top}px`,
+            width: `${zone.position.width}px`,
+            height: `${zone.position.height}px`,
+          }"
+          data-overlay="drop-zone"
+          :data-zone-id="zone.id"
+        />
+      </template>
+    </div>
+  </Teleport>
 </template>

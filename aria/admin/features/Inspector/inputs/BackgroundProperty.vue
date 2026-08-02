@@ -615,8 +615,8 @@ async function resetCurrentBreakpointBackground(): Promise<void> {
   syncBackgroundValues();
 }
 
-async function saveBackgroundColor(value: string): Promise<void> {
-  if (!hasSaveContext()) return;
+async function saveBackgroundColor(value: string): Promise<boolean> {
+  if (!hasSaveContext()) return false;
   const normalized = value.trim() || "transparent";
 
   const candidate: BackgroundValue = {
@@ -629,7 +629,7 @@ async function saveBackgroundColor(value: string): Promise<void> {
   };
 
   if (!validateBackground(candidate, "Invalid background color.")) {
-    return;
+    return false;
   }
 
   const success = await persistBackgroundStyleValues(
@@ -644,10 +644,11 @@ async function saveBackgroundColor(value: string): Promise<void> {
     },
     null,
   );
-  if (!success) return;
+  if (!success) return false;
 
   backgroundType.value = normalized === "transparent" ? "none" : "color";
   syncBackgroundValues();
+  return true;
 }
 
 function previewBackgroundColor(value: string): void {
@@ -660,9 +661,20 @@ function previewBackgroundColor(value: string): void {
 }
 
 async function persistBackgroundColor(value: string): Promise<void> {
+  const previousPreview = {
+    backgroundColor: getStyleValue("backgroundColor", "transparent"),
+    backgroundImage: getStyleValue("backgroundImage", "").trim() || undefined,
+  };
+
   backgroundColor.value = value;
   flushPendingBackgroundPreview();
-  await saveBackgroundColor(value);
+  const success = await saveBackgroundColor(value);
+  if (success) {
+    return;
+  }
+
+  backgroundPreviewQueue.restore(previousPreview);
+  syncBackgroundValues();
 }
 
 function previewGradientColors(): void {

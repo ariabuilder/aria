@@ -1,4 +1,8 @@
-import { createClient, type Client, type InStatement } from "@libsql/client";
+import {
+  createClient,
+  type Client,
+  type InStatement,
+} from "@libsql/client";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import fs from "fs/promises";
 import os from "os";
@@ -170,6 +174,7 @@ describe("CloudflareStorageAdapter", () => {
       "0003_api_idempotency_leases.sql",
       "0004_api_lifecycle_hardening.sql",
       "0008_published_dependency_pins.sql",
+      "0009_studio_presence_sessions.sql",
     ]) {
       await client.executeMultiple(
         await fs.readFile(

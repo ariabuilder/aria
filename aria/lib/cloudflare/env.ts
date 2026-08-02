@@ -1,3 +1,14 @@
+import type { AriaStudioLive } from "../../worker/studio-live";
+
+export type AriaStudioLiveStub = Pick<
+  AriaStudioLive,
+  "fetch" | "publishInvalidation"
+>;
+
+export type AriaStudioLiveNamespace = {
+  getByName(name: string): AriaStudioLiveStub;
+};
+
 /**
  * Cloudflare Worker bindings env. Bindings are injected per request via middleware (`locals.
  */
@@ -95,8 +106,8 @@ export type AriaCloudflareEnv = {
   AI?: Ai;
   aria_studio_agent?: DurableObjectNamespace;
   ARIA_STUDIO_AGENT?: DurableObjectNamespace;
-  aria_studio_live?: DurableObjectNamespace;
-  ARIA_STUDIO_LIVE?: DurableObjectNamespace;
+  aria_studio_live?: AriaStudioLiveNamespace;
+  ARIA_STUDIO_LIVE?: AriaStudioLiveNamespace;
   [key: string]: unknown;
 };
 

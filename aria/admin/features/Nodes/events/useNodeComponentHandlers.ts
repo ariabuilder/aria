@@ -15,6 +15,10 @@ import {
   insertNode as insertNodeInTree,
   deleteNodeById,
 } from "../../../../lib/blocks/nodeUtils";
+import {
+  collectNodeIds,
+  ensureUniqueNodeIdentities,
+} from "../../../../lib/blocks/nodeIdentity";
 import { nodeTreeContainsNavigation } from "../../../../lib/blocks/navigationPresetClasses";
 import {
   AddElementPayloadSchema,
@@ -82,7 +86,36 @@ export function useNodeComponentHandlers(
   } = options;
   const { broadcastRequestComponentPicker } = useShellSignalBridge();
   const { isReady, loadSettings } = useSiteSettings();
-    const replaceNodeInEditorTree = (
+
+  const prepareNodeForInsertion = (
+    source: Partial<BuilderNode>,
+    fallbackType: string,
+    slot?: string,
+  ): BuilderNode => {
+    const normalized = normalizeBuilderNode(source, fallbackType, slot);
+    const reservedIds = collectNodeIds(pageBlocks.value);
+    for (const layoutSlot of currentLayout.value?.slots ?? []) {
+      collectNodeIds(layoutSlot.defaultContent ?? [], reservedIds);
+    }
+
+    const result = ensureUniqueNodeIdentities([normalized], {
+      reservedIds,
+    });
+    if (result.repairs.length > 0) {
+      log("warn", "[NodeIdentity] Regenerated colliding insertion IDs", {
+        repairCount: result.repairs.length,
+        repairedIds: result.repairs.map((repair) => repair.previousId),
+      });
+    }
+
+    const prepared = result.nodes[0];
+    if (!prepared) {
+      throw new Error("Failed to prepare node for insertion");
+    }
+    return prepared;
+  };
+
+  const replaceNodeInEditorTree = (
     nodeId: string,
     parentId: string | null,
     index: number,
@@ -310,7 +343,7 @@ export function useNodeComponentHandlers(
     }
 
     const resolvedSlot = slot ?? getDefaultSlotName();
-    const newNode = normalizeBuilderNode(
+    const newNode = prepareNodeForInsertion(
       componentData,
       String(componentType || "Container"),
       resolvedSlot,
@@ -419,7 +452,7 @@ export function useNodeComponentHandlers(
       return;
     }
 
-    const newNode = normalizeBuilderNode(data, type, getDefaultSlotName());
+    const newNode = prepareNodeForInsertion(data, type, getDefaultSlotName());
 
     if (componentSlug) {
       newNode.componentRef = componentSlug;
@@ -457,7 +490,7 @@ export function useNodeComponentHandlers(
     const parentId =
       insertionMode === "root"
         ? null
-        : explicitParentId ?? contextualParentId ?? null;
+        : (explicitParentId ?? contextualParentId ?? null);
     const insertPosition = resolveInsertPosition(
       pageBlocks.value,
       parentId,

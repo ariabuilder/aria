@@ -1,4 +1,4 @@
-import { defineConfig } from "vitest/config";
+import { configDefaults, defineConfig } from "vitest/config";
 import vue from "@vitejs/plugin-vue";
 import path from "path";
 
@@ -63,6 +63,12 @@ export default defineConfig({
     include: [
       "aria/tests/**/*.{test,spec}.{js,ts}",
       "aria/admin/features/**/*.test.ts",
+    ],
+    exclude: [
+      ...configDefaults.exclude,
+      "aria/tests/rendering-foundation/**",
+      "aria/tests/rendering-parity/**",
+      "aria/tests/runtime-stability/**",
     ],
     testTimeout: 20000,
     hookTimeout: 20000,

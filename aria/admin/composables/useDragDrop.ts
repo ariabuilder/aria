@@ -1,5 +1,7 @@
 import { ref, readonly } from "vue";
 
+export type CanvasDragSource = "add-elements" | "components" | "canvas" | null;
+
 /**
  * Global drag-and-drop state management
  * Simplified for use with native HTML5 events (no external libraries)
@@ -8,7 +10,7 @@ import { ref, readonly } from "vue";
 
 const isDragging = ref(false);
 const draggedComponent = ref<unknown>(null);
-const dragSource = ref<"add-elements" | "components" | "canvas" | null>(null);
+const dragSource = ref<CanvasDragSource>(null);
 const wasSlotsManuallyClosed = ref(false);
 
 /**

@@ -787,6 +787,8 @@ export async function saveResource(
   authorship: AuthorshipSaveContext,
   saveOptions?: SaveResourceOptions,
 ): Promise<string> {
+  const correlationId = crypto.randomUUID();
+  const saveStartedAt = performance.now();
   const parsedAuthorship = parseAuthorshipSaveContext(authorship);
   const versionOptions = saveOptions?.versionSaveOptions;
 
@@ -845,7 +847,7 @@ export async function saveResource(
           },
           parsedAuthorship,
         );
-        await Promise.allSettled([
+        const pagePostCommitResults = await Promise.allSettled([
           touchContentRevisionForAction(
             adapter,
             {
@@ -880,6 +882,22 @@ export async function saveResource(
               ]
             : []),
         ]);
+        pagePostCommitResults.forEach((result, index) => {
+          if (result.status === "rejected") {
+            log("warn", "Resource save post-commit side effect failed", {
+              code: "RESOURCE_SAVE_POST_COMMIT_FAILED",
+              correlationId,
+              collection,
+              resourceId: slug,
+              version,
+              index,
+              error:
+                result.reason instanceof Error
+                  ? result.reason.message
+                  : String(result.reason),
+            });
+          }
+        });
         break;
       case "layouts":
         version = await adapter.saveLayoutDSL(
@@ -888,7 +906,7 @@ export async function saveResource(
           versionOptions,
           parsedAuthorship,
         );
-        await Promise.allSettled([
+        const layoutPostCommitResults = await Promise.allSettled([
           touchContentRevisionForAction(
             adapter,
             {
@@ -906,6 +924,22 @@ export async function saveResource(
           ),
           invalidateDependentPageCaches(context, "layout", slug),
         ]);
+        layoutPostCommitResults.forEach((result, index) => {
+          if (result.status === "rejected") {
+            log("warn", "Resource save post-commit side effect failed", {
+              code: "RESOURCE_SAVE_POST_COMMIT_FAILED",
+              correlationId,
+              collection,
+              resourceId: slug,
+              version,
+              index,
+              error:
+                result.reason instanceof Error
+                  ? result.reason.message
+                  : String(result.reason),
+            });
+          }
+        });
         break;
       case "components":
         version = await adapter.saveComponentDSL(
@@ -914,7 +948,7 @@ export async function saveResource(
           versionOptions,
           parsedAuthorship,
         );
-        await Promise.allSettled([
+        const componentPostCommitResults = await Promise.allSettled([
           touchContentRevisionForAction(
             adapter,
             {
@@ -932,6 +966,22 @@ export async function saveResource(
           ),
           invalidateDependentPageCaches(context, "component", slug),
         ]);
+        componentPostCommitResults.forEach((result, index) => {
+          if (result.status === "rejected") {
+            log("warn", "Resource save post-commit side effect failed", {
+              code: "RESOURCE_SAVE_POST_COMMIT_FAILED",
+              correlationId,
+              collection,
+              resourceId: slug,
+              version,
+              index,
+              error:
+                result.reason instanceof Error
+                  ? result.reason.message
+                  : String(result.reason),
+            });
+          }
+        });
         break;
       default:
         throw createError(
@@ -941,7 +991,10 @@ export async function saveResource(
     }
 
     log("info", `Saved ${collection.slice(0, -1)}: ${slug}`, {
+      code: "RESOURCE_SAVE_COMMITTED",
+      correlationId,
       version,
+      durationMs: Math.round(performance.now() - saveStartedAt),
     });
 
     return version;

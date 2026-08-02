@@ -2,7 +2,7 @@ import { readFileSync, statSync } from "node:fs";
 import { mkdtemp, readdir, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   decideApiKeyringDeployment,
@@ -166,8 +166,13 @@ function createRunner(options: {
 
 const temporaryRoots: string[] = [];
 
+beforeEach(() => {
+  vi.stubEnv("ARIA_WRANGLER_CONFIG", "wrangler.jsonc");
+});
+
 afterEach(async () => {
   vi.restoreAllMocks();
+  vi.unstubAllEnvs();
   await Promise.all(
     temporaryRoots
       .splice(0)

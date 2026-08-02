@@ -1,89 +1,118 @@
 import { onMounted, onUnmounted, type Ref } from "vue";
+import { z } from "zod";
 
-import { IFRAME_Z_INDEX } from "@/lib/zIndex";
 import { useCanvasSignalBridge } from "../../Core";
-import { getStageDragInlineStyles } from "../styles/stageDropFeedback";
 import type { StageSelectBlockInput } from "../types";
+import type { OverlayPosition } from "../../../composables/useCanvasOverlays";
+
+const ViewportRectSchema = z
+  .object({
+    left: z.number(),
+    top: z.number(),
+    width: z.number().min(0),
+    height: z.number().min(0),
+  })
+  .strict();
+
+const InsertionIndicatorDetailSchema = z.discriminatedUnion("visible", [
+  z.object({ visible: z.literal(false) }).strict(),
+  z
+    .object({
+      visible: z.literal(true),
+      nodeId: z.string().min(1),
+      position: z.enum(["before", "after"]),
+      rect: ViewportRectSchema,
+    })
+    .strict(),
+]);
+
+const NodeEventDetailSchema = z
+  .object({
+    nodeId: z.string().min(1),
+  })
+  .strict();
 
 interface UseStageGlobalCanvasEventsOptions {
   iframeRef: Ref<HTMLIFrameElement | null>;
-  insertionIndicatorEl: Ref<HTMLDivElement | null>;
+  canvasOverlays: {
+    showFrameInsertion: (
+      position: OverlayPosition,
+      orientation?: "horizontal" | "vertical",
+    ) => void;
+    hideInsertion: () => void;
+  };
   emit: {
     (e: "selectBlock", selection: StageSelectBlockInput): void;
     (e: "deleteBlock", id: string): void;
   };
 }
 
+function readCustomEventDetail(event: Event): unknown {
+  return "detail" in event ? Reflect.get(event, "detail") : undefined;
+}
+
 export function useStageGlobalCanvasEvents(
   options: UseStageGlobalCanvasEventsOptions,
-) {
+): void {
   const { broadcastComponentWrapperResponse } = useCanvasSignalBridge();
 
   const handleInsertionIndicator = (event: Event): void => {
-    const detail = (event as CustomEvent).detail;
-    const iframe = options.iframeRef.value;
-    if (!iframe?.contentDocument) {
+    const parsed = InsertionIndicatorDetailSchema.safeParse(
+      readCustomEventDetail(event),
+    );
+    if (!parsed.success) {
       return;
     }
 
+    const detail = parsed.data;
     if (!detail.visible) {
-      if (options.insertionIndicatorEl.value) {
-        options.insertionIndicatorEl.value.remove();
-        options.insertionIndicatorEl.value = null;
-      }
+      options.canvasOverlays.hideInsertion();
       return;
     }
 
-    if (!options.insertionIndicatorEl.value) {
-      options.insertionIndicatorEl.value =
-        iframe.contentDocument.createElement("div");
-      options.insertionIndicatorEl.value.className =
-        "canvas-insertion-indicator";
-      iframe.contentDocument.body.appendChild(
-        options.insertionIndicatorEl.value,
-      );
-    }
-
-    const rect = detail.rect as DOMRect;
-    const position = detail.position as "before" | "after";
-    const top = position === "before" ? rect.top : rect.bottom;
-
-    const dragStyles = getStageDragInlineStyles(document);
-    Object.assign(options.insertionIndicatorEl.value.style, {
-      position: "absolute",
-      left: `${rect.left}px`,
-      top: `${top - 2}px`,
-      width: `${rect.width}px`,
-      height: "2px",
-      background: dragStyles.insertionBackground,
-      borderRadius: "2px",
-      boxShadow: dragStyles.insertionBoxShadow,
-      pointerEvents: "none",
-      zIndex: String(IFRAME_Z_INDEX.insertion),
-    });
+    const top =
+      detail.position === "before"
+        ? detail.rect.top
+        : detail.rect.top + detail.rect.height;
+    options.canvasOverlays.showFrameInsertion(
+      {
+        left: detail.rect.left,
+        top: top - 2,
+        width: detail.rect.width,
+        height: 3,
+      },
+      "horizontal",
+    );
   };
 
   const handleComponentSelected = (event: Event): void => {
-    const detail = (event as CustomEvent).detail;
-    options.emit("selectBlock", detail.nodeId);
+    const parsed = NodeEventDetailSchema.safeParse(readCustomEventDetail(event));
+    if (parsed.success) {
+      options.emit("selectBlock", parsed.data.nodeId);
+    }
   };
 
   const handleComponentDelete = (event: Event): void => {
-    const detail = (event as CustomEvent).detail;
-    options.emit("deleteBlock", detail.nodeId);
+    const parsed = NodeEventDetailSchema.safeParse(readCustomEventDetail(event));
+    if (parsed.success) {
+      options.emit("deleteBlock", parsed.data.nodeId);
+    }
   };
 
   const handleGetComponentWrapper = (event: Event): void => {
-    const detail = (event as CustomEvent).detail;
-    const nodeId = detail.nodeId;
+    const parsed = NodeEventDetailSchema.safeParse(readCustomEventDetail(event));
+    if (!parsed.success) {
+      return;
+    }
+    const nodeId = parsed.data.nodeId;
 
     const iframe = options.iframeRef.value;
     if (!iframe?.contentDocument) {
       return;
     }
 
-    const element = iframe.contentDocument.querySelector(
-      `[data-aria-id="${nodeId}"]`,
+    const element = iframe.contentDocument.querySelector<HTMLElement>(
+      `[data-aria-id="${CSS.escape(nodeId)}"]`,
     );
     if (!element) {
       broadcastComponentWrapperResponse({ wrapperId: null });
@@ -125,10 +154,6 @@ export function useStageGlobalCanvasEvents(
       "get-component-wrapper",
       handleGetComponentWrapper,
     );
-
-    if (options.insertionIndicatorEl.value) {
-      options.insertionIndicatorEl.value.remove();
-      options.insertionIndicatorEl.value = null;
-    }
+    options.canvasOverlays.hideInsertion();
   });
 }

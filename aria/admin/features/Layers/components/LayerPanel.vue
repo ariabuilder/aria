@@ -18,6 +18,7 @@ import { useLayerExpansion } from "../composables/useLayerExpansion";
 import { useLayerHistory } from "../composables/useLayerHistory";
 import { useLayerKeyboardNavigation } from "../composables/useLayerKeyboardNavigation";
 import { useLayerPanelState } from "../composables/useLayerPanelState";
+import { useLayerRename } from "../composables/useLayerRename";
 import { useLayerUiActions } from "../composables/useLayerUiActions";
 import { studioIcons } from "@/lib/icons";
 import {
@@ -145,6 +146,14 @@ const { updateBlocksWithHistory, recordStateChange } = useLayerHistory({
   currentItemType: computed(() => props.currentItemType),
   currentItemSlug: computed(() => props.currentItemSlug),
   emitUpdateBlocks: (blocks) => emit("update:blocks", blocks),
+});
+
+const { renameNode } = useLayerRename({
+  blocks: editorBlocks,
+  currentLayout: currentLayoutRef ?? undefined,
+  nodeRegistry: editorNodeRegistry,
+  emitUpdateBlocks: (blocks) => emit("update:blocks", blocks),
+  recordStateChange,
 });
 
 const {
@@ -393,6 +402,9 @@ const {
   toggleExpand: requestToggleExpand,
   blocks: editorBlocks,
   updateBlocksWithHistory,
+  commitNodeRename: (nodeId, newLabel) => {
+    renameNode(nodeId, newLabel);
+  },
   emitOpenPicker: (slotName) => emit("openPicker", slotName),
   activeSlotName: computed(() => activeSlotName.value),
   nodeLayoutSlotName: (nodeId) => {

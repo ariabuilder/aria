@@ -1,5 +1,7 @@
 import type {
   CreateStoredPageAccessSessionInput,
+  PageActivityPage,
+  PageActivityPageRequest,
   StorageAdapter,
   StoredPageAccessMode,
   StoredPageAccessSession,
@@ -10,6 +12,7 @@ import type {
 } from "../../adapter";
 import {
   CreateStoredPageAccessSessionInputSchema,
+  PageActivityPageSchema,
   StoredPageAccessSessionSchema,
   StoredPagePolicySchema,
   StoredPagePolicySummarySchema,
@@ -36,12 +39,23 @@ export type PageAccessStorageDomain = Pick<
   | "deletePageAccessSession"
   | "deletePageAccessSessionsForPage"
   | "getPageVersions"
+  | "getPageActivityPage"
   | "getPageVersionPins"
   | "deletePageVersion"
 >;
 
+type ResolvedPageIdentity = {
+  id: string;
+  status: string | null;
+  systemRole: StoredPageSystemRole | null;
+  accessMode: StoredPageAccessMode | null;
+  draftVersion: string | null;
+  publishedVersion: string | null;
+  currentVersion: string;
+};
+
 type PageAccessStorageContext = {
-  resolvePageIdentity(idOrSlug: string): Promise<any>;
+  resolvePageIdentity(idOrSlug: string): Promise<ResolvedPageIdentity | null>;
   queryFirst<T extends Record<string, unknown>>(
     sql: string,
     args?: readonly unknown[],
@@ -55,6 +69,64 @@ type PageAccessStorageContext = {
   getPagePolicy(idOrSlug: string): Promise<StoredPagePolicy | null>;
   getPageVersions(id: string): Promise<PageVersionAuthorshipEntry[]>;
 };
+
+const USER_ACTIVITY_SQL = `(
+  (
+    CASE WHEN json_valid(activity_metadata) = 1 THEN
+      json_type(activity_metadata, '$.action') = 'text'
+      AND json_extract(activity_metadata, '$.action') IN (
+        'page_created', 'page_updated', 'page_published', 'page_scheduled',
+        'page_unpublished', 'page_archived', 'page_restored', 'page_deleted',
+        'section_added', 'section_removed', 'section_reordered',
+        'section_published', 'section_unpublished',
+        'section_visibility_toggled', 'seo_updated', 'meta_title_updated',
+        'meta_description_updated', 'og_image_updated', 'settings_updated',
+        'layout_changed', 'parent_changed', 'reverted'
+      )
+      AND json_type(activity_metadata, '$.userId') = 'text'
+      AND length(trim(json_extract(activity_metadata, '$.userId'))) > 0
+      AND lower(trim(json_extract(activity_metadata, '$.userId'))) <> 'system'
+      AND json_type(activity_metadata, '$.userName') = 'text'
+      AND length(trim(json_extract(activity_metadata, '$.userName'))) > 0
+      AND lower(trim(json_extract(activity_metadata, '$.userName'))) <> 'system'
+      AND json_type(activity_metadata, '$.target') = 'text'
+    ELSE 0 END
+  )
+  OR
+  (
+    length(trim(coalesce(created_by_id, ''))) > 0
+    AND lower(trim(created_by_id)) <> 'system'
+    AND lower(trim(coalesce(nullif(created_by_username, ''), created_by_id))) <> 'system'
+  )
+)`;
+
+type PageActivityRow = {
+  version: string;
+  created_at: string;
+  created_by_id: string | null;
+  created_by_username: string | null;
+  created_by_email: string | null;
+  created_by_avatar_url: string | null;
+  activity_metadata: string | null;
+};
+
+function parsePageActivityRow(
+  row: PageActivityRow,
+): PageVersionAuthorshipEntry {
+  return parsePageVersionAuthorshipEntry({
+    version: String(row.version),
+    createdAt: String(row.created_at),
+    createdBy: parseVersionAuthorshipRow({
+      version: row.version,
+      created_at: row.created_at,
+      created_by_id: row.created_by_id,
+      created_by_username: row.created_by_username,
+      created_by_email: row.created_by_email,
+      created_by_avatar_url: row.created_by_avatar_url,
+    }).createdBy,
+    activity: parseStoredActivityMetadata(row.activity_metadata),
+  });
+}
 
 function toStoredPageAccessSession(
   row: Record<string, unknown>,
@@ -298,6 +370,7 @@ export function createPageAccessStorageDomain(
         created_by_id: string | null;
         created_by_username: string | null;
         created_by_email: string | null;
+        created_by_avatar_url: string | null;
         activity_metadata: string | null;
       }>(
         `SELECT version,
@@ -305,6 +378,7 @@ export function createPageAccessStorageDomain(
                 created_by_id,
                 created_by_username,
                 created_by_email,
+                created_by_avatar_url,
                 activity_metadata
          FROM aria_page_versions
          WHERE id = ?
@@ -312,29 +386,39 @@ export function createPageAccessStorageDomain(
         [resolved.id],
       );
 
-      return rows.map((row) => {
-        const storedActivity = parseStoredActivityMetadata(
-          row.activity_metadata,
-        );
-        return parsePageVersionAuthorshipEntry({
-          version: String(row.version),
-          createdAt: String(row.created_at),
-          createdBy: parseVersionAuthorshipRow({
-            version: String(row.version),
-            created_at: String(row.created_at),
-            created_by_id: row.created_by_id,
-            created_by_username: row.created_by_username,
-            created_by_email: row.created_by_email,
-          }).createdBy,
-          activity: storedActivity
-            ? {
-                action: storedActivity.action,
-                userId: storedActivity.userId,
-                userName: storedActivity.userName,
-                target: storedActivity.target,
-              }
-            : null,
-        });
+      return rows.map(parsePageActivityRow);
+    },
+
+    async getPageActivityPage(
+      request: PageActivityPageRequest,
+    ): Promise<PageActivityPage> {
+      const resolved = await context.resolvePageIdentity(request.pageId);
+      if (!resolved) return { items: [], total: 0 };
+
+      const countRow = await context.queryFirst<{ total: number }>(
+        `SELECT COUNT(*) AS total
+         FROM aria_page_versions
+         WHERE id = ? AND ${USER_ACTIVITY_SQL}`,
+        [resolved.id],
+      );
+      const rows = await context.queryAll<PageActivityRow>(
+        `SELECT version,
+                created_at,
+                created_by_id,
+                created_by_username,
+                created_by_email,
+                created_by_avatar_url,
+                activity_metadata
+         FROM aria_page_versions
+         WHERE id = ? AND ${USER_ACTIVITY_SQL}
+         ORDER BY version DESC
+         LIMIT ? OFFSET ?`,
+        [resolved.id, request.limit, request.offset],
+      );
+
+      return PageActivityPageSchema.parse({
+        items: rows.map(parsePageActivityRow),
+        total: Number(countRow?.total ?? 0),
       });
     },
 

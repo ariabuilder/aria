@@ -1,0 +1,74 @@
+---
+import { z } from "zod";
+
+import { nodesToHtmlFragmentAsync } from "../lib/blocks/nodesToHtml";
+import type { ComponentDSL } from "../lib/types/nodes";
+import { P0_CANVAS_PARITY_NODES } from "../tests/rendering-parity/p0CanvasFixture";
+import {
+  assembleRendererBaseCss,
+  collectRendererStyleRequirements,
+} from "../lib/rendering/canonical/rendererStyles";
+import { isRenderingParityLoopbackHostname } from "./renderingParityRoute";
+
+export const prerender = false;
+
+const QuerySchema = z
+  .object({
+    runtime: z.enum(["node", "workerd"]),
+  })
+  .strict();
+if (!isRenderingParityLoopbackHostname(Astro.url.hostname)) {
+  return new Response("Not found", { status: 404 });
+}
+const query = QuerySchema.safeParse({
+  runtime: Astro.url.searchParams.get("runtime"),
+});
+if (!query.success) {
+  return new Response("Invalid parity request", { status: 400 });
+}
+
+Astro.response.headers.set("cache-control", "no-store");
+const publicHtml = await nodesToHtmlFragmentAsync(
+  P0_CANVAS_PARITY_NODES,
+  async (_componentId: string): Promise<ComponentDSL | null> => null,
+);
+const rendererBaseCss = assembleRendererBaseCss(
+  collectRendererStyleRequirements(P0_CANVAS_PARITY_NODES),
+);
+---
+
+<!doctype html>
+<html lang="en" data-parity-runtime={query.data.runtime}>
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover"
+    />
+    <title>Aria public parity</title>
+    <style set:html={rendererBaseCss}></style>
+    <style>
+      html,
+      body,
+      #parity-public-host {
+        width: 100%;
+        height: 100%;
+        margin: 0;
+      }
+
+      *,
+      *::before,
+      *::after {
+        animation-duration: 0s !important;
+        transition-duration: 0s !important;
+      }
+    </style>
+  </head>
+  <body>
+    <main
+      id="parity-public-host"
+      data-parity-ready="true"
+      set:html={publicHtml}
+    />
+  </body>
+</html>

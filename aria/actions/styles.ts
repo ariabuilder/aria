@@ -8,10 +8,12 @@ import { siteStyleActions } from "./styles/siteActions";
 
 export type {
   BuildGlobalCSSArtifactsOptions,
+  GeneratedDocumentStyleBands,
   RegenerateGlobalCSSArtifactsOptions,
 } from "./styles/globalCssArtifacts";
 export {
   buildGeneratedDocumentCss,
+  buildGeneratedDocumentStyleBands,
   buildGlobalCSSArtifactsSnapshot,
   buildStageRenderStylesData,
   buildStoredRenderStylesData,

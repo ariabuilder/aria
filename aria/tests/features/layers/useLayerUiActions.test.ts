@@ -30,7 +30,9 @@ function createNode(
   };
 }
 
-function blocksRef(nodes: BuilderNode[] | undefined): Ref<BuilderNode[] | undefined> {
+function blocksRef(
+  nodes: BuilderNode[] | undefined,
+): Ref<BuilderNode[] | undefined> {
   return ref(nodes as unknown) as Ref<BuilderNode[] | undefined>;
 }
 
@@ -158,5 +160,36 @@ describe("useLayerUiActions", () => {
     expect(focusNode).not.toHaveBeenCalled();
     expect(toggleExpand).not.toHaveBeenCalled();
     expect(signalScrollToNodeMock).toHaveBeenCalledWith({ nodeId: "node-1" });
+  });
+
+  it("commits a rename by canonical node ID without mutating the display node", () => {
+    const displayNode = createNode("node-1", "Section");
+    const commitNodeRename = vi.fn();
+    const updateBlocksWithHistory = vi.fn();
+    const editingNodeId = ref<string | null>("node-1");
+    const actions = useLayerUiActions({
+      focusedNodeId: ref<string | null>("node-1"),
+      focusNode: vi.fn(),
+      toggleSelection: vi.fn(),
+      hoveredNodeId: ref<string | null>(null),
+      editingNodeId,
+      expandedNodes: ref(new Set<string>()),
+      hasChildren: () => false,
+      toggleExpand: vi.fn(),
+      blocks: blocksRef([displayNode]),
+      updateBlocksWithHistory,
+      commitNodeRename,
+      emitOpenPicker: vi.fn(),
+      selectionAnchorNodeId: ref<string | null>(null),
+      replaceSelection: vi.fn(),
+      getVisibleNodeIds: vi.fn(),
+    });
+
+    actions.handleRenameNode(displayNode, "Hero");
+
+    expect(commitNodeRename).toHaveBeenCalledWith("node-1", "Hero");
+    expect(updateBlocksWithHistory).not.toHaveBeenCalled();
+    expect(displayNode.metadata).toBeUndefined();
+    expect(editingNodeId.value).toBeNull();
   });
 });

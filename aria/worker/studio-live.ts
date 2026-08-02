@@ -1,3 +1,8 @@
+import {
+  DurableObject,
+  type DurableObjectState,
+  type WebSocketRequestResponsePair,
+} from "cloudflare:workers";
 import type { AriaCloudflareEnv } from "../lib/cloudflare/env";
 import {
   StudioLiveInvalidationSchema,
@@ -17,12 +22,6 @@ type StudioLiveSocket = WebSocket & {
   deserializeAttachment(): unknown;
 };
 
-type StudioLiveState = {
-  acceptWebSocket(socket: StudioLiveSocket, tags?: string[]): void;
-  getWebSockets(tag?: string): StudioLiveSocket[];
-  setWebSocketAutoResponse(pair: unknown): void;
-};
-
 type StudioLiveRuntime = typeof globalThis & {
   WebSocketPair: new () => {
     0: StudioLiveSocket;
@@ -31,12 +30,12 @@ type StudioLiveRuntime = typeof globalThis & {
   WebSocketRequestResponsePair: new (
     request: string,
     response: string,
-  ) => unknown;
+  ) => WebSocketRequestResponsePair;
 };
 
 type LiveUserIdentity = Pick<
   StudioPresenceAttachment,
-  "userId" | "displayName" | "avatarUrl"
+  "sessionId" | "userId" | "displayName" | "avatarUrl" | "connectedAt"
 >;
 
 function parseIdentity(request: Request): LiveUserIdentity | null {
@@ -46,9 +45,11 @@ function parseIdentity(request: Request): LiveUserIdentity | null {
   try {
     const value = JSON.parse(decodeURIComponent(encoded)) as unknown;
     const parsed = StudioPresenceAttachmentSchema.pick({
+      sessionId: true,
       userId: true,
       displayName: true,
       avatarUrl: true,
+      connectedAt: true,
     }).safeParse(value);
     return parsed.success ? parsed.data : null;
   } catch {
@@ -56,13 +57,11 @@ function parseIdentity(request: Request): LiveUserIdentity | null {
   }
 }
 
-export class AriaStudioLive {
-  private readonly state: StudioLiveState;
-
-  constructor(state: StudioLiveState, _env: AriaCloudflareEnv) {
-    this.state = state;
+export class AriaStudioLive extends DurableObject<AriaCloudflareEnv> {
+  constructor(ctx: DurableObjectState, env: AriaCloudflareEnv) {
+    super(ctx, env);
     const runtime = globalThis as StudioLiveRuntime;
-    this.state.setWebSocketAutoResponse(
+    this.ctx.setWebSocketAutoResponse(
       new runtime.WebSocketRequestResponsePair("ping", "pong"),
     );
   }
@@ -81,19 +80,17 @@ export class AriaStudioLive {
     const server = pair[1];
     const now = Date.now();
     const attachment: StudioPresenceAttachment = {
-      sessionId: crypto.randomUUID(),
       ...identity,
       surface: "studio",
       resourceType: null,
       resourceId: null,
       state: "viewing",
       dirty: false,
-      connectedAt: now,
       lastActivityAt: now,
       leaseExpiresAt: null,
     };
 
-    this.state.acceptWebSocket(server, [`user:${identity.userId}`]);
+    this.ctx.acceptWebSocket(server, [`user:${identity.userId}`]);
     server.serializeAttachment(attachment);
     this.broadcastPresenceSnapshot();
 
@@ -159,7 +156,7 @@ export class AriaStudioLive {
     const now = Date.now();
     const sessions: StudioPresenceAttachment[] = [];
 
-    for (const socket of this.state.getWebSockets()) {
+    for (const socket of this.ctx.getWebSockets()) {
       if (socket === exclude) continue;
       const parsed = StudioPresenceAttachmentSchema.safeParse(
         socket.deserializeAttachment(),
@@ -182,7 +179,7 @@ export class AriaStudioLive {
 
   private broadcast(message: StudioLiveServerMessage): void {
     const serialized = JSON.stringify(message);
-    for (const socket of this.state.getWebSockets()) {
+    for (const socket of this.ctx.getWebSockets()) {
       try {
         socket.send(serialized);
       } catch {

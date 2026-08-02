@@ -140,6 +140,60 @@ describe("useCanvasOverlays", () => {
     });
   });
 
+  it("measures an empty structural section from its authored box", () => {
+    const section = document.createElement("section");
+    const emptyContainer = document.createElement("div");
+    section.setAttribute("data-aria-id", "section-1");
+    section.setAttribute("data-aria-type", "section");
+    section.style.width = "100%";
+    emptyContainer.setAttribute("data-aria-id", "container-1");
+    emptyContainer.setAttribute("data-aria-type", "Container");
+    section.appendChild(emptyContainer);
+    document.body.appendChild(section);
+
+    section.getBoundingClientRect = vi.fn(() => ({
+      left: 0,
+      top: 120,
+      right: 1200,
+      bottom: 420,
+      width: 1200,
+      height: 300,
+      x: 0,
+      y: 120,
+      toJSON: () => ({}),
+    }));
+    emptyContainer.getBoundingClientRect = vi.fn(() => ({
+      left: 0,
+      top: 120,
+      right: 0,
+      bottom: 120,
+      width: 0,
+      height: 0,
+      x: 0,
+      y: 120,
+      toJSON: () => ({}),
+    }));
+    let overlays!: ReturnType<typeof useCanvasOverlays>;
+    const TestComponent = defineComponent({
+      setup() {
+        overlays = useCanvasOverlays();
+        return () => h("div");
+      },
+    });
+
+    wrapper = mount(TestComponent);
+    overlays.showSelection(section, "section-1", "section", {
+      emitSignal: false,
+    });
+
+    expect(overlays.selection.position).toEqual({
+      left: 0,
+      top: 120,
+      width: 1200,
+      height: 300,
+    });
+  });
+
   it("walks through transparent component wrapper chains to the visible content bounds", () => {
     const componentWrapper = document.createElement("div");
     componentWrapper.setAttribute("data-aria-id", "component-2");
@@ -334,6 +388,104 @@ describe("useCanvasOverlays", () => {
       '[data-aria-selection-overlay="true"]',
     ) as HTMLElement;
     expect(selectionOverlay.style.transform).toBe("translate3d(8px, 58px, 0)");
+  });
+
+  it("projects drag and empty-state feedback into host overlays without iframe DOM nodes", async () => {
+    const iframe = document.createElement("iframe");
+    const iframeDoc = document.implementation.createHTMLDocument("stage");
+
+    Object.defineProperty(iframe, "contentDocument", {
+      value: iframeDoc,
+      configurable: true,
+    });
+    Object.defineProperty(iframe, "contentWindow", {
+      value: iframeDoc.defaultView,
+      configurable: true,
+    });
+    Object.defineProperty(iframe, "clientWidth", {
+      value: 400,
+      configurable: true,
+    });
+    Object.defineProperty(iframe, "clientHeight", {
+      value: 300,
+      configurable: true,
+    });
+    let iframeLeft = 100;
+    let iframeTop = 60;
+    let iframeWidth = 800;
+    let iframeHeight = 600;
+    iframe.getBoundingClientRect = vi.fn(() => ({
+      left: iframeLeft,
+      top: iframeTop,
+      right: iframeLeft + iframeWidth,
+      bottom: iframeTop + iframeHeight,
+      width: iframeWidth,
+      height: iframeHeight,
+      x: iframeLeft,
+      y: iframeTop,
+      toJSON: () => ({}),
+    }));
+
+    let overlays!: ReturnType<typeof useCanvasOverlays>;
+    const TestComponent = defineComponent({
+      setup() {
+        const iframeRef = ref(iframe as HTMLIFrameElement | null);
+        overlays = useCanvasOverlays({ iframeRef });
+        return () => h("div");
+      },
+    });
+
+    wrapper = mount(TestComponent);
+    await nextTick();
+
+    overlays.showAddElementsDropFeedback(
+      { left: 10, top: 20, width: 120, height: 4 },
+      { left: 8, top: 16, width: 160, height: 80 },
+      "horizontal",
+    );
+    overlays.showFrameAffordances([
+      {
+        kind: "empty-node",
+        nodeId: "empty-1",
+        nodeType: "container",
+        position: { left: 12, top: 24, width: 0, height: 0 },
+        presentation: "collapsed-rail",
+        depth: 1,
+      },
+    ]);
+
+    expect(overlays.addElementsDrop.placeholder).toEqual({
+      left: 120,
+      top: 100,
+      width: 240,
+      height: 8,
+    });
+    expect(overlays.affordances[0]?.position).toEqual({
+      left: 124,
+      top: 108,
+      width: 0,
+      height: 0,
+    });
+
+    iframeLeft = 200;
+    iframeTop = 100;
+    iframeWidth = 400;
+    iframeHeight = 300;
+    overlays.schedulePositionUpdate("measure");
+    await new Promise<void>((resolve) =>
+      requestAnimationFrame(() => resolve()),
+    );
+
+    expect(overlays.affordances[0]?.position).toEqual({
+      left: 212,
+      top: 124,
+      width: 0,
+      height: 0,
+    });
+    expect(iframeDoc.querySelector("[data-aria-add-elements-line]")).toBeNull();
+    expect(
+      iframeDoc.querySelector("[data-aria-add-elements-target]"),
+    ).toBeNull();
   });
 
   it("renders secondary selection overlays for multi-select boxes", async () => {

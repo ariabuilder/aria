@@ -176,6 +176,26 @@ describe("Stage interaction geometry contracts", () => {
       coordinateSpace: "frame-viewport",
     });
   });
+
+  it("keeps the authored box for structural nodes with collapsed children", () => {
+    const section = document.createElement("section");
+    const emptyContainer = document.createElement("div");
+    section.setAttribute("data-aria-type", "section");
+    section.style.width = "100%";
+    emptyContainer.setAttribute("data-aria-type", "Container");
+    section.appendChild(emptyContainer);
+
+    section.getBoundingClientRect = () => mockRect(120, 280, 0, 900);
+    emptyContainer.getBoundingClientRect = () => mockRect(120, 0, 0, 0);
+
+    expect(measureElementFrameViewportRect(section)).toEqual({
+      left: 0,
+      top: 120,
+      width: 900,
+      height: 280,
+      coordinateSpace: "frame-viewport",
+    });
+  });
 });
 
 describe("Stage interaction overlay descriptor contracts", () => {
@@ -228,7 +248,11 @@ describe("Stage interaction overlay descriptor contracts", () => {
       kind: "selection-toolbar",
       id: "selection-toolbar",
       nodeId: "node-1",
-      anchorRect: frameViewportRectToParentViewport(frameRectValue, frameRect, 1),
+      anchorRect: frameViewportRectToParentViewport(
+        frameRectValue,
+        frameRect,
+        1,
+      ),
     });
 
     expect(parsed.success).toBe(true);
@@ -257,7 +281,9 @@ describe("Stage interaction overlay descriptor contracts", () => {
   });
 
   it("accepts branded frame rects at schema boundaries", () => {
-    expect(FrameViewportRectSchema.safeParse(frameRectValue).success).toBe(true);
+    expect(FrameViewportRectSchema.safeParse(frameRectValue).success).toBe(
+      true,
+    );
   });
 
   it("creates stable insertion descriptors", () => {

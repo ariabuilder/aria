@@ -1,4 +1,5 @@
 import { onUnmounted, type Ref } from "vue";
+import { z } from "zod";
 
 import type {
   BreakpointDefinition,
@@ -45,13 +46,7 @@ import {
 } from "../utils/nodeStyleRuntime";
 import { findStageNodeElement } from "../utils/findStageNodeElement";
 import { requestStageUnoExtractDebounced } from "../utils/requestStageUnoExtract";
-import { DEFAULT_POSITION_VALUE } from "../../Inspector/constants/positionOptions";
-import {
-  applyImagePresentationToElement,
-  DEFAULT_IMAGE_OBJECT_FIT,
-  resolveStageMediaSrc,
-  syncImageEmptyStateAttribute,
-} from "../utils/imagePresentation";
+import { resolveStageMediaSrc } from "../utils/imagePresentation";
 import {
   compileMotionClasses,
   compileMotionDataAttributes,
@@ -63,6 +58,42 @@ import type { NodeMotion } from "../../../../lib/motion/schemas/nodeMotion.schem
 interface LiveResponsiveStyleOverride {
   nodeType: string;
   styles: StyleMap;
+}
+
+const VideoPreloadSchema = z.enum(["", "auto", "none", "metadata"]);
+type VideoBooleanProperty =
+  | "autoplay"
+  | "loop"
+  | "muted"
+  | "controls"
+  | "playsInline";
+
+function setVideoBooleanProperty(
+  video: HTMLVideoElement,
+  property: VideoBooleanProperty,
+  value: boolean,
+): void {
+  switch (property) {
+    case "autoplay":
+      video.autoplay = value;
+      return;
+    case "loop":
+      video.loop = value;
+      return;
+    case "muted":
+      video.muted = value;
+      return;
+    case "controls":
+      video.controls = value;
+      return;
+    case "playsInline":
+      video.playsInline = value;
+      return;
+    default: {
+      const exhaustive: never = property;
+      throw new Error(`Unsupported video property: ${exhaustive}`);
+    }
+  }
 }
 
 interface UseStageLiveCanvasUpdatesOptions {
@@ -722,7 +753,9 @@ export function useStageLiveCanvasUpdates(
         return;
       }
 
-      if (value === undefined || value === null || value === "") {
+      if (typeof value === "boolean") {
+        element.toggleAttribute(key, value);
+      } else if (value === undefined || value === null || value === "") {
         element.removeAttribute(key);
       } else {
         element.setAttribute(key, String(value));
@@ -893,16 +926,8 @@ export function useStageLiveCanvasUpdates(
           imgEl.removeAttribute("src");
         }
 
-        syncImageEmptyStateAttribute(imgEl, newSrc);
-
         for (const attrName of IMAGE_NON_MANAGED_HTML_ATTRS) {
           imgEl.removeAttribute(attrName);
-        }
-
-        if (!hasObjectFit && !imgEl.style.objectFit) {
-          applyImagePresentationToElement(imgEl, {
-            objectFit: DEFAULT_IMAGE_OBJECT_FIT,
-          });
         }
       }
 
@@ -926,17 +951,13 @@ export function useStageLiveCanvasUpdates(
       }
 
       if (hasObjectFit) {
-        const objectFit = String(payload.props.objectFit || "cover");
-        imgEl.style.display = "block";
-        imgEl.style.objectFit = objectFit;
+        imgEl.style.objectFit = String(payload.props.objectFit || "");
       }
 
       if (hasObjectPosition) {
-        const objectPosition = String(
-          payload.props.objectPosition || DEFAULT_POSITION_VALUE,
+        imgEl.style.objectPosition = String(
+          payload.props.objectPosition || "",
         );
-        imgEl.style.display = "block";
-        imgEl.style.objectPosition = objectPosition;
       }
 
       log("debug", "[StageFrame] Image updated successfully", {
@@ -988,48 +1009,50 @@ export function useStageLiveCanvasUpdates(
         }
       }
 
-      const booleanAttrs: Array<{
-        key: string;
-        prop: string;
+      const booleanAttrs: ReadonlyArray<{
+        key: "autoplay" | "loop" | "muted" | "controls" | "playsinline";
+        property: VideoBooleanProperty;
+        attribute: "autoplay" | "loop" | "muted" | "controls" | "playsinline";
       }> = [
-        { key: "autoplay", prop: "autoplay" },
-        { key: "loop", prop: "loop" },
-        { key: "muted", prop: "muted" },
-        { key: "controls", prop: "controls" },
-        { key: "playsinline", prop: "playsinline" },
+        { key: "autoplay", property: "autoplay", attribute: "autoplay" },
+        { key: "loop", property: "loop", attribute: "loop" },
+        { key: "muted", property: "muted", attribute: "muted" },
+        { key: "controls", property: "controls", attribute: "controls" },
+        {
+          key: "playsinline",
+          property: "playsInline",
+          attribute: "playsinline",
+        },
       ];
 
-      for (const { key, prop } of booleanAttrs) {
+      for (const { key, property, attribute } of booleanAttrs) {
         if (key in payload.props) {
           const value = Boolean(payload.props[key]);
+          setVideoBooleanProperty(videoEl, property, value);
           if (value) {
-            (videoEl as unknown as Record<string, boolean>)[prop] = true;
-            videoEl.setAttribute(prop, "");
+            videoEl.setAttribute(attribute, "");
           } else {
-            (videoEl as unknown as Record<string, boolean>)[prop] = false;
-            videoEl.removeAttribute(prop);
+            videoEl.removeAttribute(attribute);
           }
         }
       }
 
       if ("preload" in payload.props) {
-        const newPreload = String(payload.props.preload || "metadata");
-        videoEl.preload = newPreload as "" | "auto" | "none" | "metadata";
+        const newPreload = VideoPreloadSchema.parse(
+          String(payload.props.preload || "metadata"),
+        );
+        videoEl.preload = newPreload;
         videoEl.setAttribute("preload", newPreload);
       }
 
       if ("objectFit" in payload.props) {
-        const objectFit = String(payload.props.objectFit || "cover");
-        videoEl.style.display = "block";
-        videoEl.style.objectFit = objectFit;
+        videoEl.style.objectFit = String(payload.props.objectFit || "");
       }
 
       if ("objectPosition" in payload.props) {
-        const objectPosition = String(
-          payload.props.objectPosition || DEFAULT_POSITION_VALUE,
+        videoEl.style.objectPosition = String(
+          payload.props.objectPosition || "",
         );
-        videoEl.style.display = "block";
-        videoEl.style.objectPosition = objectPosition;
       }
 
       if ("aspectRatio" in payload.props) {

@@ -1,6 +1,5 @@
 <!-- Preview iframe: render, select, hover, and drag-drop. -->
 <script setup lang="ts">
-
 import { actions } from "astro:actions";
 import { z } from "zod";
 
@@ -56,25 +55,32 @@ import {
 } from "../../../../lib/blocks/buttonContent";
 import {
   isRenderableContainerNodeType,
-  isStructuralContainerNodeType,
   normalizeContainerNodeType,
 } from "../../../../lib/blocks/containerTypes";
 import { createDesktopFirstFallbackBreakpoints } from "../../../../lib/styles/responsiveBreakpoints";
+import {
+  materializeManagedImageDom,
+  projectManagedImage,
+} from "../../../../lib/rendering/canonical/managedImage";
+import {
+  assembleRendererBaseCss,
+  collectRendererStyleRequirements,
+  splitCompatibilityRendererBaseCss,
+} from "../../../../lib/rendering/canonical/rendererStyles";
 import { getSiteSettingsUtilityEngine } from "../../../../lib/storage/adapter";
 import { resolveRenderableContentValue } from "../../../../lib/cms/structuredText";
 import { sortRootBlocksByLayoutSlot } from "../../../../lib/layouts/resolveNodeSlot";
 import { useCanonicalBreakpoints } from "../../../composables/useCanonicalBreakpoints";
 import { log } from "@/lib/utils/logger";
-import {
-  getStageDropFeedbackCss,
-  resolveAdminPrimaryColor,
-} from "../styles/stageDropFeedback";
+import { resolveAdminPrimaryColor } from "../styles/stageDropFeedback";
 import wireframeStyles from "../../../styles/wireframe.css?raw";
 
 import { useFrameCoords } from "../composables/useFrameCoords";
 import { useCanvasReorder } from "../dragdrop/useCanvasReorder";
-import { useStageInteractionEngine } from "../interaction";
-import { useCanvasOverlays } from "../../../composables/useCanvasOverlays";
+import {
+  useCanvasOverlays,
+  type CanvasAffordanceDescriptor,
+} from "../../../composables/useCanvasOverlays";
 import { useDragDrop } from "../../../composables/useDragDrop";
 import { useBlockData, useComponentFetcher } from "../../Blocks";
 import { useBeacon } from "../../Beacon";
@@ -107,12 +113,8 @@ import { useStageSignals } from "../composables/useStageSignals";
 import { useOverlayListeners } from "../composables/useOverlayListeners";
 import { hydrateIconHost } from "../utils/canvasIconHydration";
 import {
-  applyImagePresentationToElement,
   attachBrokenMediaFallback,
-  resolveImageObjectFit,
-  resolveImageObjectPosition,
   resolveStageMediaSrc,
-  syncImageEmptyStateAttribute,
 } from "../utils/imagePresentation";
 import { normalizeCanvasAttributeProps } from "../utils/canvasRenderAttributes";
 import { createStageRenderFreshnessTracker } from "../utils/renderFreshness";
@@ -129,7 +131,6 @@ import {
   hasAuthoredCanvasBackgroundCss,
   resolveCanvasBodyBackground,
 } from "../utils/canvasBackgroundFallback";
-import { getContentStyleTargetElement } from "../utils/nodeStyleRuntime";
 import { useSlotActions } from "../composables/useSlotActions";
 import { useDropReorder } from "../composables/useDropReorder";
 import { useAgentCanvasBuildPresentation } from "../composables/useAgentCanvasBuildPresentation";
@@ -311,13 +312,12 @@ const hasRenderedOnce = ref(false);
 /** Tracks if we've emitted canvas-ready */
 const hasEmittedReady = ref(false);
 
-const insertionIndicatorEl = ref<HTMLDivElement | null>(null);
-
 let isUnmounted = false;
 const stageFrameInstanceId = nextStartupInstanceId("stage-frame");
 let unoExtractTimeoutId: number | null = null;
 const stageRenderFreshness = createStageRenderFreshnessTracker();
 let renderedBlocksForStyleSync: readonly BuilderNode[] = [];
+const brokenMediaNodeIds = new Set<string>();
 
 const { worldToFrameLocal, getElementAtWorldPoint } = useFrameCoords(iframeRef);
 const { isDragging } = useDragDrop();
@@ -332,13 +332,9 @@ const canvasOverlays = useCanvasOverlays({
   debug: import.meta.env.DEV,
   getBlocks: () => [...props.blocks],
 });
-const stageInteractionEngine = useStageInteractionEngine({ iframeRef });
-
 useAddElementsOverlayBridge({
-  showAddElementsDropFeedback:
-    stageInteractionEngine.showAddElementsDropFeedback,
-  hideAddElementsDropFeedback:
-    stageInteractionEngine.hideAddElementsDropFeedback,
+  showAddElementsDropFeedback: canvasOverlays.showAddElementsDropFeedback,
+  hideAddElementsDropFeedback: canvasOverlays.hideAddElementsDropFeedback,
   hideInsertion: canvasOverlays.hideInsertion,
   hideHover: canvasOverlays.hideHover,
 });
@@ -547,7 +543,7 @@ const { clearLiveResponsiveStyleOverrides, syncLiveResponsiveStyleOverrides } =
 
 useStageGlobalCanvasEvents({
   iframeRef,
-  insertionIndicatorEl,
+  canvasOverlays,
   emit,
 });
 
@@ -704,7 +700,8 @@ function syncGlobalCssLink(
 }
 
 function resolveStageDocumentCss(styles: IframeRenderStyles): string {
-  return styles.globalCSS || styles.baseCSS;
+  return splitCompatibilityRendererBaseCss(styles.globalCSS || styles.baseCSS)
+    .remainingCss;
 }
 
 function syncUtilityCss(head: HTMLHeadElement, css: string): void {
@@ -805,6 +802,11 @@ function upsertHeadStyle(
     `style[${attributeName}]`,
   ) as HTMLStyleElement | null;
 
+  if (!css.trim()) {
+    styleElement?.remove();
+    return;
+  }
+
   if (!styleElement) {
     styleElement = document.createElement("style");
     styleElement.setAttribute(attributeName, "true");
@@ -818,6 +820,11 @@ function syncResponsiveNodeStyles(
   head: HTMLHeadElement,
   blocks: readonly BuilderNode[],
 ): void {
+  upsertHeadStyle(
+    head,
+    "data-aria-renderer-base",
+    assembleRendererBaseCss(collectRendererStyleRequirements(blocks)),
+  );
   upsertHeadStyle(
     head,
     "data-aria-node-styles",
@@ -1006,12 +1013,119 @@ const renderFrame = (): void => {
   renderFrameInternal(body, head);
 };
 
+function collectCanvasAffordances(
+  blocks: readonly BuilderNode[],
+  contentDocument: Document,
+): CanvasAffordanceDescriptor[] {
+  const descriptors: CanvasAffordanceDescriptor[] = [];
+
+  const visit = (block: BuilderNode, depth: number): void => {
+    const element = findStageNodeElement(contentDocument, blocks, block.id);
+    if (element) {
+      const rect = element.getBoundingClientRect();
+      const position = {
+        left: rect.left,
+        top: rect.top,
+        width: rect.width,
+        height: rect.height,
+      };
+      const nodeType = String(block.type || "element").toLowerCase();
+      const hasChildren = (block.children?.length ?? 0) > 0;
+      const isComponent =
+        element.hasAttribute("data-component-ref") || nodeType === "component";
+      const source =
+        typeof block.props?.src === "string" ? block.props.src.trim() : "";
+      const isMissingMedia =
+        (nodeType === "image" || nodeType === "video") &&
+        (!source || brokenMediaNodeIds.has(block.id));
+      const presentation = rect.height <= 0.5 ? "collapsed-rail" : "box";
+
+      if (isMissingMedia) {
+        descriptors.push({
+          kind: "missing-media",
+          nodeId: block.id,
+          nodeType,
+          position,
+          presentation,
+          depth,
+        });
+      } else if (isComponent && !hasChildren && element.children.length === 0) {
+        descriptors.push({
+          kind: "empty-component",
+          nodeId: block.id,
+          nodeType,
+          position,
+          presentation,
+          depth,
+        });
+      } else if (
+        isRenderableContainerNodeType(block.type) &&
+        !hasChildren &&
+        element.children.length === 0
+      ) {
+        descriptors.push({
+          kind: "empty-node",
+          nodeId: block.id,
+          nodeType,
+          position,
+          presentation,
+          depth,
+        });
+      }
+    }
+
+    for (const child of block.children ?? []) {
+      visit(child, depth + 1);
+    }
+  };
+
+  for (const block of blocks) {
+    visit(block, 0);
+  }
+
+  return descriptors;
+}
+
+function syncCanvasAffordances(blocks: readonly BuilderNode[]): void {
+  const contentDocument = iframeRef.value?.contentDocument;
+  if (!contentDocument) {
+    canvasOverlays.hideAffordances();
+    return;
+  }
+
+  canvasOverlays.showFrameAffordances(
+    collectCanvasAffordances(blocks, contentDocument),
+  );
+}
+
+function handleAffordanceSelection(
+  descriptor: CanvasAffordanceDescriptor,
+): void {
+  const contentDocument = iframeRef.value?.contentDocument;
+  if (!contentDocument) {
+    return;
+  }
+
+  const element = findStageNodeElement(
+    contentDocument,
+    renderedBlocksForStyleSync,
+    descriptor.nodeId,
+  );
+  if (!element) {
+    return;
+  }
+
+  canvasOverlays.showSelection(element, descriptor.nodeId, descriptor.nodeType);
+  emit("selectBlock", descriptor.nodeId);
+}
+
 const renderFrameInternalWithBlocks = (
   body: HTMLBodyElement,
   head: HTMLHeadElement,
   blocksToRender: readonly BuilderNode[],
 ): void => {
   const startTotal = performance.now();
+  brokenMediaNodeIds.clear();
   // Live style updates must use the same expanded tree as the DOM. Component
   // instances intentionally have no styles of their own; their styles live on
   // the expanded component nodes.
@@ -1081,7 +1195,7 @@ const renderFrameInternalWithBlocks = (
   customFontsStyleEl.textContent = customFontsCSS.value;
   syncDisplayModeState(head.ownerDocument);
 
-  let styles = getStageDropFeedbackCss();
+  let styles = "";
 
   if (props.showOutlines) {
     styles += `
@@ -1129,6 +1243,7 @@ const renderFrameInternalWithBlocks = (
 
       // Recalculate overlay positions after layout-affecting DOM updates.
       canvasOverlays.schedulePositionUpdate("measure");
+      syncCanvasAffordances(blocksToRender);
       syncExternalSelectionOverlays({ force: true });
     });
   }
@@ -1293,6 +1408,10 @@ function buildTextLinkAnchor(
   return anchor;
 }
 
+function isHtmlImageElement(element: Element): element is HTMLImageElement {
+  return element.localName === "img";
+}
+
 /**
  * Creates a DOM element from a BuilderNode.
  * Recursively builds the element tree with props, children, and data attributes.
@@ -1332,10 +1451,6 @@ const createElementFromBlock = (
   // Mark component instances with special attribute for locked selection
   if (block.type?.toLowerCase() === "component" && block.reference?.masterId) {
     el.setAttribute("data-component-ref", block.reference.masterId);
-    // Ensure component wrappers render as block elements for proper bounding box
-    el.style.display = "block";
-    el.style.width = "100%";
-    el.style.minHeight = "10px"; // Ensure at least some height if empty content
   }
 
   if (props.showOutlines) {
@@ -1371,10 +1486,7 @@ const createElementFromBlock = (
     }
 
     if (key === "data-component-ref") {
-      // This is a component wrapper - set the attribute and styling
       el.setAttribute("data-component-ref", String(value));
-      el.style.display = "block";
-      el.style.width = "100%";
     } else {
       el.setAttribute(key, String(value));
     }
@@ -1437,9 +1549,36 @@ const createElementFromBlock = (
     }
   }
 
+  if (normalizedType === "image" && isHtmlImageElement(el)) {
+    const image = el;
+    const src = resolveCanvasImageSrc(block.props?.src);
+    if (src) image.setAttribute("src", src);
+    image.alt = toDomString(block.props?.alt, "");
+    attachBrokenMediaFallback(image, () => {
+      brokenMediaNodeIds.add(block.id);
+      requestAnimationFrame(() => {
+        syncCanvasAffordances(renderedBlocksForStyleSync);
+      });
+    });
+
+    const projection = projectManagedImage({
+      node: block,
+      breakpoints: resolveStageBreakpoints(),
+    });
+    const renderedImage = projection
+      ? materializeManagedImageDom(image, projection)
+      : image;
+    const linkAnchor = buildTextLinkAnchor(block.props);
+    if (linkAnchor) {
+      linkAnchor.appendChild(renderedImage);
+      return linkAnchor;
+    }
+    return renderedImage;
+  }
+
   // Render content based on type
   const content = renderBlockContent(block);
-  if (content instanceof HTMLElement) {
+  if (content !== null && typeof content !== "string") {
     if (content.tagName.toLowerCase() === el.tagName.toLowerCase()) {
       for (const { name, value } of Array.from(content.attributes)) {
         el.setAttribute(name, value);
@@ -1454,20 +1593,6 @@ const createElementFromBlock = (
       }
     } else {
       el.appendChild(content);
-    }
-
-    if ((block.type ?? "").toLowerCase() === "image") {
-      const imageElement = getContentStyleTargetElement(el, block.type ?? "");
-      if (imageElement instanceof HTMLImageElement) {
-        syncImageEmptyStateAttribute(
-          imageElement,
-          resolveCanvasImageSrc(block.props?.src),
-        );
-        applyImagePresentationToElement(imageElement, {
-          objectFit: resolveImageObjectFit(block),
-          objectPosition: resolveImageObjectPosition(block),
-        });
-      }
     }
   } else if (typeof content === "string") {
     el.textContent = content;
@@ -1535,24 +1660,6 @@ const createElementFromBlock = (
     }
   }
 
-  // Add placeholder height for empty containers/divs
-  const isContainer = isStructuralContainerNodeType(block.type || "");
-  const isEmpty = !block.children || block.children.length === 0;
-
-  if (isContainer && isEmpty) {
-    el.style.minHeight = "1rem";
-    el.style.border = "1px dashed rgba(148, 163, 184, 0.3)";
-
-    // Give components a slightly different look to distinguish them
-    if (block.type?.toLowerCase() === "component") {
-      el.style.backgroundColor =
-        "color-mix(in srgb, hsl(var(--primary)) 6%, transparent)";
-      el.style.borderColor =
-        "color-mix(in srgb, hsl(var(--primary)) 28%, transparent)";
-      el.setAttribute("title", "Empty Component");
-    }
-  }
-
   return el;
 };
 
@@ -1563,9 +1670,7 @@ const createElementFromBlock = (
  * @param block - The BuilderNode containing type and props
  * @returns HTMLElement for complex content, string for text, or null for containers
  */
-const renderBlockContent = (
-  block: BuilderNode,
-): HTMLElement | string | null => {
+const renderBlockContent = (block: BuilderNode): Element | string | null => {
   const type = block.type;
   const blockProps = block.props ?? {};
   const normalizedType = normalizeContainerNodeType(type ?? "").toLowerCase();
@@ -1696,21 +1801,16 @@ const renderBlockContent = (
     case "image": {
       const img = document.createElement("img");
       const src = resolveCanvasImageSrc(blockProps.src);
-      img.src = src;
-      img.alt = toDomString(blockProps.alt, "");
-      syncImageEmptyStateAttribute(img, src);
-      applyImagePresentationToElement(img, {
-        objectFit: resolveImageObjectFit(block),
-        objectPosition: resolveImageObjectPosition(block),
-      });
-      attachBrokenMediaFallback(img);
-      const linkAnchor = buildTextLinkAnchor(blockProps);
-
-      if (linkAnchor) {
-        linkAnchor.appendChild(img);
-        return linkAnchor;
+      if (src) {
+        img.setAttribute("src", src);
       }
-
+      img.alt = toDomString(blockProps.alt, "");
+      attachBrokenMediaFallback(img, () => {
+        brokenMediaNodeIds.add(block.id);
+        requestAnimationFrame(() => {
+          syncCanvasAffordances(renderedBlocksForStyleSync);
+        });
+      });
       return img;
     }
     case "video": {
@@ -1729,27 +1829,12 @@ const renderBlockContent = (
         toDomString(blockProps.preload, "metadata"),
       );
 
-      // Default block display and full width for consistent sizing
-      video.style.display = "block";
-      video.style.width = "100%";
-
-      // Apply aspect-ratio if specified in props
-      const aspectRatio = toDomString(blockProps.aspectRatio, "");
-      if (aspectRatio) {
-        video.style.aspectRatio = aspectRatio.replace(":", "/");
-      }
-
-      // Apply object-fit and object-position styles if present in props
-      const objectFit = toDomString(blockProps.objectFit, "");
-      const objectPosition = toDomString(blockProps.objectPosition, "");
-      if (objectFit) {
-        video.style.objectFit = objectFit;
-      }
-      if (objectPosition) {
-        video.style.objectPosition = objectPosition;
-      }
-
-      attachBrokenMediaFallback(video);
+      attachBrokenMediaFallback(video, () => {
+        brokenMediaNodeIds.add(block.id);
+        requestAnimationFrame(() => {
+          syncCanvasAffordances(renderedBlocksForStyleSync);
+        });
+      });
 
       const linkAnchor = buildTextLinkAnchor(blockProps);
       if (linkAnchor) {
@@ -1878,7 +1963,7 @@ const renderBlockContent = (
         svg.innerHTML = rawContent;
       }
 
-      return svg as unknown as HTMLElement;
+      return svg;
     }
     case "icon": {
       const iconHost = document.createElement("span");
@@ -1890,7 +1975,7 @@ const renderBlockContent = (
         fallbackText: blockProps.content,
       });
 
-      return iconHost as unknown as HTMLElement;
+      return iconHost;
     }
     case "pagination": {
       const nav = document.createElement("nav");
@@ -2494,6 +2579,11 @@ function syncExternalSelectionOverlays(options?: { force?: boolean }): void {
   syncSelectionToolbar(primaryTarget.nodeId);
 }
 
+function handleOverlayLayerReady(): void {
+  lastExternalSelectionKey.value = "";
+  syncExternalSelectionOverlays({ force: true });
+}
+
 watch(
   () => [
     isCanvasReady.value,
@@ -2643,6 +2733,8 @@ defineExpose({ iframeRef, getWindow, getDoc, getBody, getHead });
       @toolbar-action="handleToolbarAction"
       @toolbar-style-change="handleToolbarStyleChange"
       @toolbar-props-change="handleToolbarPropsChange"
+      @select-affordance="handleAffordanceSelection"
+      @ready="handleOverlayLayerReady"
     />
 
     <!-- Convert to Component Dialog -->

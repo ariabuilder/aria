@@ -97,7 +97,7 @@ export interface SavePublishDeps {
 
 export interface SavePublishReturn {
   handleSave: () => Promise<void>;
-  handlePublish: () => Promise<boolean>;
+  handlePublish: (options?: { showSuccessToast?: boolean }) => Promise<boolean>;
   handleSaveAndPublish: (options?: {
     showSuccessToast?: boolean;
   }) => Promise<void>;
@@ -794,7 +794,10 @@ export function useSavePublish(deps: SavePublishDeps): SavePublishReturn {
    * Handle publish operation (pages only)
    */
   const handlePublish = async (
-    options: { skipSave?: boolean } = {},
+    options: {
+      skipSave?: boolean;
+      showSuccessToast?: boolean;
+    } = {},
   ): Promise<boolean> => {
     if (currentItemType.value !== "page") {
       toast.error("Only pages can be published");
@@ -882,9 +885,12 @@ export function useSavePublish(deps: SavePublishDeps): SavePublishReturn {
         invalidateComposeCache("page", publishingPageSlug);
         markPageThumbnailStale(publishingPageId);
         await refreshPagesNow();
+        if (options.showSuccessToast ?? true) {
+          toast.success("Page published");
+        }
         return true;
       }
-      return false;
+      throw new Error("Invalid publish response");
     } catch (err) {
       if (
         isVersionConflictError({
@@ -923,7 +929,10 @@ export function useSavePublish(deps: SavePublishDeps): SavePublishReturn {
     }
     let completed = true;
     if (currentItemType.value === "page") {
-      completed = await handlePublish({ skipSave: true });
+      completed = await handlePublish({
+        skipSave: true,
+        showSuccessToast: false,
+      });
     }
     if (showSuccessToast && completed) {
       toast.success(

@@ -30,6 +30,7 @@ const SYNC_CLEAR_TABLES = [
   "aria_content_sync_items",
   "aria_content_sync_jobs",
   "aria_content_site_state",
+  "aria_studio_presence_sessions",
 ] as const;
 
 export interface SlimLocalStorageOptions {

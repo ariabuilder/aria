@@ -41,10 +41,6 @@ import type { VersionSaveOptions } from "../lib/storage/versioning";
 import { invalidateCollectionPublicCache } from "../lib/cms/invalidateEntryCache";
 import { parseAuthorshipSaveContext } from "../lib/authorship/stamping";
 import { formatActorDisplayName } from "../lib/authorship/reads";
-import {
-  buildUserAvatarLookup,
-  resolveActorAvatarUrl,
-} from "../lib/authorship/avatarLookup";
 import { getAuthAdapterAsync } from "../lib/auth/getAuthAdapter";
 import {
   invalidateComposeCache,
@@ -266,6 +262,8 @@ async function persistPageDraft(
   authorship: AuthorshipSaveContext,
   options?: PersistPageDraftOptions,
 ): Promise<string> {
+  const correlationId = crypto.randomUUID();
+  const startedAt = performance.now();
   const parsedAuthorship = parseAuthorshipSaveContext(authorship);
   const activityMetadata = buildPageActivityMetadata(
     parsedAuthorship,
@@ -322,7 +320,10 @@ async function persistPageDraft(
   postCommitResults.forEach((result, index) => {
     if (result.status === "rejected") {
       log("warn", "Page draft post-commit side effect failed", {
+        code: "PAGE_DRAFT_POST_COMMIT_FAILED",
+        correlationId,
         pageId: page.id,
+        version,
         index,
         error:
           result.reason instanceof Error
@@ -330,6 +331,14 @@ async function persistPageDraft(
             : String(result.reason),
       });
     }
+  });
+
+  log("info", "Page draft committed", {
+    code: "PAGE_DRAFT_COMMITTED",
+    correlationId,
+    pageId: page.id,
+    version,
+    durationMs: Math.round(performance.now() - startedAt),
   });
 
   return version;
@@ -1247,19 +1256,13 @@ export const pages = {
           });
         }
 
-        const versions = await adapter.getPageVersions(page.id);
+        const activityPage = await adapter.getPageActivityPage({
+          pageId: page.id,
+          limit,
+          offset,
+        });
 
-        // Sort by version descending (newest first)
-        const sorted = [...versions].sort((a, b) =>
-          b.version.localeCompare(a.version),
-        );
-
-        const authAdapter = await getAuthAdapterAsync(context.locals);
-        const avatarLookup = buildUserAvatarLookup(
-          await authAdapter.listUsers(),
-        );
-
-        const userActivityItems = sorted
+        const userActivityItems = activityPage.items
           .map((version) => {
             const resolvedActivity =
               resolvePageVersionActivityMetadata(version);
@@ -1267,39 +1270,53 @@ export const pages = {
               return null;
             }
 
-            const activity = resolvedActivity.userAvatarUrl
-              ? resolvedActivity
-              : {
-                  ...resolvedActivity,
-                  userAvatarUrl: resolveActorAvatarUrl(
-                    resolvedActivity.userId,
-                    resolvedActivity.userAvatarUrl,
-                    avatarLookup,
-                  ),
-                };
-
             return {
               version: version.version,
               createdAt: version.createdAt,
-              activity,
+              activity: resolvedActivity,
             };
           })
           .filter((item): item is NonNullable<typeof item> => item !== null);
 
-        const total = userActivityItems.length;
-        const paged = userActivityItems.slice(offset, offset + limit);
+        const missingActorIds = Array.from(
+          new Set(
+            userActivityItems
+              .filter((item) => !item.activity.userAvatarUrl)
+              .map((item) => item.activity.userId),
+          ),
+        ).slice(0, limit);
+        const authAdapter = await getAuthAdapterAsync(context.locals);
+        const avatarByUserId = new Map<string, string>();
+        for (let index = 0; index < missingActorIds.length; index += 10) {
+          const batch = missingActorIds.slice(index, index + 10);
+          const users = await Promise.all(
+            batch.map((userId) => authAdapter.getUserById(userId)),
+          );
+          for (const user of users) {
+            if (user?.avatarUrl) avatarByUserId.set(user.id, user.avatarUrl);
+          }
+        }
+        const items = userActivityItems.map((item) => ({
+          ...item,
+          activity: item.activity.userAvatarUrl
+            ? item.activity
+            : {
+                ...item.activity,
+                userAvatarUrl: avatarByUserId.get(item.activity.userId) ?? null,
+              },
+        }));
 
         const output = GetPageActivityOutputSchema.parse({
-          items: paged,
-          total,
+          items,
+          total: activityPage.total,
         });
 
         const duration = endPerformanceTracking(operation);
         log("debug", "Page activity loaded", {
           slug,
           duration: `${duration}ms`,
-          total,
-          returned: paged.length,
+          total: activityPage.total,
+          returned: items.length,
         });
 
         return output;

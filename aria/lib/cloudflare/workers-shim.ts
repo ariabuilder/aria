@@ -6,16 +6,50 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 
+export interface DurableObjectWebSocket extends WebSocket {
+  serializeAttachment(attachment: unknown): void;
+  deserializeAttachment(): unknown;
+}
+
+export interface WebSocketRequestResponsePair {
+  readonly request: string;
+  readonly response: string;
+}
+
+export interface DurableObjectState {
+  acceptWebSocket(socket: DurableObjectWebSocket, tags?: string[]): void;
+  getWebSockets(tag?: string): DurableObjectWebSocket[];
+  setWebSocketAutoResponse(
+    pair: WebSocketRequestResponsePair | undefined,
+  ): void;
+}
+
+export abstract class DurableObject<Env = Record<string, unknown>> {
+  protected readonly ctx: DurableObjectState;
+  protected readonly env: Env;
+
+  constructor(ctx: DurableObjectState, env: Env) {
+    this.ctx = ctx;
+    this.env = env;
+  }
+}
+
 const publicRoot = path.resolve(process.cwd(), "public");
 
 function contentType(pathname: string): string {
-  return pathname.endsWith(".json") ? "application/json; charset=utf-8" : "application/octet-stream";
+  return pathname.endsWith(".json")
+    ? "application/json; charset=utf-8"
+    : "application/octet-stream";
 }
 
 const ariaAssets = {
   async fetch(input: RequestInfo | URL): Promise<Response> {
     const url = new URL(
-      typeof input === "string" ? input : input instanceof URL ? input.href : input.url,
+      typeof input === "string"
+        ? input
+        : input instanceof URL
+          ? input.href
+          : input.url,
     );
     const relativePath = decodeURIComponent(url.pathname).replace(/^\/+/, "");
     const filePath = path.resolve(publicRoot, relativePath);
