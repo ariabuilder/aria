@@ -6,6 +6,7 @@ import { ref, computed, readonly, type Ref, type ComputedRef } from "vue";
 import { toast } from "vue-sonner";
 import type { OperationId } from "../../lib/auth/capabilityOperations";
 import type { BuilderNode } from "../../lib/types/nodes";
+import { decodeRenderActionErrorMessage } from "../../lib/rendering/actionErrorMessage";
 import { getForbiddenMessageForOperation } from "./useCapabilities";
 
 /**
@@ -210,7 +211,6 @@ function createError(message: string, code = "ACTION_ERROR"): Error {
  * ```
  */
 export function useActions(): UseActionsReturn {
-
   const loading = ref<boolean>(false);
   const error = ref<string | null>(null);
 
@@ -231,11 +231,14 @@ export function useActions(): UseActionsReturn {
 
       // Handle action-level errors
       if (result.error) {
+        const renderError = decodeRenderActionErrorMessage(
+          result.error.message,
+        );
         const errorMessage =
           result.error.code === "FORBIDDEN" && options.forbiddenOperationId
             ? getForbiddenMessageForOperation(options.forbiddenOperationId)
-            : result.error.message || "Action failed";
-        throw createError(errorMessage, result.error.code);
+            : renderError?.message || result.error.message || "Action failed";
+        throw createError(errorMessage, renderError?.code ?? result.error.code);
       }
 
       // Handle success

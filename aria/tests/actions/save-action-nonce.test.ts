@@ -1,4 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { ActionError as ClientActionError } from "../../../node_modules/astro/dist/actions/runtime/client.js";
+
+import { decodeRenderActionErrorMessage } from "../../lib/rendering/actionErrorMessage";
 
 const {
   assertPageLayoutChangeAllowedMock,
@@ -193,12 +196,99 @@ describe("save action nonce handling", () => {
       ),
     ).rejects.toMatchObject({
       code: "VERSION_CONFLICT",
-      message: "savePage:home failed: This draft is out of date. Reload it before saving.",
+      message:
+        "savePage:home failed: This draft is out of date. Reload it before saving.",
     });
 
     expect(saveResourceMock).not.toHaveBeenCalled();
     expect(consumeNonceMock).not.toHaveBeenCalled();
     expect(storeNonceMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects invalid render input before persistence, nonce consumption, or snapshots", async () => {
+    const { save } = await import("../../actions/save");
+    const cyclicNode: Record<string, unknown> = {
+      id: "cycle",
+      type: "Container",
+      props: {},
+      styles: {},
+    };
+    cyclicNode.children = [cyclicNode];
+
+    let thrown: unknown;
+    try {
+      await (save.page as any).handler(
+        {
+          id: "home",
+          blocks: [cyclicNode],
+          layout: "default",
+          nonce: "nonce-current",
+        },
+        { locals: {} } as never,
+      );
+    } catch (error) {
+      thrown = error;
+    }
+
+    expect(thrown).toMatchObject({
+      code: "BAD_REQUEST",
+      message: "RENDER_INPUT_INVALID: The render input is invalid.",
+    });
+    expect(thrown).not.toHaveProperty("context");
+
+    const actionError = thrown as { code: string; message: string };
+    const transported = ClientActionError.fromJson(
+      JSON.parse(
+        JSON.stringify({
+          type: "AstroActionError",
+          code: actionError.code,
+          status: 400,
+          message: actionError.message,
+        }),
+      ),
+    );
+    expect(transported).toMatchObject({
+      code: "BAD_REQUEST",
+      message: "RENDER_INPUT_INVALID: The render input is invalid.",
+    });
+    expect(decodeRenderActionErrorMessage(transported.message)).toEqual({
+      code: "RENDER_INPUT_INVALID",
+      message: "The render input is invalid.",
+    });
+
+    expect(saveResourceMock).not.toHaveBeenCalled();
+    expect(consumeNonceMock).not.toHaveBeenCalled();
+    expect(savePageSnapshotMock).not.toHaveBeenCalled();
+    expect(invalidateComposeCacheMock).not.toHaveBeenCalled();
+    expect(invalidateDependentPageCachesMock).not.toHaveBeenCalled();
+  });
+
+  it("preflights deeply nested page settings before any write", async () => {
+    const { save } = await import("../../actions/save");
+    let settings: unknown = null;
+    for (let index = 0; index < 65; index += 1) settings = [settings];
+
+    await expect(
+      (save.page as any).handler(
+        {
+          id: "home",
+          blocks: [],
+          layout: "default",
+          settings,
+          expectedVersion: "v-current",
+        },
+        { locals: {} } as never,
+      ),
+    ).rejects.toMatchObject({
+      code: "BAD_REQUEST",
+      message: "RENDER_INPUT_INVALID: The render input is invalid.",
+    });
+
+    expect(saveResourceMock).not.toHaveBeenCalled();
+    expect(consumeNonceMock).not.toHaveBeenCalled();
+    expect(savePageSnapshotMock).not.toHaveBeenCalled();
+    expect(invalidateComposeCacheMock).not.toHaveBeenCalled();
+    expect(invalidateDependentPageCachesMock).not.toHaveBeenCalled();
   });
 
   it("forwards the current Composer version to the storage save boundary", async () => {
@@ -230,7 +320,9 @@ describe("save action nonce handling", () => {
 
   it("returns the committed save when snapshot refresh fails afterward", async () => {
     const { save } = await import("../../actions/save");
-    savePageSnapshotMock.mockRejectedValueOnce(new Error("snapshot unavailable"));
+    savePageSnapshotMock.mockRejectedValueOnce(
+      new Error("snapshot unavailable"),
+    );
 
     await expect(
       (save.page as any).handler(

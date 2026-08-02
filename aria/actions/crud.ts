@@ -3,18 +3,14 @@
  * layouts, and components. These are collection-agnostic operations.
  */
 
-import { ActionError, defineAction, type ActionAPIContext } from "astro:actions";
-import { z } from "astro/zod";
-import type {
-  PageDSL,
-  LayoutDSL,
-  ComponentDSL,
-} from "../lib/types/nodes";
 import {
-  validatePageDSL,
-  validateLayoutDSL,
-  validateComponentDSL,
-} from "../lib/schemas/nodes";
+  ActionError,
+  defineAction,
+  type ActionAPIContext,
+} from "astro:actions";
+import { z } from "astro/zod";
+import type { PageDSL, LayoutDSL, ComponentDSL } from "../lib/types/nodes";
+import { normalizeEditableSurface } from "../lib/rendering/canonical";
 import type { ContentMutationKind } from "../lib/storage/adapter";
 import {
   deleteResource,
@@ -29,6 +25,7 @@ import { assertPageLayoutChangeAllowed } from "../lib/pages/layoutPolicy.server"
 import { normalizePageLayoutRef } from "../lib/pages/layoutPolicy";
 import { savePageSnapshot } from "../lib/rendering/pageSnapshots";
 import { log as baseLog } from "../lib/utils/logger";
+import { throwSafeRenderContractActionError } from "./_renderContractError";
 
 type LogLevel = "debug" | "info" | "warn" | "error";
 
@@ -51,45 +48,21 @@ function collectionMutationKind(
   }
 }
 
-function validateResourceForSave(
+async function validateResourceForSave(
   collection: CollectionType,
-  slug: string,
   data: unknown,
-): PageDSL | LayoutDSL | ComponentDSL {
+): Promise<PageDSL | LayoutDSL | ComponentDSL> {
   switch (collection) {
-    case "pages": {
-      const validated = validatePageDSL(data);
-      if (!validated.success) {
-        throw createError(ERROR_CODES.INVALID_INPUT, "Invalid page DSL", {
-          slug,
-          collection,
-          details: validated.error.issues,
-        });
-      }
-      return validated.data as PageDSL;
-    }
-    case "layouts": {
-      const validated = validateLayoutDSL(data);
-      if (!validated.success) {
-        throw createError(ERROR_CODES.INVALID_INPUT, "Invalid layout DSL", {
-          slug,
-          collection,
-          details: validated.error.issues,
-        });
-      }
-      return validated.data as LayoutDSL;
-    }
-    case "components": {
-      const validated = validateComponentDSL(data);
-      if (!validated.success) {
-        throw createError(ERROR_CODES.INVALID_INPUT, "Invalid component DSL", {
-          slug,
-          collection,
-          details: validated.error.issues,
-        });
-      }
-      return validated.data as ComponentDSL;
-    }
+    case "pages":
+      return (await normalizeEditableSurface({ kind: "page", source: data }))
+        .source;
+    case "layouts":
+      return (await normalizeEditableSurface({ kind: "layout", source: data }))
+        .source;
+    case "components":
+      return (
+        await normalizeEditableSurface({ kind: "component", source: data })
+      ).source;
   }
 }
 
@@ -173,6 +146,7 @@ function isStructuredCrudError(error: unknown): error is StructuredCrudError {
 }
 
 function handleError(error: unknown, operation: string): never {
+  throwSafeRenderContractActionError(error);
   if (error instanceof ActionError) {
     log("error", `${operation} failed`, {
       code: error.code,
@@ -330,7 +304,7 @@ export async function handleCreateItem(
       );
     }
 
-    const validated = validateResourceForSave(collection, sanitizedSlug, data);
+    const validated = await validateResourceForSave(collection, data);
     await saveResource(
       adapter,
       context,
@@ -385,12 +359,13 @@ export async function handleUpdateItem(
         "This draft is out of date. Reload it before saving.",
         {
           expectedVersion,
-          currentVersion: typeof currentVersion === "string" ? currentVersion : null,
+          currentVersion:
+            typeof currentVersion === "string" ? currentVersion : null,
         },
       );
     }
 
-    const validated = validateResourceForSave(collection, sanitizedSlug, data);
+    const validated = await validateResourceForSave(collection, data);
 
     if (collection === "pages") {
       const existingPage = existing as PageDSL;
@@ -544,11 +519,7 @@ export async function handleDuplicateItem(
       updatedAt: new Date().toISOString(),
     };
 
-    const validated = validateResourceForSave(
-      collection,
-      sanitizedNew,
-      duplicatedData,
-    );
+    const validated = await validateResourceForSave(collection, duplicatedData);
     await saveResource(
       adapter,
       context,

@@ -831,6 +831,7 @@ export const ComponentDSLSchema: z.ZodType<ComponentDSL> = z
 
     source: ComponentSourceSchema.optional(), // Defaults to 'custom' for existing components
     packId: z.string().optional(), // Pack identifier for aria-sourced components
+    packVersion: z.string().optional(), // Installed pack version, not storage revision
     tier: ComponentTierSchema.optional(), // Defaults to 'free'
     isLocked: z.boolean().optional(), // If true, component structure cannot be edited
 

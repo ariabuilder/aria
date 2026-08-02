@@ -3,8 +3,6 @@
  * change. Prevents breaking existing pages when component APIs are updated.
  */
 
-import { log } from "../utils/logger";
-
 import type { BuilderNode, PageDSL } from "../types/nodes";
 import { blockRegistry } from "../blocks/blockRegistry";
 
@@ -107,12 +105,9 @@ export function migrateNode(node: BuilderNode): BuilderNode {
           `v${currentVersion} → v${nextVersion}: ${migration.description}`,
         );
       } catch (error) {
-        log(
-          "error",
+        console.error(
           `[Migration Error] Failed to migrate ${node.type} from v${currentVersion} to v${nextVersion}`,
-          {
-            error: error instanceof Error ? error.message : String(error),
-          },
+          error instanceof Error ? error.message : "Unknown migration error",
         );
         // Continue with partial migration
       }

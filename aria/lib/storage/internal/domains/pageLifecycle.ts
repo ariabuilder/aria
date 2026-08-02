@@ -15,7 +15,6 @@ import {
 } from "../../adapter";
 import {
   allocateVersionId,
-  computeVersionContentHash,
   isStorageVersionConflictError,
   VersionConflictError,
   VersionSaveOptionsSchema,
@@ -34,13 +33,15 @@ import {
   serializeDslForStorage,
 } from "../../helpers";
 import type { LayoutDSL, PageDSL } from "../../../types/nodes";
-import { computePageAnalytics } from "../../../blocks/nodeAnalytics";
-import { migratePageDSL } from "../../../migrations/propMigrations";
 import { validateLayoutDSL, validatePageDSL } from "../../../schemas/nodes";
 import {
   buildCurrentCompilerMetadata,
   serializeCompilerMetadata,
 } from "../../../system/metadata";
+import {
+  normalizeSurfaceForPersistence,
+  resolveStoredSemanticSourceHash,
+} from "./surfaceNormalization";
 
 export type PageLifecycleStorageDomain = Pick<
   StorageAdapter,
@@ -106,7 +107,9 @@ async function prepareLinkedLayoutDraft(
   now: string,
   pageGuard: LinkedPageSaveGuard,
 ): Promise<PreparedLinkedLayoutDraft> {
-  const validation = validateLayoutDSL(input.dsl);
+  const normalized = await normalizeSurfaceForPersistence("layout", input.dsl);
+  const normalizedDSL = normalized.source;
+  const validation = validateLayoutDSL(normalizedDSL);
   if (!validation.success) {
     throw new Error(`Invalid layout DSL: ${validation.error.message}`);
   }
@@ -119,7 +122,7 @@ async function prepareLinkedLayoutDraft(
     );
   }
 
-  const incomingHash = await computeVersionContentHash(input.dsl);
+  const incomingHash = normalized.sourceHash;
   const currentVersionRow = await context.getStoredVersionRow(
     "aria_layout_versions",
     existing.id,
@@ -127,12 +130,16 @@ async function prepareLinkedLayoutDraft(
   );
   if (
     currentVersionRow &&
-    (await context.resolveStoredVersionContentHash(currentVersionRow)) ===
-      incomingHash
+    (await resolveStoredSemanticSourceHash({
+      kind: "layout",
+      row: currentVersionRow,
+      fallback: () =>
+        context.resolveStoredVersionContentHash(currentVersionRow),
+    })) === incomingHash
   ) {
     return {
       id: input.id,
-      dsl: input.dsl,
+      dsl: normalizedDSL,
       version: existing.currentVersion,
       expectedVersion: input.expectedVersion,
       statements: [],
@@ -142,7 +149,7 @@ async function prepareLinkedLayoutDraft(
 
   const version = allocateVersionId();
   const versionedDSL: LayoutDSL = {
-    ...input.dsl,
+    ...normalizedDSL,
     version,
     updatedAt: now,
   };
@@ -183,7 +190,7 @@ async function prepareLinkedLayoutDraft(
 
   return {
     id: input.id,
-    dsl: input.dsl,
+    dsl: normalizedDSL,
     version,
     expectedVersion: input.expectedVersion,
     changed: true,
@@ -274,19 +281,14 @@ export function createPageLifecycleStorageDomain(
       const shouldSkipIfContentUnchanged =
         parsedOptions.skipIfContentUnchanged !== false;
       const existing = await context.resolvePageIdentity(id);
-      const { dsl: migratedDSL } = migratePageDSL(dsl);
-      // Strip derived fields that should never be persisted
-      delete migratedDSL.isModifiedSincePublish;
-      delete migratedDSL.systemRole;
-      delete migratedDSL.accessMode;
-      delete migratedDSL.hasPassword;
-      delete migratedDSL._publicationDependencies;
-      const validation = validatePageDSL(migratedDSL);
+      const normalized = await normalizeSurfaceForPersistence("page", dsl);
+      const normalizedDSL = normalized.source;
+      const validation = validatePageDSL(normalizedDSL);
       if (!validation.success) {
         throw new Error(`Invalid page DSL: ${validation.error.message}`);
       }
 
-      const incomingHash = await computeVersionContentHash(migratedDSL);
+      const incomingHash = normalized.sourceHash;
       const currentDraftVersion =
         existing?.draftVersion ?? existing?.currentVersion;
       const now = context.nowIso();
@@ -301,10 +303,7 @@ export function createPageLifecycleStorageDomain(
         );
       }
 
-      if (
-        linkedLayoutDraft &&
-        (!existing || !parsedOptions.expectedVersion)
-      ) {
+      if (linkedLayoutDraft && (!existing || !parsedOptions.expectedVersion)) {
         throw new Error(
           "A linked layout draft requires an existing page and expected page revision",
         );
@@ -338,8 +337,12 @@ export function createPageLifecycleStorageDomain(
         );
 
         if (currentVersionRow) {
-          const currentHash =
-            await context.resolveStoredVersionContentHash(currentVersionRow);
+          const currentHash = await resolveStoredSemanticSourceHash({
+            kind: "page",
+            row: currentVersionRow,
+            fallback: () =>
+              context.resolveStoredVersionContentHash(currentVersionRow),
+          });
           if (currentHash === incomingHash) {
             const latest = await context.resolvePageIdentity(existing.id);
             const latestDraftVersion =
@@ -351,7 +354,7 @@ export function createPageLifecycleStorageDomain(
               );
             }
             await settlePostCommit([
-              () => context.syncPageUsage(id, migratedDSL),
+              () => context.syncPageUsage(id, normalizedDSL),
             ]);
             return currentDraftVersion;
           }
@@ -363,17 +366,17 @@ export function createPageLifecycleStorageDomain(
         parsedOptions.preserveVersion && hintedVersion
           ? hintedVersion
           : allocateVersionId();
-      const title = migratedDSL.title ?? migratedDSL.slug ?? id;
-      const slug = migratedDSL.slug ?? id;
-      const status = migratedDSL.status ?? "draft";
+      const title = normalizedDSL.title ?? normalizedDSL.slug ?? id;
+      const slug = normalizedDSL.slug ?? id;
+      const status = normalizedDSL.status ?? "draft";
       const layout =
-        typeof migratedDSL.layout === "string" &&
-        migratedDSL.layout.trim().length > 0
-          ? migratedDSL.layout
+        typeof normalizedDSL.layout === "string" &&
+        normalizedDSL.layout.trim().length > 0
+          ? normalizedDSL.layout
           : null;
       const publishedVersion =
         existing?.publishedVersion ??
-        (migratedDSL.status === "published" ? version : null);
+        (normalizedDSL.status === "published" ? version : null);
       const effectiveStatus = publishedVersion
         ? "published"
         : status === "published" || status === "archived"
@@ -381,7 +384,7 @@ export function createPageLifecycleStorageDomain(
           : "draft";
       const initialSystemRole: StoredPageSystemRole = "standard";
       const initialAccessMode = deriveLegacyPageAccessMode(
-        migratedDSL.visibility,
+        normalizedDSL.visibility,
       );
       const initialAccessPolicyVersion = 1;
       const metaValues: unknown[] = [
@@ -389,7 +392,7 @@ export function createPageLifecycleStorageDomain(
         slug,
         title,
         effectiveStatus,
-        typeof migratedDSL.parent === "string" ? migratedDSL.parent : null,
+        typeof normalizedDSL.parent === "string" ? normalizedDSL.parent : null,
         layout,
         version,
         publishedVersion,
@@ -425,8 +428,12 @@ export function createPageLifecycleStorageDomain(
         version,
       );
       if (existingVersionRow) {
-        const existingVersionHash =
-          await context.resolveStoredVersionContentHash(existingVersionRow);
+        const existingVersionHash = await resolveStoredSemanticSourceHash({
+          kind: "page",
+          row: existingVersionRow,
+          fallback: () =>
+            context.resolveStoredVersionContentHash(existingVersionRow),
+        });
         if (existingVersionHash !== incomingHash) {
           if (!parsedOptions.overwriteVersionIfExists) {
             throw new Error(
@@ -440,20 +447,19 @@ export function createPageLifecycleStorageDomain(
       }
 
       const versionedDSL = {
-        ...migratedDSL,
+        ...normalizedDSL,
         version,
         updatedAt: now,
-        _computedMetrics: {
-          ...computePageAnalytics(migratedDSL.nodes ?? []),
-          computedAt: now,
-          contentHash: incomingHash,
-        },
       };
       let committedWithGuard = false;
 
       if (!shouldInsertVersion && existingVersionRow) {
-        const existingVersionHash =
-          await context.resolveStoredVersionContentHash(existingVersionRow);
+        const existingVersionHash = await resolveStoredSemanticSourceHash({
+          kind: "page",
+          row: existingVersionRow,
+          fallback: () =>
+            context.resolveStoredVersionContentHash(existingVersionRow),
+        });
         if (existingVersionHash !== incomingHash) {
           await context.run(
             `UPDATE aria_page_versions
@@ -528,14 +534,13 @@ export function createPageLifecycleStorageDomain(
 
               const linkedLayoutStatements =
                 preparedLinkedLayout?.statements ?? [];
-              const linkedLayoutCommitGuard =
-                preparedLinkedLayout?.changed
-                  ? `AND EXISTS (
+              const linkedLayoutCommitGuard = preparedLinkedLayout?.changed
+                ? `AND EXISTS (
                        SELECT 1
                        FROM aria_layout_meta
                        WHERE id = ? AND current_version = ?
                      )`
-                  : "";
+                : "";
               const linkedLayoutCommitArgs = preparedLinkedLayout?.changed
                 ? [preparedLinkedLayout.id, preparedLinkedLayout.version]
                 : [];
@@ -618,10 +623,9 @@ export function createPageLifecycleStorageDomain(
                 batchResults[pageMetaIndex]?.changes !== 1
               ) {
                 if (!linkedLayoutCommitted && preparedLinkedLayout) {
-                  const latestLayout =
-                    await context.resolveLayoutVersionState(
-                      preparedLinkedLayout.id,
-                    );
+                  const latestLayout = await context.resolveLayoutVersionState(
+                    preparedLinkedLayout.id,
+                  );
                   if (
                     latestLayout?.currentVersion !==
                     preparedLinkedLayout.expectedVersion
@@ -632,8 +636,9 @@ export function createPageLifecycleStorageDomain(
                     );
                   }
                 }
-                const committed =
-                  await context.resolvePageIdentity(existing.id);
+                const committed = await context.resolvePageIdentity(
+                  existing.id,
+                );
                 const committedDraftVersion =
                   committed?.draftVersion ?? committed?.currentVersion ?? null;
                 throw new VersionConflictError(
@@ -678,14 +683,11 @@ export function createPageLifecycleStorageDomain(
           ? [
               () =>
                 context.deletePageThumbnail(
-                  existing?.id ?? migratedDSL.id ?? id,
+                  existing?.id ?? normalizedDSL.id ?? id,
                   "draft",
                 ),
               () =>
-                context.pruneStoredVersionHistory(
-                  "page",
-                  existing?.id ?? id,
-                ),
+                context.pruneStoredVersionHistory("page", existing?.id ?? id),
             ]
           : []),
         ...(preparedLinkedLayout?.changed
@@ -703,7 +705,7 @@ export function createPageLifecycleStorageDomain(
                 ),
             ]
           : []),
-        () => context.syncPageUsage(id, migratedDSL),
+        () => context.syncPageUsage(id, normalizedDSL),
       ]);
       return version;
     },
@@ -732,8 +734,7 @@ export function createPageLifecycleStorageDomain(
         );
       }
 
-      const sourceVersion =
-        currentDraftVersion ?? resolved.publishedVersion;
+      const sourceVersion = currentDraftVersion ?? resolved.publishedVersion;
       if (!sourceVersion) {
         return null;
       }
@@ -764,9 +765,7 @@ export function createPageLifecycleStorageDomain(
           now,
           resolved.id,
           sourceVersion,
-          ...(scheduleLeaseToken
-            ? [scheduleLeaseToken, sourceVersion]
-            : []),
+          ...(scheduleLeaseToken ? [scheduleLeaseToken, sourceVersion] : []),
         ],
       };
       const publishChanges = parsedOptions.dependencies

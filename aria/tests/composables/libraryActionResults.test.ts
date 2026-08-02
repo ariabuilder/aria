@@ -65,4 +65,24 @@ describe("libraryActionResults", () => {
       error: "Component ID conflicts with an existing custom component",
     });
   });
+
+  it("decodes render validation transport errors to safe UI copy", async () => {
+    const { unwrapLibraryInstallComponentResult } =
+      await import("../../admin/features/Studio/composer/composables/libraryActionResults");
+
+    const result = unwrapLibraryInstallComponentResult(
+      {
+        data: undefined,
+        error: {
+          message: "RENDER_INPUT_INVALID: The render input is invalid.",
+        },
+      },
+      "Failed to install aria-hero",
+    );
+
+    expect(result).toEqual({
+      success: false,
+      error: "The render input is invalid.",
+    });
+  });
 });

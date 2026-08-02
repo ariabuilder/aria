@@ -18,18 +18,25 @@ import type {
   PackPayload,
 } from "../lib/types/nodes";
 import {
-  ComponentDSLSchema,
   PackManifestSchema,
   PackPayloadSchema,
   RegistryManifestSchema,
 } from "../lib/schemas/nodes";
+import {
+  RenderContractError,
+  createRenderFailure,
+  normalizeEditableSurface,
+} from "../lib/rendering/canonical";
+import { preflightEditableSurface } from "../lib/rendering/canonical/preflight";
 import {
   SEEDED_REGISTRY_MANIFEST,
   getSeededPayload,
 } from "../lib/registry/seed";
 import {
   checkPackCompatibility,
+  compareVersions,
   isNewerVersion,
+  parseVersion,
 } from "../lib/registry/compatibility";
 import {
   OFFICIAL_PACK_SIGNERS,
@@ -44,6 +51,7 @@ import {
   requireOperation,
   resolveAuthorizedMutation,
 } from "./_shared";
+import { throwSafeRenderContractActionError } from "./_renderContractError";
 
 const TierSchema = z.enum(["free", "pro"]);
 
@@ -77,6 +85,80 @@ const InstallStarterButtonInputSchema = z.object({
   force: z.boolean().default(false),
 });
 
+const ShallowPackPayloadSchema = z
+  .object({
+    manifest: PackManifestSchema,
+    components: z.array(z.unknown()),
+  })
+  .strict();
+
+function packInputError(
+  stage: string,
+  issueCount: number,
+): RenderContractError {
+  return new RenderContractError(
+    createRenderFailure("RENDER_INPUT_INVALID", {
+      surfaceKind: "component",
+      stage,
+      issueCount,
+    }),
+  );
+}
+
+function parsePackPayloadAfterPreflight(payload: unknown): PackPayload {
+  try {
+    const shallow = ShallowPackPayloadSchema.safeParse(payload);
+    if (!shallow.success) {
+      throw packInputError("pack-shallow-schema", shallow.error.issues.length);
+    }
+    const components = shallow.data.components.map(
+      (component) =>
+        preflightEditableSurface({
+          kind: "component",
+          source: component,
+        }).source,
+    );
+    const parsed = PackPayloadSchema.safeParse({
+      manifest: shallow.data.manifest,
+      components,
+    });
+    if (!parsed.success) {
+      throw packInputError("pack-schema", parsed.error.issues.length);
+    }
+    return parsed.data as PackPayload;
+  } catch (error) {
+    throwSafeRenderContractActionError(error);
+    throw error;
+  }
+}
+
+async function normalizeLibraryComponent(
+  component: ComponentDSL,
+): Promise<ComponentDSL> {
+  try {
+    return (
+      await normalizeEditableSurface({
+        kind: "component",
+        source: component,
+      })
+    ).source;
+  } catch (error) {
+    throwSafeRenderContractActionError(error);
+    throw error;
+  }
+}
+
+export async function normalizeLibraryComponentsForInstall(
+  components: readonly ComponentDSL[],
+  manifest: PackManifest,
+): Promise<ComponentDSL[]> {
+  return Promise.all(
+    components.map((component) =>
+      normalizeLibraryComponent(normalizeAriaComponent(component, manifest)),
+    ),
+  );
+}
+
 interface InstalledPackSummary {
   packId: string;
   name: string;
@@ -85,6 +167,8 @@ interface InstalledPackSummary {
   componentCount: number;
   installedAt: string;
 }
+
+const UNKNOWN_PACK_VERSION = "unknown";
 
 interface CatalogPackResult extends PackManifest {
   installState: "not_installed" | "partial" | "installed";
@@ -138,15 +222,50 @@ function normalizeAriaComponent(
     ...component,
     source: "aria",
     packId: pack.id,
+    packVersion: pack.version,
     tier: pack.tier,
     isLocked: true,
-    version: component.version ?? pack.version,
     updatedAt: new Date().toISOString(),
   };
 }
 
 function isAriaComponent(component: ComponentDSL): boolean {
   return component.source === "aria";
+}
+
+export function resolveInstalledPackVersion(
+  components: readonly ComponentDSL[],
+): string {
+  const versions = components.map((component) => component.packVersion);
+  if (
+    versions.length === 0 ||
+    versions.some(
+      (version) =>
+        typeof version !== "string" || parseVersion(version) === null,
+    )
+  ) {
+    return UNKNOWN_PACK_VERSION;
+  }
+
+  return (versions as string[]).reduce((lowest, candidate) =>
+    compareVersions(candidate, lowest) < 0 ? candidate : lowest,
+  );
+}
+
+export function resolveCatalogPackVersionState(
+  latestVersion: string,
+  installedPackVersion?: string,
+): { installedVersion?: string; updateAvailable: boolean } {
+  if (installedPackVersion === undefined) {
+    return { updateAvailable: false };
+  }
+  if (installedPackVersion === UNKNOWN_PACK_VERSION) {
+    return { updateAvailable: true };
+  }
+  return {
+    installedVersion: installedPackVersion,
+    updateAvailable: isNewerVersion(latestVersion, installedPackVersion),
+  };
 }
 
 function groupInstalledPacks(
@@ -168,14 +287,7 @@ function groupInstalledPacks(
 
   return Array.from(grouped.entries()).map(([packId, packComponents]) => {
     const manifest = manifestById.get(packId);
-    const version =
-      packComponents
-        .map((component) => component.version)
-        .find(
-          (candidate): candidate is string => typeof candidate === "string",
-        ) ??
-      manifest?.version ??
-      "unknown";
+    const version = resolveInstalledPackVersion(packComponents);
 
     const installedAt =
       packComponents
@@ -346,11 +458,8 @@ export const library = {
             : installedComponentCount === pack.componentIds.length
               ? "installed"
               : "partial";
-        const installedVersion = installedPack?.version;
-        const updateAvailable =
-          typeof installedVersion === "string"
-            ? isNewerVersion(pack.version, installedVersion)
-            : false;
+        const { installedVersion, updateAvailable } =
+          resolveCatalogPackVersionState(pack.version, installedPack?.version);
 
         return {
           ...pack,
@@ -390,21 +499,11 @@ export const library = {
         };
       }
 
-      const parsedPayload = PackPayloadSchema.safeParse(payload);
-      if (!parsedPayload.success) {
-        return {
-          success: false as const,
-          error: {
-            code: "INVALID_PAYLOAD",
-            message: "Pack payload failed validation",
-            details: parsedPayload.error.issues,
-          },
-        };
-      }
+      const parsedPayload = parsePackPayloadAfterPreflight(payload);
 
       return {
         success: true as const,
-        data: parsedPayload.data,
+        data: parsedPayload,
       };
     },
   }),
@@ -457,17 +556,7 @@ export const library = {
         };
       }
 
-      const parsedPayload = PackPayloadSchema.safeParse(payload);
-      if (!parsedPayload.success) {
-        return {
-          success: false as const,
-          error: {
-            code: "INVALID_PAYLOAD",
-            message: "Pack payload failed validation",
-            details: parsedPayload.error.issues,
-          },
-        };
-      }
+      const parsedPayload = parsePackPayloadAfterPreflight(payload);
 
       const compatibility = checkPackCompatibility(parsedManifest.data);
       if (!compatibility.compatible) {
@@ -486,7 +575,7 @@ export const library = {
         };
       }
 
-      const checksumResult = await verifyPayloadChecksum(parsedPayload.data);
+      const checksumResult = await verifyPayloadChecksum(parsedPayload);
       if (!checksumResult.success) {
         return {
           success: false as const,
@@ -495,7 +584,7 @@ export const library = {
       }
 
       const signatureResult = await verifyPackSignature(
-        parsedPayload.data,
+        parsedPayload,
         undefined,
         {
           requireSignature: true,
@@ -517,7 +606,7 @@ export const library = {
           (component) => [component.id, component] as const,
         ),
       );
-      const conflicts = parsedPayload.data.components.filter((component) => {
+      const conflicts = parsedPayload.components.filter((component) => {
         const existing = existingById.get(component.id);
         if (!existing) return false;
         if (existing.source === "aria") return false;
@@ -538,31 +627,15 @@ export const library = {
         };
       }
 
-      const savedIds: string[] = [];
-      for (const component of parsedPayload.data.components) {
-        const normalized = normalizeAriaComponent(
-          component,
-          parsedManifest.data,
-        );
-        const validated = ComponentDSLSchema.safeParse(normalized);
-        if (!validated.success) {
-          return {
-            success: false as const,
-            error: {
-              code: "INVALID_COMPONENT",
-              message: `Component failed schema validation: ${component.id}`,
-              details: validated.error.issues,
-            },
-          };
-        }
+      const validatedComponents = await normalizeLibraryComponentsForInstall(
+        parsedPayload.components,
+        parsedManifest.data,
+      );
 
-        await persistLibraryComponent(
-          adapter,
-          context,
-          validated.data,
-          authorship,
-        );
-        savedIds.push(validated.data.id);
+      const savedIds: string[] = [];
+      for (const validated of validatedComponents) {
+        await persistLibraryComponent(adapter, context, validated, authorship);
+        savedIds.push(validated.id);
       }
 
       return {
@@ -610,17 +683,7 @@ export const library = {
         };
       }
 
-      const parsedPayload = PackPayloadSchema.safeParse(payload);
-      if (!parsedPayload.success) {
-        return {
-          success: false as const,
-          error: {
-            code: "INVALID_PAYLOAD",
-            message: "Pack payload failed validation",
-            details: parsedPayload.error.issues,
-          },
-        };
-      }
+      const parsedPayload = parsePackPayloadAfterPreflight(payload);
 
       const compatibility = checkPackCompatibility(parsedManifest.data);
       if (!compatibility.compatible) {
@@ -639,7 +702,7 @@ export const library = {
         };
       }
 
-      const checksumResult = await verifyPayloadChecksum(parsedPayload.data);
+      const checksumResult = await verifyPayloadChecksum(parsedPayload);
       if (!checksumResult.success) {
         return {
           success: false as const,
@@ -648,7 +711,7 @@ export const library = {
       }
 
       const signatureResult = await verifyPackSignature(
-        parsedPayload.data,
+        parsedPayload,
         undefined,
         {
           requireSignature: true,
@@ -662,7 +725,7 @@ export const library = {
         };
       }
 
-      const targetComponent = parsedPayload.data.components.find(
+      const targetComponent = parsedPayload.components.find(
         (component) => component.id === componentId,
       );
 
@@ -701,7 +764,7 @@ export const library = {
           data: {
             packId,
             componentId,
-            version: existing.version ?? parsedManifest.data.version,
+            version: resolveInstalledPackVersion([existing]),
             action: "already_installed" as const,
           },
         };
@@ -711,24 +774,9 @@ export const library = {
         targetComponent,
         parsedManifest.data,
       );
-      const validated = ComponentDSLSchema.safeParse(normalized);
-      if (!validated.success) {
-        return {
-          success: false as const,
-          error: {
-            code: "INVALID_COMPONENT",
-            message: `Component failed schema validation: ${componentId}`,
-            details: validated.error.issues,
-          },
-        };
-      }
+      const validated = await normalizeLibraryComponent(normalized);
 
-      await persistLibraryComponent(
-        adapter,
-        context,
-        validated.data,
-        authorship,
-      );
+      await persistLibraryComponent(adapter, context, validated, authorship);
 
       return {
         success: true as const,
@@ -778,7 +826,7 @@ export const library = {
           success: true as const,
           data: {
             componentId: existing.id,
-            version: existing.version ?? ARIA_FREE_BUTTON_COMPONENT.version,
+            version: resolveInstalledPackVersion([existing]),
             action: "already_installed" as const,
           },
         };
@@ -788,35 +836,21 @@ export const library = {
         ...ARIA_FREE_BUTTON_COMPONENT,
         source: "aria" as const,
         packId: "aria-free-pack",
+        packVersion: ARIA_FREE_BUTTON_COMPONENT.version ?? "1.0.0",
         tier: "free" as const,
         isLocked: true,
         updatedAt: new Date().toISOString(),
       };
 
-      const validated = ComponentDSLSchema.safeParse(normalized);
-      if (!validated.success) {
-        return {
-          success: false as const,
-          error: {
-            code: "INVALID_COMPONENT",
-            message: "Starter Button failed schema validation",
-            details: validated.error.issues,
-          },
-        };
-      }
+      const validated = await normalizeLibraryComponent(normalized);
 
-      await persistLibraryComponent(
-        adapter,
-        context,
-        validated.data,
-        authorship,
-      );
+      await persistLibraryComponent(adapter, context, validated, authorship);
 
       return {
         success: true as const,
         data: {
-          componentId: validated.data.id,
-          version: validated.data.version ?? "1.0.0",
+          componentId: validated.id,
+          version: validated.packVersion ?? UNKNOWN_PACK_VERSION,
           action: "installed" as const,
         },
       };
@@ -911,7 +945,10 @@ export const library = {
           packId: item.packId,
           currentVersion: item.version,
           latestVersion,
-          hasUpdate: isNewerVersion(latestVersion, item.version),
+          hasUpdate:
+            item.version === UNKNOWN_PACK_VERSION
+              ? Boolean(latest)
+              : isNewerVersion(latestVersion, item.version),
           tier: latest?.tier ?? item.tier,
         };
       });

@@ -10,6 +10,7 @@ import { existsSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { cleanupOrphanedNavigationBindingsInPage } from "../lib/cms/navigationBindingCleanup";
+import { prepareNormalizedSurfaceVersion } from "../lib/storage/internal/domains/surfaceNormalization";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const dbPath = join(__dirname, "../storage/aria.db");
@@ -46,19 +47,23 @@ try {
     }
 
     const nextVersion = String(Date.now());
-    const nextDsl = {
-      ...result.page,
+    const updatedAt = new Date().toISOString();
+    const prepared = await prepareNormalizedSurfaceVersion({
+      kind: "page",
+      source: result.page,
       version: nextVersion,
-      updatedAt: new Date().toISOString(),
-    };
+      updatedAt,
+    });
+    const nextDsl = prepared.source;
     await database.batch([
       {
-        sql: "INSERT INTO aria_page_versions (id, version, title, status, dsl_json, content_hash, created_at) VALUES (?, ?, ?, 'draft', ?, NULL, ?)",
+        sql: "INSERT INTO aria_page_versions (id, version, title, status, dsl_json, content_hash, created_at) VALUES (?, ?, ?, 'draft', ?, ?, ?)",
         args: [
           id,
           nextVersion,
           String(nextDsl.title ?? id),
           JSON.stringify(nextDsl),
+          prepared.sourceHash,
           nextDsl.updatedAt,
         ],
       },

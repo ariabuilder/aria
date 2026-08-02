@@ -1,9 +1,6 @@
 import { z } from "zod";
 
-import {
-  RenderContractError,
-  createRenderFailure,
-} from "./errors";
+import { RenderContractError, createRenderFailure } from "./errors";
 
 export type CanonicalJsonValue =
   | null
@@ -13,17 +10,84 @@ export type CanonicalJsonValue =
   | readonly CanonicalJsonValue[]
   | Readonly<{ [key: string]: CanonicalJsonValue }>;
 
-export const CanonicalJsonValueSchema: z.ZodType<CanonicalJsonValue> = z.lazy(
-  () =>
-    z.union([
-      z.null(),
-      z.boolean(),
-      z.number(),
-      z.string(),
-      z.array(CanonicalJsonValueSchema),
-      z.record(z.string(), CanonicalJsonValueSchema),
-    ]),
-);
+export const CanonicalJsonValueSchema: z.ZodType<CanonicalJsonValue> =
+  z.custom<CanonicalJsonValue>(
+    isCanonicalJsonValueGraph,
+    "Expected a JSON-compatible value",
+  );
+
+function isCanonicalJsonValueGraph(input: unknown): boolean {
+  const activeAncestors = new WeakSet<object>();
+  const stack: Array<
+    { type: "visit"; value: unknown } | { type: "exit"; value: object }
+  > = [{ type: "visit", value: input }];
+
+  while (stack.length > 0) {
+    const frame = stack.pop();
+    if (!frame) break;
+    if (frame.type === "exit") {
+      activeAncestors.delete(frame.value);
+      continue;
+    }
+
+    const value = frame.value;
+    if (
+      value === null ||
+      typeof value === "string" ||
+      typeof value === "boolean"
+    ) {
+      continue;
+    }
+    if (typeof value === "number") {
+      if (!Number.isFinite(value)) return false;
+      continue;
+    }
+    if (!value || typeof value !== "object" || activeAncestors.has(value)) {
+      return false;
+    }
+
+    activeAncestors.add(value);
+    stack.push({ type: "exit", value });
+
+    if (Array.isArray(value)) {
+      if (Object.getPrototypeOf(value) !== Array.prototype) return false;
+      for (let index = 0; index < value.length; index += 1) {
+        if (!Object.prototype.hasOwnProperty.call(value, index)) return false;
+        const descriptor = Object.getOwnPropertyDescriptor(
+          value,
+          String(index),
+        );
+        if (!descriptor || !("value" in descriptor)) return false;
+        stack.push({ type: "visit", value: descriptor.value });
+      }
+      const extraKeys = Reflect.ownKeys(value).filter(
+        (key) =>
+          key !== "length" &&
+          (typeof key !== "string" || !/^(?:0|[1-9]\d*)$/u.test(key)),
+      );
+      if (extraKeys.length > 0) return false;
+      continue;
+    }
+
+    const prototype = Object.getPrototypeOf(value);
+    if (prototype !== Object.prototype && prototype !== null) return false;
+    for (const key of Reflect.ownKeys(value)) {
+      if (typeof key !== "string") return false;
+      const descriptor = Object.getOwnPropertyDescriptor(value, key);
+      if (
+        !descriptor ||
+        !("value" in descriptor) ||
+        !descriptor.enumerable ||
+        descriptor.value === undefined
+      ) {
+        return false;
+      }
+      stack.push({ type: "visit", value: descriptor.value });
+    }
+  }
+
+  return true;
+}
 
 /** Validates unknown input at the portable canonical-data boundary. */
 export function parseCanonicalJsonValue(input: unknown): CanonicalJsonValue {

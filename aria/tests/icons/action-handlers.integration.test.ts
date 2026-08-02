@@ -214,16 +214,20 @@ describe("icon action handlers integration", () => {
       }),
     ];
 
-    await expect(
-      (save.page as any).handler(
-        {
-          id: "home",
-          blocks,
-          layout: "default",
-        },
-        { locals: {} } as never,
-      ),
-    ).rejects.toThrow("Invalid icon payload for node icon-invalid");
+    const request = (save.page as any).handler(
+      {
+        id: "home",
+        blocks,
+        layout: "default",
+      },
+      { locals: {} } as never,
+    );
+    await expect(request).rejects.toMatchObject({
+      code: "BAD_REQUEST",
+      message: "RENDER_INPUT_INVALID: The render input is invalid.",
+    });
+    await expect(request).rejects.not.toHaveProperty("context");
+    await expect(request).rejects.not.toThrow("icon-invalid");
 
     expect(mockSavePageDSL).not.toHaveBeenCalled();
   });

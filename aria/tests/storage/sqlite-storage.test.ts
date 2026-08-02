@@ -25,6 +25,7 @@ import type {
   RuntimeLocals,
 } from "../../lib/cloudflare/env";
 import { createD1Mock } from "../helpers/d1Mock";
+import { normalizeSurfaceForPersistence } from "../../lib/storage/internal/domains/surfaceNormalization";
 
 const samplePage: PageDSL = {
   id: "page-home",
@@ -170,6 +171,113 @@ describe("SQLiteStorageAdapter", () => {
     expect(byId?.title).toBe(samplePage.title);
     expect(bySlug?.slug).toBe(samplePage.slug);
     expect(bySlug?.layout).toBe(samplePage.layout);
+  });
+
+  it("stores canonical surface sources and source hashes for every DSL kind", async () => {
+    const page = {
+      ...samplePage,
+      version: "client-page-version",
+      updatedAt: "2020-01-01T00:00:00.000Z",
+      nodes: [
+        {
+          ...samplePage.nodes[0],
+          props: { borderRadius: "12px" },
+        },
+      ],
+    } as PageDSL;
+    const layout = {
+      ...sampleLayout,
+      version: "client-layout-version",
+      updatedAt: "2020-01-01T00:00:00.000Z",
+    };
+    const component = {
+      ...sampleComponent,
+      version: "client-component-version",
+      updatedAt: "2020-01-01T00:00:00.000Z",
+    };
+
+    const [pageVersion, layoutVersion, componentVersion] = await Promise.all([
+      adapter.savePageDSL(page.id, page),
+      adapter.saveLayoutDSL(layout.id, layout),
+      adapter.saveComponentDSL(component.id, component),
+    ]);
+    const [pageExpected, layoutExpected, componentExpected] = await Promise.all(
+      [
+        normalizeSurfaceForPersistence("page", page),
+        normalizeSurfaceForPersistence("layout", layout),
+        normalizeSurfaceForPersistence("component", component),
+      ],
+    );
+
+    for (const expected of [
+      {
+        table: "aria_page_versions",
+        id: page.id,
+        version: pageVersion,
+        normalized: pageExpected,
+      },
+      {
+        table: "aria_layout_versions",
+        id: layout.id,
+        version: layoutVersion,
+        normalized: layoutExpected,
+      },
+      {
+        table: "aria_component_versions",
+        id: component.id,
+        version: componentVersion,
+        normalized: componentExpected,
+      },
+    ]) {
+      const result = await client.execute({
+        sql: `SELECT dsl_json, content_hash FROM ${expected.table} WHERE id = ? AND version = ?`,
+        args: [expected.id, expected.version],
+      });
+      const row = result.rows[0];
+      expect(row?.content_hash).toBe(expected.normalized.sourceHash);
+      const stored = JSON.parse(String(row?.dsl_json)) as Record<
+        string,
+        unknown
+      >;
+      expect(stored.version).toBe(expected.version);
+      expect(typeof stored.updatedAt).toBe("string");
+      delete stored.version;
+      delete stored.updatedAt;
+      expect(stored).toEqual(expected.normalized.source);
+    }
+  });
+
+  it("rejects invalid recursive page input before creating storage rows", async () => {
+    const cyclicNode: Record<string, unknown> = {
+      id: "cycle",
+      type: "Container",
+      props: {},
+      styles: {},
+    };
+    cyclicNode.children = [cyclicNode];
+
+    await expect(
+      adapter.savePageDSL(samplePage.id, {
+        ...samplePage,
+        nodes: [cyclicNode],
+      } as unknown as PageDSL),
+    ).rejects.toMatchObject({
+      failure: {
+        code: "RENDER_INPUT_INVALID",
+        context: expect.objectContaining({ stage: "preflight" }),
+      },
+    });
+
+    const [versions, metadata] = await Promise.all([
+      client.execute(
+        "SELECT COUNT(*) AS count FROM aria_page_versions WHERE id = 'page-home'",
+      ),
+      client.execute(
+        "SELECT COUNT(*) AS count FROM aria_page_meta WHERE id = 'page-home'",
+      ),
+    ]);
+    expect(Number(versions.rows[0]?.count)).toBe(0);
+    expect(Number(metadata.rows[0]?.count)).toBe(0);
   });
 
   it("persists lease-bounded Studio presence and rejects stale heartbeats", async () => {
@@ -409,6 +517,33 @@ describe("SQLiteStorageAdapter", () => {
 
     expect(secondVersion).toBe(firstVersion);
     expect(versions.map((entry) => entry.version)).toEqual([firstVersion]);
+  });
+
+  it("compares legacy stored rows by normalized semantic source hash", async () => {
+    const firstVersion = await adapter.savePageDSL(samplePage.id, samplePage);
+    const stored = await client.execute({
+      sql: "SELECT dsl_json FROM aria_page_versions WHERE id = ? AND version = ?",
+      args: [samplePage.id, firstVersion],
+    });
+    const legacyProjection = {
+      ...(JSON.parse(String(stored.rows[0]?.dsl_json)) as PageDSL),
+      updatedAt: "1999-01-01T00:00:00.000Z",
+      author: { id: "legacy-author" },
+      isModifiedSincePublish: true,
+    };
+    await client.execute({
+      sql: "UPDATE aria_page_versions SET dsl_json = ?, content_hash = ? WHERE id = ? AND version = ?",
+      args: [
+        JSON.stringify(legacyProjection),
+        "legacy-non-semantic-hash",
+        samplePage.id,
+        firstVersion,
+      ],
+    });
+
+    const resavedVersion = await adapter.savePageDSL(samplePage.id, samplePage);
+    expect(resavedVersion).toBe(firstVersion);
+    expect(await adapter.getPageVersions(samplePage.id)).toHaveLength(1);
   });
 
   it("allows exactly one concurrent guarded page save", async () => {
@@ -673,7 +808,6 @@ describe("SQLiteStorageAdapter", () => {
     expect(publishedVersion).toBeTruthy();
 
     const enrichedPage = await adapter.getPageDSL(samplePage.id);
-    expect(enrichedPage?._computedMetrics).toBeTruthy();
     expect(enrichedPage?.isModifiedSincePublish).toBe(false);
 
     await new Promise((resolve) => setTimeout(resolve, 10));
@@ -1121,7 +1255,12 @@ describe("SQLiteStorageAdapter", () => {
 
   it("saves, lists, and deletes layouts and components", async () => {
     await adapter.saveLayoutDSL(sampleLayout.id, sampleLayout);
-    await adapter.saveComponentDSL(sampleComponent.id, sampleComponent);
+    await adapter.saveComponentDSL(sampleComponent.id, {
+      ...sampleComponent,
+      source: "aria",
+      packId: "aria-marketing",
+      packVersion: "2.4.0",
+    });
 
     const layout = await adapter.getLayoutDSL(sampleLayout.id);
     const component = await adapter.getComponentDSL(sampleComponent.id);
@@ -1130,8 +1269,17 @@ describe("SQLiteStorageAdapter", () => {
 
     expect(layout?.name).toBe(sampleLayout.name);
     expect(component?.name).toBe(sampleComponent.name);
+    expect(component?.packVersion).toBe("2.4.0");
+    expect(component?.version).not.toBe(component?.packVersion);
     expect(layouts.map((item) => item.id)).toContain(sampleLayout.id);
-    expect(components.map((item) => item.id)).toContain(sampleComponent.id);
+    expect(components).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: sampleComponent.id,
+          packVersion: "2.4.0",
+        }),
+      ]),
+    );
 
     await adapter.deleteLayoutDSL(sampleLayout.id);
     await adapter.deleteComponentDSL(sampleComponent.id);

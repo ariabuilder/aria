@@ -42,11 +42,16 @@ import { normalizeNodeForPersist } from "../lib/blocks/normalizeNodeForPersist";
 import { ensureNavigationPresetClassesForAdapter } from "./styles";
 import { isTypographyNodeType } from "../lib/blocks/typographyTypes";
 import {
-  BuilderNodeSchema,
   NodeDataSourceSchema,
   NodeIdSchema as StrictNodeIdSchema,
   NodeMetadataSchema,
 } from "../lib/schemas/nodes";
+import {
+  preflightBuilderNodeArrayInput,
+  preflightBuilderNodeInput,
+} from "../lib/rendering/canonical/preflight";
+import type { RenderSurfaceKind } from "../lib/rendering/canonical";
+import { throwSafeRenderContractActionError } from "./_renderContractError";
 
 type LogLevel = "debug" | "info" | "warn" | "error";
 
@@ -60,6 +65,17 @@ function collectionMutationKind(
       return "save-layout";
     case "components":
       return "save-component";
+  }
+}
+
+function collectionSurfaceKind(collection: CollectionType): RenderSurfaceKind {
+  switch (collection) {
+    case "pages":
+      return "page";
+    case "layouts":
+      return "layout";
+    case "components":
+      return "component";
   }
 }
 
@@ -123,6 +139,7 @@ function createError(
 }
 
 function handleError(error: unknown, operation: string): never {
+  throwSafeRenderContractActionError(error);
   if (error instanceof Error) {
     log("error", `${operation} failed`, { error: error.message });
     throw error;
@@ -435,7 +452,7 @@ const InsertNodesInputSchema = z.object({
   collection: CollectionSchema,
   id: IdSchema,
   parentId: z.string().nullable(),
-  nodes: z.array(BuilderNodeSchema).min(1),
+  nodes: z.array(z.unknown()).min(1),
   position: z.number().optional(),
   version: z.string().optional(),
 });
@@ -569,7 +586,8 @@ export async function handleMutateBatch(
       updatedNodes = updateNodeById(
         updatedNodes,
         mutation.nodeId,
-        (node: BuilderNode) => applyNodeUpdatesForPersist(node, mutation.updates),
+        (node: BuilderNode) =>
+          applyNodeUpdatesForPersist(node, mutation.updates),
       );
       mutatedNodeIds.push(mutation.nodeId);
     }
@@ -632,7 +650,11 @@ export async function handleInsertNodes(
       sanitizedId,
     );
 
-    const normalizedNodes = input.nodes.map((node) =>
+    const preflightedNodes = preflightBuilderNodeArrayInput({
+      kind: collectionSurfaceKind(input.collection),
+      nodes: input.nodes,
+    }).source as BuilderNode[];
+    const normalizedNodes = preflightedNodes.map((node) =>
       normalizeNodeForPersist({
         ...node,
         id: node.id || generateNodeId(),
@@ -899,7 +921,7 @@ export const nodes = {
       collection: CollectionSchema,
       id: IdSchema,
       parentId: z.string().nullable(),
-      node: BuilderNodeSchema,
+      node: z.unknown(),
       position: z.number().optional(),
       version: z.string().optional(),
     }),
@@ -930,9 +952,13 @@ export const nodes = {
         );
 
         // Ensure node has an ID
+        const preflightedNode = preflightBuilderNodeInput({
+          kind: collectionSurfaceKind(input.collection),
+          node: input.node,
+        }).source as BuilderNode;
         const nodeToInsert: BuilderNode = {
-          ...input.node,
-          id: input.node.id || generateNodeId(),
+          ...preflightedNode,
+          id: preflightedNode.id || generateNodeId(),
         } as BuilderNode;
 
         const normalizedNodeToInsert = normalizeNodeForPersist(nodeToInsert);
@@ -1021,14 +1047,10 @@ export const nodes = {
         collection: CollectionSchema,
         id: IdSchema,
         nodeId: StrictNodeIdSchema,
-        node: BuilderNodeSchema,
+        node: z.unknown(),
         version: z.string().optional(),
       })
-      .strict()
-      .refine((value) => value.node.id === value.nodeId, {
-        message: "Replacement node id must match nodeId",
-        path: ["node", "id"],
-      }),
+      .strict(),
     handler: async (input, context) => {
       const { authorship } = await authorizeNodeMutation(
         context,
@@ -1063,7 +1085,25 @@ export const nodes = {
           );
         }
 
-        const normalizedReplacement = normalizeNodeForPersist(input.node);
+        const preflightedReplacement = preflightBuilderNodeInput({
+          kind: collectionSurfaceKind(input.collection),
+          node: input.node,
+        }).source as BuilderNode;
+        if (preflightedReplacement.id !== input.nodeId) {
+          throw createError(
+            "RENDER_INPUT_INVALID",
+            "The render input is invalid.",
+            {
+              surfaceKind: collectionSurfaceKind(input.collection),
+              stage: "preflight",
+              issue: "replacement-node-id-mismatch",
+              issueCount: 1,
+            },
+          );
+        }
+        const normalizedReplacement = normalizeNodeForPersist(
+          preflightedReplacement,
+        );
 
         const updatedNodes = updateNodeById(doc.nodes, input.nodeId, () => ({
           type: normalizedReplacement.type,

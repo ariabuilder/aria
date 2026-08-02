@@ -40,10 +40,23 @@ import { hasEffectiveCapability } from "../../../../../lib/auth/hasEffectiveCapa
 import { useAppRouter } from "@/features/Core";
 import { parseComposerRouteTarget } from "@/lib/router/composerRouteTarget";
 import { normalizeEditorSlug } from "@/lib/editor/slugs";
+import {
+  preflightBuilderNodeArrayInput,
+  preflightBuilderNodeInput,
+} from "../../../../../lib/rendering/canonical/preflight";
+import type { RenderSurfaceKind } from "../../../../../lib/rendering/canonical";
 
 export type ClientToolResult<T> =
   | { ok: true; data: T }
   | { ok: false; error: AgentToolError };
+
+function collectionSurfaceKind(
+  collection: "pages" | "layouts" | "components",
+): RenderSurfaceKind {
+  if (collection === "pages") return "page";
+  if (collection === "layouts") return "layout";
+  return "component";
+}
 
 type PageBlocksRef = { value: BuilderNode[] };
 type NodeMotionValue = NonNullable<BuilderNode["motion"]>;
@@ -259,7 +272,34 @@ export function useAgentClientTools() {
       );
     }
 
-    const normalizedTree = normalizeAgentNodeTreeForInsert(parsed.data.nodes);
+    if (!executeNodeEventOperation || !resolveMutationPath) {
+      return toolError(
+        "NO_OPEN_DOCUMENT",
+        "Composer is not open — cannot insert blocks.",
+        "Open the target page in Composer first.",
+      );
+    }
+
+    const mutationPath = resolveMutationPath();
+    if (!mutationPath) {
+      return toolError(
+        "NO_OPEN_DOCUMENT",
+        "No open document for insert.",
+        "Open a page, layout, or component in Composer.",
+      );
+    }
+
+    let preflightedNodes: unknown[];
+    try {
+      preflightedNodes = preflightBuilderNodeArrayInput({
+        kind: collectionSurfaceKind(mutationPath.collection),
+        nodes: parsed.data.nodes,
+      }).source as unknown[];
+    } catch {
+      return toolError("RENDER_INPUT_INVALID", "The render input is invalid.");
+    }
+
+    const normalizedTree = normalizeAgentNodeTreeForInsert(preflightedNodes);
     if (!normalizedTree.ok) {
       return toolError(
         "INVALID_INPUT",
@@ -275,22 +315,6 @@ export function useAgentClientTools() {
         "INVALID_INPUT",
         treeValidation.errors.map((e) => e.message).join("; ") ||
           "Invalid node tree",
-      );
-    }
-
-    if (!executeNodeEventOperation || !resolveMutationPath) {
-      return toolError(
-        "NO_OPEN_DOCUMENT",
-        "Composer is not open — cannot insert blocks.",
-        "Open the target page in Composer first.",
-      );
-    }
-
-    if (!resolveMutationPath()) {
-      return toolError(
-        "NO_OPEN_DOCUMENT",
-        "No open document for insert.",
-        "Open a page, layout, or component in Composer.",
       );
     }
 
@@ -370,7 +394,26 @@ export function useAgentClientTools() {
       );
     }
 
-    const normalized = normalizeDesignedSectionNode(parsed.data.node);
+    const mutationPath = resolveMutationPath?.();
+    if (!mutationPath) {
+      return toolError(
+        "NO_OPEN_DOCUMENT",
+        "No open document for insert.",
+        "Open a page, layout, or component in Composer.",
+      );
+    }
+
+    let preflightedNode: unknown;
+    try {
+      preflightedNode = preflightBuilderNodeInput({
+        kind: collectionSurfaceKind(mutationPath.collection),
+        node: parsed.data.node,
+      }).source;
+    } catch {
+      return toolError("RENDER_INPUT_INVALID", "The render input is invalid.");
+    }
+
+    const normalized = normalizeDesignedSectionNode(preflightedNode);
     if (!normalized.ok) {
       return toolError(
         "INVALID_INPUT",

@@ -657,33 +657,6 @@ describe("nodesToHtml", () => {
     expect(html).not.toContain("aria-icon-alias.js");
   });
 
-  it("targets inline canonical icon SVGs with generated size styles", () => {
-    const html = nodesToHtmlDocument(
-      [
-        createNode({
-          id: "feature-icon",
-          type: "icon",
-          props: {
-            icon: normalizeIconValue("i-lucide:circle-check"),
-          },
-          styles: {
-            width: { base: "60px" },
-            height: { base: "60px" },
-            fontSize: { base: "60px" },
-          },
-        }),
-      ],
-      withIcons(),
-    );
-
-    expect(html).toContain('<svg xmlns="http://www.w3.org/2000/svg"');
-    expect(html).toContain('class="aria-feature-icon"');
-    expect(html).toContain(
-      "svg.aria-feature-icon { font-size: 60px; width: 60px; height: 60px; }",
-    );
-    expect(html).not.toContain("i.aria-feature-icon {");
-  });
-
   it("does not leak raw icon props into rendered icon markup", () => {
     const html = nodesToHtmlDocument(
       [

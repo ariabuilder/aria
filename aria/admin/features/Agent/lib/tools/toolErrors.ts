@@ -1,6 +1,6 @@
-
 import type { $ZodIssue } from "zod/v4/core";
 import type { AgentToolError, AgentToolErrorCode } from "../schemas";
+import { decodeRenderActionErrorMessage } from "../../../../../lib/rendering/actionErrorMessage";
 
 function isActionError(
   error: unknown,
@@ -78,6 +78,13 @@ export function mapActionErrorToToolError(error: unknown): AgentToolError {
   }
 
   if (isActionError(error)) {
+    const renderError = decodeRenderActionErrorMessage(error.message);
+    if (renderError) {
+      return {
+        code: renderError.code,
+        message: renderError.message,
+      };
+    }
     const code = mapActionCode(error.code);
     return {
       code,
@@ -115,6 +122,8 @@ function mapActionCode(code: string): AgentToolErrorCode {
     case "BAD_REQUEST":
     case "INVALID_INPUT":
       return "INVALID_INPUT";
+    case "RENDER_INPUT_INVALID":
+      return "RENDER_INPUT_INVALID";
     case "TOO_MANY_REQUESTS":
       return "RATE_LIMITED";
     default:

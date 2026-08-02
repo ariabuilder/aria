@@ -102,6 +102,7 @@
     "test:rendering:canvas-parity": "playwright test --config playwright.rendering-parity.config.ts",
     "test:runtime-stability:workerd": "vitest run --config vitest.runtime-stability.workerd.config.ts",
     "check:rendering-boundaries": "node --import tsx aria/scripts/check-rendering-foundation-boundaries.ts",
+    "check:rendering-writers": "node --import tsx aria/scripts/check-rendering-writer-boundaries.ts",
     "check:rendering-parity-routes": "node --import tsx aria/scripts/check-rendering-parity-route-isolation.ts",
     "test:ui": "vitest --ui",
     "test:coverage": "vitest --coverage",
