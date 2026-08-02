@@ -79,6 +79,8 @@ export interface BodyGlobalStyle {
   fontWeight: string;
   letterSpacing: string;
   maxWidth: string;
+  margin: string;
+  padding: string;
   textWrap?: string;
 }
 
@@ -173,6 +175,8 @@ export interface ContainerGlobalStyle {
 
 export interface RootGlobalStyle {
   fontSize: string;
+  margin: string;
+  padding: string;
   cursor: string;
   caretColor: string;
   selectionColor: string;
@@ -281,7 +285,10 @@ export interface UniversalDesignSystem {
   semanticClasses: Record<string, SemanticClass>;
   contextRules: ContextRule[];
   animations: {
-    keyframes: Record<string, { steps: Record<string, Record<string, string>> }>;
+    keyframes: Record<
+      string,
+      { steps: Record<string, Record<string, string>> }
+    >;
   };
   utilities: {
     safelist: string[];
@@ -346,6 +353,8 @@ export const BodyGlobalStyleSchema = z.object({
   fontWeight: CssValueSchema,
   letterSpacing: CssValueSchema,
   maxWidth: CssValueSchema.optional().default(""),
+  margin: CssValueSchema.optional().default("0"),
+  padding: CssValueSchema.optional().default("0"),
   textWrap: CssValueSchema.optional(),
 });
 
@@ -452,6 +461,8 @@ export const ContainerGlobalStyleSchema = z
 export const RootGlobalStyleSchema = z
   .object({
     fontSize: CssValueSchema,
+    margin: CssValueSchema.optional().default("0"),
+    padding: CssValueSchema.optional().default("0"),
     cursor: CssValueSchema,
     caretColor: CssValueSchema,
     selectionColor: CssValueSchema,
@@ -465,6 +476,8 @@ export const RootGlobalStyleSchema = z
   })
   .default({
     fontSize: "",
+    margin: "0",
+    padding: "0",
     cursor: "",
     caretColor: "",
     selectionColor: "",
@@ -841,6 +854,8 @@ export function createDefaultGlobalStylesConfig(): GlobalStylesConfig {
         fontWeight: "",
         letterSpacing: "",
         maxWidth: "",
+        margin: "0",
+        padding: "0",
         textWrap: "",
       },
       heading: {
@@ -921,6 +936,8 @@ export function createDefaultGlobalStylesConfig(): GlobalStylesConfig {
       },
       root: {
         fontSize: "",
+        margin: "0",
+        padding: "0",
         cursor: "",
         caretColor: "",
         selectionColor: "",
@@ -1399,7 +1416,8 @@ export function normalizeStylesDataToUniversalDesignSystem(
   normalized.animations = {
     keyframes: {
       ...(((stylesData as { animations?: UniversalDesignSystem["animations"] })
-        .animations?.keyframes ?? {}) as UniversalDesignSystem["animations"]["keyframes"]),
+        .animations?.keyframes ??
+        {}) as UniversalDesignSystem["animations"]["keyframes"]),
     },
   };
 

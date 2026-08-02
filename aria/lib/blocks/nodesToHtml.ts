@@ -197,11 +197,6 @@ function resolveBreakpoints(
   );
 }
 
-export const ARIA_DOCUMENT_RESET_CSS = `html, body {
-  margin: 0;
-  padding: 0;
-}`;
-
 function collectStyleDeclarations(
   styles: StyleMap = {},
   breakpointName: string,
@@ -1566,8 +1561,11 @@ export interface NodeToHtmlDocumentOptions {
   /** Suppress framework tags when CSS is already fully inlined */
   suppressFrameworkTags?: boolean;
 
-  /** Inline generated reset/responsive document CSS instead of relying on the stylesheet */
+  /** Inline generated global/responsive document CSS instead of relying on the stylesheet */
   inlineGeneratedDocumentCss?: boolean;
+
+  /** Serialized Global Styles CSS used by fallback document rendering. */
+  inlineGlobalStylesCSS?: string;
 
   customFonts?: {
     fonts?: Record<string, CustomFontDefinition>;
@@ -1617,6 +1615,7 @@ export function nodesToHtmlDocument(
     globalCSSHref = "",
     suppressFrameworkTags = false,
     inlineGeneratedDocumentCss = true,
+    inlineGlobalStylesCSS = "",
     customFonts,
     darkMode = "media",
     siteSettings,
@@ -1717,7 +1716,7 @@ export function nodesToHtmlDocument(
   );
 
   const documentBaseStyles = inlineGeneratedDocumentCss
-    ? ARIA_DOCUMENT_RESET_CSS
+    ? inlineGlobalStylesCSS.trim()
     : "";
   const inlineCustomFontsCSS = inlineGeneratedDocumentCss ? customFontsCSS : "";
 

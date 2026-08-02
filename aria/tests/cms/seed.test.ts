@@ -1,5 +1,5 @@
 import { createClient, type Client } from "@libsql/client";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -52,12 +52,39 @@ describe("official starter content", () => {
     expect((await adapter.getPagePolicy("not-found"))?.systemRole).toBe("not-found");
     expect(await adapter.getPublishedPageDSL("not-found")).not.toBeNull();
     expect(await adapter.listCollections()).toHaveLength(0);
+    const blankStarterDesign = await adapter.getDesignSystem();
+    expect(blankStarterDesign?.globalStyles.defaults.root).toMatchObject({
+      margin: "0",
+      padding: "0",
+    });
+    expect(blankStarterDesign?.globalStyles.defaults.body).toMatchObject({
+      margin: "0",
+      padding: "0",
+    });
+
+    const resumedSave = vi.spyOn(adapter, "saveDesignSystem");
+    await applyStarterDemoContentStep(adapter, "site-shell", actor);
+    expect(resumedSave).toHaveBeenCalledWith(
+      expect.objectContaining({
+        globalStyles: expect.objectContaining({
+          defaults: expect.objectContaining({
+            root: expect.objectContaining({ margin: "0", padding: "0" }),
+            body: expect.objectContaining({ margin: "0", padding: "0" }),
+          }),
+        }),
+      }),
+      expect.objectContaining({ mutationKind: "seed" }),
+    );
+    resumedSave.mockRestore();
 
     await applyStarterDemoContentStep(adapter, "collections", actor);
     await applyStarterDemoContentStep(adapter, "pages", actor);
     await applyStarterDemoContentStep(adapter, "catalog", actor);
 
     expect(await adapter.getDesignSystem()).not.toBeNull();
+    const seededStarterDesign = await adapter.getDesignSystem();
+    expect(seededStarterDesign?.globalStyles.defaults.root.margin).toBe("0");
+    expect(seededStarterDesign?.globalStyles.defaults.body.padding).toBe("0");
     expect((await adapter.listCollections()).map((collection) => collection.name)).toEqual(
       expect.arrayContaining(["main-nav", "tags", "authors", "blog"]),
     );

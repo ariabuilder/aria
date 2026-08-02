@@ -24,6 +24,18 @@ function createNode(overrides: Partial<BuilderNode>): BuilderNode {
 }
 
 describe("nodesToHtml", () => {
+  it("uses caller-provided Global Styles instead of a hardcoded document reset", () => {
+    const fallbackHtml = nodesToHtmlDocument([], {
+      inlineGlobalStylesCSS:
+        "html {\n  margin: 1rem;\n}\n\nbody {\n  padding: var(--page-gutter);\n}",
+    });
+    const bareHtml = nodesToHtmlDocument([]);
+
+    expect(fallbackHtml).toContain("html {\n  margin: 1rem;");
+    expect(fallbackHtml).toContain("body {\n  padding: var(--page-gutter);");
+    expect(bareHtml).not.toContain("html, body {");
+  });
+
   function withIcons() {
     return { iconResources: createTestIconRenderResources() };
   }

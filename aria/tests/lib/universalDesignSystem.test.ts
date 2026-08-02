@@ -12,6 +12,40 @@ import {
 import type { StylesData } from "../../lib/types/classes";
 
 describe("universalDesignSystem", () => {
+  it("defaults missing document spacing without overwriting explicit values", () => {
+    const stored = createDefaultUniversalDesignSystem() as unknown as {
+      globalStyles: {
+        defaults: {
+          body: Record<string, unknown>;
+          root: Record<string, unknown>;
+        };
+      };
+    };
+    delete stored.globalStyles.defaults.body.margin;
+    delete stored.globalStyles.defaults.body.padding;
+    delete stored.globalStyles.defaults.root.margin;
+    delete stored.globalStyles.defaults.root.padding;
+
+    const migrated = parseStoredUniversalDesignSystem(stored);
+    expect(migrated.globalStyles.defaults.body.margin).toBe("0");
+    expect(migrated.globalStyles.defaults.body.padding).toBe("0");
+    expect(migrated.globalStyles.defaults.root.margin).toBe("0");
+    expect(migrated.globalStyles.defaults.root.padding).toBe("0");
+
+    migrated.globalStyles.defaults.body.margin = "";
+    migrated.globalStyles.defaults.body.padding = "var(--page-gutter)";
+    migrated.globalStyles.defaults.root.margin = "1rem";
+    migrated.globalStyles.defaults.root.padding = "";
+
+    const explicit = parseStoredUniversalDesignSystem(migrated);
+    expect(explicit.globalStyles.defaults.body.margin).toBe("");
+    expect(explicit.globalStyles.defaults.body.padding).toBe(
+      "var(--page-gutter)",
+    );
+    expect(explicit.globalStyles.defaults.root.margin).toBe("1rem");
+    expect(explicit.globalStyles.defaults.root.padding).toBe("");
+  });
+
   it("returns a stable empty universal model for null styles data", () => {
     const normalized = normalizeStylesDataToUniversalDesignSystem(null);
 

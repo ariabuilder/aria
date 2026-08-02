@@ -419,6 +419,51 @@ describe("GlobalStylesView preview", () => {
     wrapper.unmount();
   });
 
+  it("shows Root and Body spacing defaults in variable-assignable controls", async () => {
+    const wrapper = createWrapper();
+    await flushPromises();
+
+    const bodyMargin = wrapper.get(
+      '[data-testid="global-styles-measurement-defaults-body-margin"]',
+    );
+    const bodyPadding = wrapper.get(
+      '[data-testid="global-styles-measurement-defaults-body-padding"]',
+    );
+    expect(bodyMargin.attributes("data-model-value")).toBe("0");
+    expect(bodyPadding.attributes("data-model-value")).toBe("0");
+    expect(
+      wrapper
+        .findAllComponents(VariableAssignableInputStub)
+        .some(
+          (component) =>
+            component.attributes("data-testid") ===
+            "global-styles-measurement-defaults-body-margin",
+        ),
+    ).toBe(true);
+
+    await clickTab(wrapper, "Root");
+
+    const rootMargin = wrapper.get(
+      '[data-testid="global-styles-measurement-defaults-root-margin"]',
+    );
+    const rootPadding = wrapper.get(
+      '[data-testid="global-styles-measurement-defaults-root-padding"]',
+    );
+    expect(rootMargin.attributes("data-model-value")).toBe("0");
+    expect(rootPadding.attributes("data-model-value")).toBe("0");
+    expect(
+      wrapper
+        .findAllComponents(VariableAssignableInputStub)
+        .some(
+          (component) =>
+            component.attributes("data-testid") ===
+            "global-styles-measurement-defaults-root-padding",
+        ),
+    ).toBe(true);
+
+    wrapper.unmount();
+  });
+
   it("retains the chosen unit for empty measurement fields", async () => {
     const wrapper = createWrapper();
     await flushPromises();
