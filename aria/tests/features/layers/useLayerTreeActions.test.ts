@@ -45,7 +45,9 @@ function createDragEvent(node: BuilderNode): LayerDragEvent {
   };
 }
 
-function blocksRef(nodes: BuilderNode[] | undefined): Ref<BuilderNode[] | undefined> {
+function blocksRef(
+  nodes: BuilderNode[] | undefined,
+): Ref<BuilderNode[] | undefined> {
   return ref(nodes as unknown) as Ref<BuilderNode[] | undefined>;
 }
 
@@ -53,7 +55,9 @@ function pageBlocksRef(nodes: BuilderNode[]): Ref<BuilderNode[]> {
   return ref(nodes as unknown) as Ref<BuilderNode[]>;
 }
 
-function layoutInfoRef(layout: LayerLayoutInfo | undefined): Ref<LayerLayoutInfo | undefined> {
+function layoutInfoRef(
+  layout: LayerLayoutInfo | undefined,
+): Ref<LayerLayoutInfo | undefined> {
   return ref(layout as unknown) as Ref<LayerLayoutInfo | undefined>;
 }
 
@@ -61,7 +65,9 @@ function layoutRef(layout: LayoutDSL | null): Ref<LayoutDSL | null> {
   return ref(layout as unknown) as Ref<LayoutDSL | null>;
 }
 
-function layerLayoutRef(layout: Ref<LayoutDSL | null>): Ref<LayerLayoutInfo | undefined> {
+function layerLayoutRef(
+  layout: Ref<LayoutDSL | null>,
+): Ref<LayerLayoutInfo | undefined> {
   return layout as unknown as Ref<LayerLayoutInfo | undefined>;
 }
 
@@ -537,7 +543,8 @@ describe("useLayerTreeActions", () => {
       false,
     );
     expect(
-      currentLayout.value!.slots?.find((slot) => slot.name === "header")
+      currentLayout
+        .value!.slots?.find((slot) => slot.name === "header")
         ?.defaultContent?.some((node) => node.id === "main-section"),
     ).toBe(true);
     expect(stateChanges).toHaveLength(1);
@@ -594,9 +601,9 @@ describe("useLayerTreeActions", () => {
       currentLayout.value!.slots?.find((slot) => slot.name === "header")
         ?.defaultContent?.length ?? 0,
     ).toBe(0);
-    expect(
-      pageBlocks.value.some((node) => node.id === "header-section"),
-    ).toBe(true);
+    expect(pageBlocks.value.some((node) => node.id === "header-section")).toBe(
+      true,
+    );
     expect(pageBlocks.value.map((node) => node.id)).toEqual([
       "header-section",
       "main-section",
@@ -646,9 +653,9 @@ describe("useLayerTreeActions", () => {
       currentLayout.value!.slots?.find((slot) => slot.name === "header")
         ?.defaultContent?.length ?? 0,
     ).toBe(0);
-    expect(
-      pageBlocks.value.some((node) => node.id === "header-section"),
-    ).toBe(true);
+    expect(pageBlocks.value.some((node) => node.id === "header-section")).toBe(
+      true,
+    );
   });
 
   it("moves a nested node from main to header via handleSlotChange", () => {
@@ -702,7 +709,8 @@ describe("useLayerTreeActions", () => {
       ),
     ).toBe(false);
     expect(
-      currentLayout.value!.slots?.find((slot) => slot.name === "header")
+      currentLayout
+        .value!.slots?.find((slot) => slot.name === "header")
         ?.defaultContent?.some((node) => node.id === "nested-child"),
     ).toBe(true);
   });
@@ -757,9 +765,9 @@ describe("useLayerTreeActions", () => {
 
     expect(moveSpy).toHaveBeenCalled();
     expect(onTreeStructureChanged).toHaveBeenCalled();
-    expect(
-      pageBlocks.value.some((node) => node.id === "main-section"),
-    ).toBe(true);
+    expect(pageBlocks.value.some((node) => node.id === "main-section")).toBe(
+      true,
+    );
 
     moveSpy.mockRestore();
   });
@@ -814,7 +822,8 @@ describe("useLayerTreeActions", () => {
       false,
     );
     expect(
-      currentLayout.value!.slots?.find((slot) => slot.name === "footer")
+      currentLayout
+        .value!.slots?.find((slot) => slot.name === "footer")
         ?.defaultContent?.some((node) => node.id === "footer-section"),
     ).toBe(true);
     expect(stateChanges).toHaveLength(1);
@@ -875,7 +884,8 @@ describe("useLayerTreeActions", () => {
       false,
     );
     expect(
-      currentLayout.value!.slots?.find((slot) => slot.name === "footer")
+      currentLayout
+        .value!.slots?.find((slot) => slot.name === "footer")
         ?.defaultContent?.some((node) => node.id === "footer-section"),
     ).toBe(true);
     expect(stateChanges).toHaveLength(1);

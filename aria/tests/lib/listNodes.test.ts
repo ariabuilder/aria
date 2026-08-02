@@ -15,6 +15,9 @@ describe("listNodes", () => {
 
     expect(listNode.type).toBe("list");
     expect(listNode.metadata?.label).toBe("List");
+    expect(listNode.styles).toMatchObject({
+      listStyleType: { base: "none" },
+    });
     expect(listNode.children).toHaveLength(3);
     expect(listNode.children.map((child) => child.type)).toEqual([
       "listitem",
@@ -83,6 +86,18 @@ describe("listNodes", () => {
     expect(listNode.children[0]?.children[1]?.classNames).toBeUndefined();
     expect(listNode.children[0]?.children[1]?.props).toMatchObject({
       [ICON_LIST_SYSTEM_ATTRIBUTE]: ICON_LIST_SYSTEM_VALUES.text,
+    });
+  });
+
+  it("preserves decimal markers when explicitly creating an ordered list", () => {
+    const listNode = createListNode({
+      ordered: true,
+      items: ["First item"],
+    });
+
+    expect(listNode.props.ordered).toBe(true);
+    expect(listNode.styles).toMatchObject({
+      listStyleType: { base: "decimal" },
     });
   });
 });

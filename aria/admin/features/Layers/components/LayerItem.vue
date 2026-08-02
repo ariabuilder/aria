@@ -6,16 +6,13 @@
         ref="layerItemRef"
         data-layer-item
         :class="[
-          'group relative mx-1 flex h-7 items-center transition-colors',
+          'group relative mx-1 flex h-7 items-center border border-transparent transition-colors',
           selected
-            ? 'rounded-sm bg-primary/10 text-foreground shadow-none'
+            ? 'rounded-sm border-primary/20 bg-primary/10 text-foreground shadow-none'
             : 'text-foreground hover:bg-primary/4',
           hovered && !selected ? 'bg-primary/6 text-foreground' : '',
           dropIndicatorClass === 'drop-inside' ? 'layer-item--drop-inside' : '',
         ]"
-        :style="{
-          borderLeftColor: selected ? 'var(--primary)' : '',
-        }"
         @click.stop="!isEditing && $emit('select', $event)"
         @mouseenter="!isEditing && $emit('hover')"
         @mouseleave="!isEditing && $emit('leave')"
