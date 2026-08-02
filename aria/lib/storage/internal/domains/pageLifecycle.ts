@@ -1,6 +1,8 @@
 import type {
   AuthorshipSaveContext,
+  LinkedLayoutDraftSave,
   PageInventoryItem,
+  PageSaveOptions,
   PublishPageOptions,
   StorageAdapter,
   StoredPageAccessMode,
@@ -16,7 +18,6 @@ import {
   computeVersionContentHash,
   isStorageVersionConflictError,
   VersionConflictError,
-  type VersionSaveOptions,
   VersionSaveOptionsSchema,
 } from "../../versioning";
 import {
@@ -32,10 +33,10 @@ import {
   parseFeaturedImage,
   serializeDslForStorage,
 } from "../../helpers";
-import type { PageDSL } from "../../../types/nodes";
+import type { LayoutDSL, PageDSL } from "../../../types/nodes";
 import { computePageAnalytics } from "../../../blocks/nodeAnalytics";
 import { migratePageDSL } from "../../../migrations/propMigrations";
-import { validatePageDSL } from "../../../schemas/nodes";
+import { validateLayoutDSL, validatePageDSL } from "../../../schemas/nodes";
 import {
   buildCurrentCompilerMetadata,
   serializeCompilerMetadata,
@@ -54,12 +55,24 @@ export type PageLifecycleStorageDomain = Pick<
 
 type PageLifecycleStorageContext = {
   resolvePageIdentity: any;
+  resolveLayoutVersionState: any;
   getStoredVersionRow: any;
   resolveStoredVersionContentHash: any;
   syncPageUsage: any;
+  syncMediaUsageBestEffort: any;
   normalizeVersion: any;
   nowIso: () => string;
   run(sql: string, args?: readonly unknown[]): Promise<void>;
+  runBatch(
+    statements: Array<{ sql: string; args?: readonly unknown[] }>,
+  ): Promise<void>;
+  runBatchWithChanges(
+    statements: Array<{ sql: string; args?: readonly unknown[] }>,
+  ): Promise<Array<{ changes: number }>>;
+  runWithChanges(
+    sql: string,
+    args?: readonly unknown[],
+  ): Promise<{ changes: number }>;
   deletePageThumbnail: any;
   pruneStoredVersionHistory: any;
   loadPageVersion: any;
@@ -70,6 +83,181 @@ type PageLifecycleStorageContext = {
   bindArgs(args: readonly unknown[]): readonly unknown[];
 };
 
+type PreparedLinkedLayoutDraft = {
+  id: string;
+  dsl: LayoutDSL;
+  version: string;
+  expectedVersion: string;
+  statements: Array<{ sql: string; args: readonly unknown[] }>;
+  changed: boolean;
+};
+
+type LinkedPageSaveGuard = {
+  id: string;
+  expectedVersion: string;
+  status: string | null;
+  publishedVersion: string | null;
+};
+
+async function prepareLinkedLayoutDraft(
+  context: PageLifecycleStorageContext,
+  input: LinkedLayoutDraftSave,
+  authorship: ReturnType<typeof parseOptionalAuthorshipSaveContext>,
+  now: string,
+  pageGuard: LinkedPageSaveGuard,
+): Promise<PreparedLinkedLayoutDraft> {
+  const validation = validateLayoutDSL(input.dsl);
+  if (!validation.success) {
+    throw new Error(`Invalid layout DSL: ${validation.error.message}`);
+  }
+
+  const existing = await context.resolveLayoutVersionState(input.id);
+  if (existing?.currentVersion !== input.expectedVersion) {
+    throw new VersionConflictError(
+      input.expectedVersion,
+      existing?.currentVersion ?? null,
+    );
+  }
+
+  const incomingHash = await computeVersionContentHash(input.dsl);
+  const currentVersionRow = await context.getStoredVersionRow(
+    "aria_layout_versions",
+    existing.id,
+    existing.currentVersion,
+  );
+  if (
+    currentVersionRow &&
+    (await context.resolveStoredVersionContentHash(currentVersionRow)) ===
+      incomingHash
+  ) {
+    return {
+      id: input.id,
+      dsl: input.dsl,
+      version: existing.currentVersion,
+      expectedVersion: input.expectedVersion,
+      statements: [],
+      changed: false,
+    };
+  }
+
+  const version = allocateVersionId();
+  const versionedDSL: LayoutDSL = {
+    ...input.dsl,
+    version,
+    updatedAt: now,
+  };
+  const status =
+    typeof (versionedDSL as { status?: unknown }).status === "string"
+      ? ((versionedDSL as { status?: string }).status ?? "published")
+      : "published";
+  const description =
+    typeof versionedDSL.description === "string"
+      ? versionedDSL.description
+      : null;
+  const versionAuthorship = resolveVersionAuthorshipForSave(
+    {},
+    authorship,
+    now,
+  );
+  const versionInsert = appendSqlFragment(
+    [
+      "id",
+      "version",
+      "name",
+      "status",
+      "dsl_json",
+      "created_at",
+      "content_hash",
+    ],
+    [
+      input.id,
+      version,
+      versionedDSL.name ?? input.id,
+      status,
+      serializeDslForStorage(versionedDSL),
+      now,
+      incomingHash,
+    ],
+    buildVersionInsertAuthorshipColumns(versionAuthorship),
+  );
+
+  return {
+    id: input.id,
+    dsl: input.dsl,
+    version,
+    expectedVersion: input.expectedVersion,
+    changed: true,
+    statements: [
+      {
+        sql: `INSERT INTO aria_layout_versions (${versionInsert.columns.join(", ")})
+              SELECT ${versionInsert.columns.map(() => "?").join(", ")}
+              FROM aria_layout_meta
+              WHERE id = ? AND current_version = ?
+                AND EXISTS (
+                  SELECT 1
+                  FROM aria_page_meta
+                  WHERE id = ?
+                    AND COALESCE(draft_version, current_version) = ?
+                    AND status IS ?
+                    AND published_version IS ?
+                )`,
+        args: context.bindArgs([
+          ...versionInsert.values,
+          existing.id,
+          input.expectedVersion,
+          pageGuard.id,
+          pageGuard.expectedVersion,
+          pageGuard.status,
+          pageGuard.publishedVersion,
+        ]),
+      },
+      {
+        sql: `UPDATE aria_layout_meta
+              SET name = ?,
+                  description = ?,
+                  status = ?,
+                  current_version = ?,
+                  updated_at = ?
+              WHERE id = ?
+                AND current_version = ?
+                AND EXISTS (
+                  SELECT 1 FROM aria_layout_versions
+                  WHERE id = ? AND version = ?
+                )
+                AND EXISTS (
+                  SELECT 1
+                  FROM aria_page_meta
+                  WHERE id = ?
+                    AND COALESCE(draft_version, current_version) = ?
+                    AND status IS ?
+                    AND published_version IS ?
+                )`,
+        args: context.bindArgs([
+          versionedDSL.name ?? input.id,
+          description,
+          status,
+          version,
+          now,
+          existing.id,
+          input.expectedVersion,
+          existing.id,
+          version,
+          pageGuard.id,
+          pageGuard.expectedVersion,
+          pageGuard.status,
+          pageGuard.publishedVersion,
+        ]),
+      },
+    ],
+  };
+}
+
+async function settlePostCommit(
+  tasks: Array<() => Promise<unknown>>,
+): Promise<void> {
+  await Promise.allSettled(tasks.map((task) => Promise.resolve().then(task)));
+}
+
 export function createPageLifecycleStorageDomain(
   context: PageLifecycleStorageContext,
 ): PageLifecycleStorageDomain {
@@ -77,10 +265,11 @@ export function createPageLifecycleStorageDomain(
     async savePageDSL(
       id: string,
       dsl: PageDSL,
-      options?: VersionSaveOptions,
+      options?: PageSaveOptions,
       authorship?: AuthorshipSaveContext,
     ): Promise<string> {
-      const parsedOptions = VersionSaveOptionsSchema.parse(options ?? {});
+      const { linkedLayoutDraft, ...versionOptions } = options ?? {};
+      const parsedOptions = VersionSaveOptionsSchema.parse(versionOptions);
       const parsedAuthorship = parseOptionalAuthorshipSaveContext(authorship);
       const shouldSkipIfContentUnchanged =
         parsedOptions.skipIfContentUnchanged !== false;
@@ -91,6 +280,7 @@ export function createPageLifecycleStorageDomain(
       delete migratedDSL.systemRole;
       delete migratedDSL.accessMode;
       delete migratedDSL.hasPassword;
+      delete migratedDSL._publicationDependencies;
       const validation = validatePageDSL(migratedDSL);
       if (!validation.success) {
         throw new Error(`Invalid page DSL: ${validation.error.message}`);
@@ -99,6 +289,7 @@ export function createPageLifecycleStorageDomain(
       const incomingHash = await computeVersionContentHash(migratedDSL);
       const currentDraftVersion =
         existing?.draftVersion ?? existing?.currentVersion;
+      const now = context.nowIso();
 
       if (
         parsedOptions.expectedVersion &&
@@ -110,7 +301,36 @@ export function createPageLifecycleStorageDomain(
         );
       }
 
-      if (shouldSkipIfContentUnchanged && existing && currentDraftVersion) {
+      if (
+        linkedLayoutDraft &&
+        (!existing || !parsedOptions.expectedVersion)
+      ) {
+        throw new Error(
+          "A linked layout draft requires an existing page and expected page revision",
+        );
+      }
+
+      const preparedLinkedLayout = linkedLayoutDraft
+        ? await prepareLinkedLayoutDraft(
+            context,
+            linkedLayoutDraft,
+            parsedAuthorship,
+            now,
+            {
+              id: existing!.id,
+              expectedVersion: parsedOptions.expectedVersion!,
+              status: existing!.status,
+              publishedVersion: existing!.publishedVersion,
+            },
+          )
+        : null;
+
+      if (
+        shouldSkipIfContentUnchanged &&
+        !preparedLinkedLayout?.changed &&
+        existing &&
+        currentDraftVersion
+      ) {
         const currentVersionRow = await context.getStoredVersionRow(
           "aria_page_versions",
           existing.id,
@@ -121,7 +341,18 @@ export function createPageLifecycleStorageDomain(
           const currentHash =
             await context.resolveStoredVersionContentHash(currentVersionRow);
           if (currentHash === incomingHash) {
-            await context.syncPageUsage(id, migratedDSL);
+            const latest = await context.resolvePageIdentity(existing.id);
+            const latestDraftVersion =
+              latest?.draftVersion ?? latest?.currentVersion;
+            if (latestDraftVersion !== currentDraftVersion) {
+              throw new VersionConflictError(
+                parsedOptions.expectedVersion ?? currentDraftVersion,
+                latestDraftVersion ?? null,
+              );
+            }
+            await settlePostCommit([
+              () => context.syncPageUsage(id, migratedDSL),
+            ]);
             return currentDraftVersion;
           }
         }
@@ -132,7 +363,6 @@ export function createPageLifecycleStorageDomain(
         parsedOptions.preserveVersion && hintedVersion
           ? hintedVersion
           : allocateVersionId();
-      const now = context.nowIso();
       const title = migratedDSL.title ?? migratedDSL.slug ?? id;
       const slug = migratedDSL.slug ?? id;
       const status = migratedDSL.status ?? "draft";
@@ -154,6 +384,39 @@ export function createPageLifecycleStorageDomain(
         migratedDSL.visibility,
       );
       const initialAccessPolicyVersion = 1;
+      const metaValues: unknown[] = [
+        id,
+        slug,
+        title,
+        effectiveStatus,
+        typeof migratedDSL.parent === "string" ? migratedDSL.parent : null,
+        layout,
+        version,
+        publishedVersion,
+        version,
+        now,
+        initialSystemRole,
+        initialAccessMode,
+        initialAccessPolicyVersion,
+      ];
+      const metaUpsertSql = `INSERT INTO aria_page_meta (id, slug, title, status, parent, layout, draft_version, published_version, current_version, updated_at, system_role, access_mode, access_policy_version)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         ON CONFLICT(id) DO UPDATE SET
+           slug = excluded.slug,
+           title = excluded.title,
+           status = excluded.status,
+           parent = excluded.parent,
+           layout = excluded.layout,
+           draft_version = excluded.draft_version,
+           published_version = excluded.published_version,
+           current_version = excluded.current_version,
+           scheduled_for = NULL,
+           scheduled_version = NULL,
+           schedule_lease_token = NULL,
+           schedule_lease_expires_at = NULL,
+           schedule_attempt_count = 0,
+           last_schedule_error = NULL,
+           updated_at = excluded.updated_at`;
 
       let shouldInsertVersion = true;
       const existingVersionRow = await context.getStoredVersionRow(
@@ -186,6 +449,7 @@ export function createPageLifecycleStorageDomain(
           contentHash: incomingHash,
         },
       };
+      let committedWithGuard = false;
 
       if (!shouldInsertVersion && existingVersionRow) {
         const existingVersionHash =
@@ -257,18 +521,146 @@ export function createPageLifecycleStorageDomain(
           versionInsert.values[5] = versionedDslJson;
 
           try {
-            await context.run(
-              `INSERT INTO aria_page_versions (${versionInsert.columns.join(", ")})
-               VALUES (${versionInsert.columns.map(() => "?").join(", ")})`,
-              context.bindArgs(versionInsert.values),
-            );
+            if (existing && parsedOptions.expectedVersion) {
+              const expectedVersion = parsedOptions.expectedVersion;
+              metaValues[6] = version;
+              metaValues[8] = version;
+
+              const linkedLayoutStatements =
+                preparedLinkedLayout?.statements ?? [];
+              const linkedLayoutCommitGuard =
+                preparedLinkedLayout?.changed
+                  ? `AND EXISTS (
+                       SELECT 1
+                       FROM aria_layout_meta
+                       WHERE id = ? AND current_version = ?
+                     )`
+                  : "";
+              const linkedLayoutCommitArgs = preparedLinkedLayout?.changed
+                ? [preparedLinkedLayout.id, preparedLinkedLayout.version]
+                : [];
+              const batchResults = await context.runBatchWithChanges([
+                ...linkedLayoutStatements,
+                {
+                  sql: `INSERT INTO aria_page_versions (${versionInsert.columns.join(", ")})
+                        SELECT ${versionInsert.columns.map(() => "?").join(", ")}
+                        FROM aria_page_meta
+                        WHERE id = ?
+                          AND COALESCE(draft_version, current_version) = ?
+                          AND status IS ?
+                          AND published_version IS ?
+                          ${linkedLayoutCommitGuard}`,
+                  args: context.bindArgs([
+                    ...versionInsert.values,
+                    existing.id,
+                    expectedVersion,
+                    existing.status,
+                    existing.publishedVersion,
+                    ...linkedLayoutCommitArgs,
+                  ]),
+                },
+                {
+                  sql: `UPDATE aria_page_meta
+                        SET slug = ?,
+                            title = ?,
+                            status = ?,
+                            parent = ?,
+                            layout = ?,
+                            draft_version = ?,
+                            published_version = ?,
+                            current_version = ?,
+                            scheduled_for = NULL,
+                            scheduled_version = NULL,
+                            schedule_lease_token = NULL,
+                            schedule_lease_expires_at = NULL,
+                            schedule_attempt_count = 0,
+                            last_schedule_error = NULL,
+                            updated_at = ?
+                        WHERE id = ?
+                          AND COALESCE(draft_version, current_version) = ?
+                          AND status IS ?
+                          AND published_version IS ?
+                          AND EXISTS (
+                            SELECT 1
+                            FROM aria_page_versions
+                            WHERE id = ? AND version = ?
+                          )
+                          ${linkedLayoutCommitGuard}`,
+                  args: context.bindArgs([
+                    metaValues[1],
+                    metaValues[2],
+                    metaValues[3],
+                    metaValues[4],
+                    metaValues[5],
+                    metaValues[6],
+                    metaValues[7],
+                    metaValues[8],
+                    metaValues[9],
+                    existing.id,
+                    expectedVersion,
+                    existing.status,
+                    existing.publishedVersion,
+                    existing.id,
+                    version,
+                    ...linkedLayoutCommitArgs,
+                  ]),
+                },
+              ]);
+              const pageInsertIndex = linkedLayoutStatements.length;
+              const pageMetaIndex = pageInsertIndex + 1;
+              const linkedLayoutCommitted = linkedLayoutStatements.every(
+                (_statement, index) => batchResults[index]?.changes === 1,
+              );
+
+              if (
+                !linkedLayoutCommitted ||
+                batchResults[pageInsertIndex]?.changes !== 1 ||
+                batchResults[pageMetaIndex]?.changes !== 1
+              ) {
+                if (!linkedLayoutCommitted && preparedLinkedLayout) {
+                  const latestLayout =
+                    await context.resolveLayoutVersionState(
+                      preparedLinkedLayout.id,
+                    );
+                  if (
+                    latestLayout?.currentVersion !==
+                    preparedLinkedLayout.expectedVersion
+                  ) {
+                    throw new VersionConflictError(
+                      preparedLinkedLayout.expectedVersion,
+                      latestLayout?.currentVersion ?? null,
+                    );
+                  }
+                }
+                const committed =
+                  await context.resolvePageIdentity(existing.id);
+                const committedDraftVersion =
+                  committed?.draftVersion ?? committed?.currentVersion ?? null;
+                throw new VersionConflictError(
+                  expectedVersion,
+                  committedDraftVersion,
+                );
+              }
+              committedWithGuard = true;
+            } else {
+              await context.run(
+                `INSERT INTO aria_page_versions (${versionInsert.columns.join(", ")})
+                 VALUES (${versionInsert.columns.map(() => "?").join(", ")})`,
+                context.bindArgs(versionInsert.values),
+              );
+            }
             insertedVersionRow = true;
             break;
           } catch (error) {
+            if (error instanceof VersionConflictError) {
+              throw error;
+            }
             if (!isStorageVersionConflictError(error) || attempt >= 4) {
               throw error;
             }
             version = allocateVersionId();
+            metaValues[6] = version;
+            metaValues[8] = version;
           }
         }
 
@@ -277,51 +669,42 @@ export function createPageLifecycleStorageDomain(
         }
       }
 
-      await context.run(
-        `INSERT INTO aria_page_meta (id, slug, title, status, parent, layout, draft_version, published_version, current_version, updated_at, system_role, access_mode, access_policy_version)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-         ON CONFLICT(id) DO UPDATE SET
-           slug = excluded.slug,
-           title = excluded.title,
-           status = excluded.status,
-           parent = excluded.parent,
-           layout = excluded.layout,
-           draft_version = excluded.draft_version,
-           published_version = excluded.published_version,
-           current_version = excluded.current_version,
-           scheduled_for = NULL,
-           scheduled_version = NULL,
-           schedule_lease_token = NULL,
-           schedule_lease_expires_at = NULL,
-           schedule_attempt_count = 0,
-           last_schedule_error = NULL,
-           updated_at = excluded.updated_at`,
-        [
-          id,
-          slug,
-          title,
-          effectiveStatus,
-          typeof migratedDSL.parent === "string" ? migratedDSL.parent : null,
-          layout,
-          version,
-          publishedVersion,
-          version,
-          now,
-          initialSystemRole,
-          initialAccessMode,
-          initialAccessPolicyVersion,
-        ],
-      );
-
-      if (shouldInsertVersion) {
-        await context.deletePageThumbnail(
-          existing?.id ?? migratedDSL.id ?? id,
-          "draft",
-        );
-        await context.pruneStoredVersionHistory("page", existing?.id ?? id);
+      if (!committedWithGuard) {
+        await context.run(metaUpsertSql, metaValues);
       }
 
-      await context.syncPageUsage(id, migratedDSL);
+      await settlePostCommit([
+        ...(shouldInsertVersion
+          ? [
+              () =>
+                context.deletePageThumbnail(
+                  existing?.id ?? migratedDSL.id ?? id,
+                  "draft",
+                ),
+              () =>
+                context.pruneStoredVersionHistory(
+                  "page",
+                  existing?.id ?? id,
+                ),
+            ]
+          : []),
+        ...(preparedLinkedLayout?.changed
+          ? [
+              () =>
+                context.pruneStoredVersionHistory(
+                  "layout",
+                  preparedLinkedLayout.id,
+                ),
+              () =>
+                context.syncMediaUsageBestEffort(
+                  "layout",
+                  preparedLinkedLayout.id,
+                  preparedLinkedLayout.dsl,
+                ),
+            ]
+          : []),
+        () => context.syncPageUsage(id, migratedDSL),
+      ]);
       return version;
     },
 
@@ -331,150 +714,115 @@ export function createPageLifecycleStorageDomain(
       options?: PublishPageOptions,
     ): Promise<string | null> {
       const parsedOptions = PublishPageOptionsSchema.parse(options ?? {});
-      const parsedAuthorship = parseOptionalAuthorshipSaveContext(authorship);
+      void authorship;
       const resolved = await context.resolvePageIdentity(id);
       if (!resolved) {
         return null;
       }
 
+      const currentDraftVersion =
+        resolved.draftVersion ?? resolved.currentVersion;
       if (
         parsedOptions.expectedVersion &&
-        resolved.currentVersion !== parsedOptions.expectedVersion
+        currentDraftVersion !== parsedOptions.expectedVersion
       ) {
         throw new VersionConflictError(
           parsedOptions.expectedVersion,
-          resolved.currentVersion,
+          currentDraftVersion,
         );
       }
 
       const sourceVersion =
-        resolved.draftVersion ??
-        resolved.currentVersion ??
-        resolved.publishedVersion;
+        currentDraftVersion ?? resolved.publishedVersion;
       if (!sourceVersion) {
         return null;
       }
 
-      const sourcePage = await context.loadPageVersion(
-        resolved.id,
-        sourceVersion,
-      );
-      if (!sourcePage) {
-        return null;
-      }
-
-      const hintedVersion = context.normalizeVersion(parsedOptions.versionHint);
-      const version = hintedVersion ?? allocateVersionId();
       const now = context.nowIso();
-      const title = sourcePage.title ?? sourcePage.slug ?? resolved.id;
-      const slug = sourcePage.slug ?? resolved.slug ?? resolved.id;
-      const layout =
-        typeof sourcePage.layout === "string" &&
-        sourcePage.layout.trim().length > 0
-          ? sourcePage.layout
-          : null;
-      // After publishing, the draft pointer should match the published version
-      // so that isModifiedSincePublish is false until the user edits again.
-      const nextDraftVersion = version;
-      const publishedPage: PageDSL = {
-        ...sourcePage,
-        status: "published",
-        publishedAt: now,
-        updatedAt: now,
-        version,
-      };
-      const publishedHash = await computeVersionContentHash(publishedPage);
-      const compilerMetadataJson = serializeCompilerMetadata(
-        parsedOptions.compilerMetadata ?? buildCurrentCompilerMetadata(now),
-      );
-      const publishedPageWithMetrics: PageDSL = {
-        ...publishedPage,
-        _computedMetrics: {
-          ...computePageAnalytics(publishedPage.nodes ?? []),
-          computedAt: now,
-          contentHash: publishedHash,
-        },
-      };
-      const versionAuthorship = resolveVersionAuthorshipForSave(
-        undefined,
-        parsedAuthorship,
-        now,
-      );
-      const authorshipFragment =
-        buildVersionInsertAuthorshipColumns(versionAuthorship);
-      const versionColumns = [
-        "id",
-        "version",
-        "slug",
-        "title",
-        "status",
-        "dsl_json",
-        "created_at",
-        "content_hash",
-        "compiler_metadata_json",
-      ];
-      const versionValues: unknown[] = [
-        resolved.id,
-        version,
-        slug,
-        title,
-        "published",
-        serializeDslForStorage(publishedPageWithMetrics),
-        now,
-        publishedHash,
-        compilerMetadataJson,
-      ];
-      if (parsedOptions.activityMetadata) {
-        versionColumns.push("activity_metadata");
-        versionValues.push(parsedOptions.activityMetadata);
-      }
-      const versionInsert = appendSqlFragment(
-        versionColumns,
-        versionValues,
-        authorshipFragment,
-      );
+      const scheduleLeaseToken = parsedOptions.scheduleLeaseToken;
 
-      await context.run(
-        `INSERT INTO aria_page_versions (${versionInsert.columns.join(", ")})
-         VALUES (${versionInsert.columns.map(() => "?").join(", ")})`,
-        context.bindArgs(versionInsert.values),
-      );
-
-      await context.run(
-        `UPDATE aria_page_meta
-         SET slug = ?,
-             title = ?,
-             status = 'published',
-             parent = ?,
-             layout = ?,
-             draft_version = ?,
-             published_version = ?,
-             current_version = ?,
-             scheduled_for = NULL,
-             scheduled_version = NULL,
-             schedule_lease_token = NULL,
-             schedule_lease_expires_at = NULL,
-             schedule_attempt_count = 0,
-             last_schedule_error = NULL,
-             updated_at = ?
-         WHERE id = ?`,
-        [
-          slug,
-          title,
-          typeof sourcePage.parent === "string" ? sourcePage.parent : null,
-          layout,
-          nextDraftVersion,
-          version,
-          nextDraftVersion,
+      const publishMetaStatement = {
+        sql: `UPDATE aria_page_meta
+              SET status = 'published',
+                  published_version = ?,
+                  scheduled_for = NULL,
+                  scheduled_version = NULL,
+                  schedule_lease_token = NULL,
+                  schedule_lease_expires_at = NULL,
+                  schedule_attempt_count = 0,
+                  last_schedule_error = NULL,
+                  updated_at = ?
+              WHERE id = ?
+                AND COALESCE(draft_version, current_version) = ?
+                ${
+                  scheduleLeaseToken
+                    ? "AND schedule_lease_token = ? AND scheduled_version = ?"
+                    : ""
+                }`,
+        args: [
+          sourceVersion,
           now,
           resolved.id,
+          sourceVersion,
+          ...(scheduleLeaseToken
+            ? [scheduleLeaseToken, sourceVersion]
+            : []),
         ],
-      );
+      };
+      const publishChanges = parsedOptions.dependencies
+        ? await context.runBatchWithChanges([
+            {
+              sql: `UPDATE aria_page_versions
+                    SET dependency_versions_json = ?
+                    WHERE id = ? AND version = ?
+                      AND EXISTS (
+                        SELECT 1
+                        FROM aria_page_meta
+                        WHERE id = ?
+                          AND COALESCE(draft_version, current_version) = ?
+                          ${
+                            scheduleLeaseToken
+                              ? "AND schedule_lease_token = ? AND scheduled_version = ?"
+                              : ""
+                          }
+                      )`,
+              args: [
+                JSON.stringify(parsedOptions.dependencies),
+                resolved.id,
+                sourceVersion,
+                resolved.id,
+                sourceVersion,
+                ...(scheduleLeaseToken
+                  ? [scheduleLeaseToken, sourceVersion]
+                  : []),
+              ],
+            },
+            publishMetaStatement,
+          ])
+        : [
+            await context.runWithChanges(
+              publishMetaStatement.sql,
+              publishMetaStatement.args,
+            ),
+          ];
+      const publishResult = publishChanges[publishChanges.length - 1];
 
-      await context.deletePageThumbnail(resolved.id, "published");
-      await context.pruneStoredVersionHistory("page", resolved.id);
+      if (
+        publishResult?.changes !== 1 ||
+        (parsedOptions.dependencies && publishChanges[0]?.changes !== 1)
+      ) {
+        const committed = await context.resolvePageIdentity(resolved.id);
+        throw new VersionConflictError(
+          sourceVersion,
+          committed?.draftVersion ?? committed?.currentVersion ?? null,
+        );
+      }
 
-      return version;
+      await settlePostCommit([
+        () => context.deletePageThumbnail(resolved.id, "published"),
+      ]);
+
+      return sourceVersion;
     },
 
     async schedulePageDSL(
@@ -488,7 +836,7 @@ export function createPageLifecycleStorageDomain(
       }
 
       const parsedOptions = SchedulePageOptionsSchema.parse(options ?? {});
-      const parsedAuthorship = parseOptionalAuthorshipSaveContext(authorship);
+      void authorship;
       const resolved = await context.resolvePageIdentity(id);
       if (!resolved) {
         return null;
@@ -501,96 +849,20 @@ export function createPageLifecycleStorageDomain(
       if (!sourceVersion) {
         return null;
       }
-
-      const sourcePage = await context.loadPageVersion(
-        resolved.id,
-        sourceVersion,
-      );
-      if (!sourcePage) {
-        return null;
+      if (
+        parsedOptions.expectedVersion &&
+        sourceVersion !== parsedOptions.expectedVersion
+      ) {
+        throw new VersionConflictError(
+          parsedOptions.expectedVersion,
+          sourceVersion,
+        );
       }
 
-      const version = allocateVersionId();
       const now = context.nowIso();
-      const title = sourcePage.title ?? sourcePage.slug ?? resolved.id;
-      const slug = sourcePage.slug ?? resolved.slug ?? resolved.id;
-      const layout =
-        typeof sourcePage.layout === "string" &&
-        sourcePage.layout.trim().length > 0
-          ? sourcePage.layout
-          : null;
-      const scheduledPage: PageDSL = {
-        ...sourcePage,
-        status: "scheduled",
-        updatedAt: now,
-        version,
-      };
-      const scheduledHash = await computeVersionContentHash(scheduledPage);
-      const compilerMetadataJson = serializeCompilerMetadata(
-        parsedOptions.compilerMetadata ?? buildCurrentCompilerMetadata(now),
-      );
-      const scheduledPageWithMetrics: PageDSL = {
-        ...scheduledPage,
-        _computedMetrics: {
-          ...computePageAnalytics(scheduledPage.nodes ?? []),
-          computedAt: now,
-          contentHash: scheduledHash,
-        },
-      };
-      const versionAuthorship = resolveVersionAuthorshipForSave(
-        undefined,
-        parsedAuthorship,
-        now,
-      );
-      const authorshipFragment =
-        buildVersionInsertAuthorshipColumns(versionAuthorship);
-      const versionColumns = [
-        "id",
-        "version",
-        "slug",
-        "title",
-        "status",
-        "dsl_json",
-        "created_at",
-        "content_hash",
-        "compiler_metadata_json",
-      ];
-      const versionValues: unknown[] = [
-        resolved.id,
-        version,
-        slug,
-        title,
-        "scheduled",
-        serializeDslForStorage(scheduledPageWithMetrics),
-        now,
-        scheduledHash,
-        compilerMetadataJson,
-      ];
-      if (parsedOptions.activityMetadata) {
-        versionColumns.push("activity_metadata");
-        versionValues.push(parsedOptions.activityMetadata);
-      }
-      const versionInsert = appendSqlFragment(
-        versionColumns,
-        versionValues,
-        authorshipFragment,
-      );
-
-      await context.run(
-        `INSERT INTO aria_page_versions (${versionInsert.columns.join(", ")})
-         VALUES (${versionInsert.columns.map(() => "?").join(", ")})`,
-        context.bindArgs(versionInsert.values),
-      );
-
-      await context.run(
+      const scheduleResult = await context.runWithChanges(
         `UPDATE aria_page_meta
-         SET slug = ?,
-             title = ?,
-             status = 'scheduled',
-             parent = ?,
-             layout = ?,
-             draft_version = ?,
-             current_version = ?,
+         SET status = 'scheduled',
              scheduled_for = ?,
              scheduled_version = ?,
              schedule_lease_token = NULL,
@@ -598,25 +870,29 @@ export function createPageLifecycleStorageDomain(
              schedule_attempt_count = 0,
              last_schedule_error = NULL,
              updated_at = ?
-         WHERE id = ?`,
+         WHERE id = ?
+           AND COALESCE(draft_version, current_version, published_version) = ?
+           AND status IS ?
+           AND published_version IS ?`,
         [
-          slug,
-          title,
-          typeof sourcePage.parent === "string" ? sourcePage.parent : null,
-          layout,
-          version,
-          version,
           scheduledFor,
-          version,
+          sourceVersion,
           now,
           resolved.id,
+          sourceVersion,
+          resolved.status,
+          resolved.publishedVersion,
         ],
       );
+      if (scheduleResult.changes !== 1) {
+        const latest = await context.resolvePageIdentity(resolved.id);
+        throw new VersionConflictError(
+          parsedOptions.expectedVersion ?? sourceVersion,
+          latest?.draftVersion ?? latest?.currentVersion ?? null,
+        );
+      }
 
-      await context.deletePageThumbnail(resolved.id, "draft");
-      await context.pruneStoredVersionHistory("page", resolved.id);
-
-      return version;
+      return sourceVersion;
     },
 
     async unpublishPageDSL(id: string): Promise<void> {
@@ -626,12 +902,10 @@ export function createPageLifecycleStorageDomain(
       }
 
       const draftVersion = resolved.draftVersion ?? resolved.currentVersion;
-      await context.run(
+      const unpublishResult = await context.runWithChanges(
         `UPDATE aria_page_meta
          SET status = 'draft',
-             draft_version = ?,
              published_version = NULL,
-             current_version = ?,
              scheduled_for = NULL,
              scheduled_version = NULL,
              schedule_lease_token = NULL,
@@ -639,9 +913,25 @@ export function createPageLifecycleStorageDomain(
              schedule_attempt_count = 0,
              last_schedule_error = NULL,
              updated_at = ?
-         WHERE id = ?`,
-        [draftVersion, draftVersion, context.nowIso(), resolved.id],
+         WHERE id = ?
+           AND COALESCE(draft_version, current_version) = ?
+           AND status IS ?
+           AND published_version IS ?`,
+        [
+          context.nowIso(),
+          resolved.id,
+          draftVersion,
+          resolved.status,
+          resolved.publishedVersion,
+        ],
       );
+      if (unpublishResult.changes !== 1) {
+        const latest = await context.resolvePageIdentity(resolved.id);
+        throw new VersionConflictError(
+          draftVersion,
+          latest?.draftVersion ?? latest?.currentVersion ?? null,
+        );
+      }
     },
 
     async archivePageDSL(id: string): Promise<void> {
@@ -650,7 +940,7 @@ export function createPageLifecycleStorageDomain(
         return;
       }
 
-      await context.run(
+      const archiveResult = await context.runWithChanges(
         `UPDATE aria_page_meta
          SET status = 'archived',
              scheduled_for = NULL,
@@ -658,9 +948,25 @@ export function createPageLifecycleStorageDomain(
              schedule_lease_token = NULL,
              schedule_lease_expires_at = NULL,
              updated_at = ?
-         WHERE id = ?`,
-        [context.nowIso(), resolved.id],
+         WHERE id = ?
+           AND COALESCE(draft_version, current_version) = ?
+           AND status IS ?
+           AND published_version IS ?`,
+        [
+          context.nowIso(),
+          resolved.id,
+          resolved.draftVersion ?? resolved.currentVersion,
+          resolved.status,
+          resolved.publishedVersion,
+        ],
       );
+      if (archiveResult.changes !== 1) {
+        const latest = await context.resolvePageIdentity(resolved.id);
+        throw new VersionConflictError(
+          resolved.draftVersion ?? resolved.currentVersion,
+          latest?.draftVersion ?? latest?.currentVersion ?? null,
+        );
+      }
     },
 
     async unarchivePageDSL(id: string): Promise<void> {
@@ -674,7 +980,7 @@ export function createPageLifecycleStorageDomain(
         typeof resolved.publishedVersion === "string" &&
         resolved.publishedVersion.trim().length > 0;
 
-      await context.run(
+      const unarchiveResult = await context.runWithChanges(
         `UPDATE aria_page_meta
          SET status = ?,
              draft_version = ?,
@@ -684,15 +990,28 @@ export function createPageLifecycleStorageDomain(
              schedule_lease_token = NULL,
              schedule_lease_expires_at = NULL,
              updated_at = ?
-         WHERE id = ?`,
+         WHERE id = ?
+           AND COALESCE(draft_version, current_version) = ?
+           AND status IS ?
+           AND published_version IS ?`,
         [
           hasPublishedVersion ? "published" : "draft",
           draftVersion,
           draftVersion,
           context.nowIso(),
           resolved.id,
+          draftVersion,
+          resolved.status,
+          resolved.publishedVersion,
         ],
       );
+      if (unarchiveResult.changes !== 1) {
+        const latest = await context.resolvePageIdentity(resolved.id);
+        throw new VersionConflictError(
+          draftVersion,
+          latest?.draftVersion ?? latest?.currentVersion ?? null,
+        );
+      }
     },
 
     async listPagesDSL(opts?: {

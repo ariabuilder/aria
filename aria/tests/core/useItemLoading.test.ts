@@ -85,6 +85,7 @@ function createComposeResult(overrides?: {
       pageMetadata: {
         id: `page-${slug}`,
         title,
+        description: "Saved description",
         slug,
         version: "v-current",
         status: "draft",
@@ -95,12 +96,19 @@ function createComposeResult(overrides?: {
         settings: {
           cssVariables: { "--brand": "#111111" },
           breakpoints: [],
+          seo: {
+            title: "Saved SEO title",
+            description: "Saved SEO description",
+            noindex: false,
+            nofollow: false,
+          },
         },
       },
       currentLayout: {
         id: "default",
         slug: "default",
         title: "Default Layout",
+        version: "layout-v1",
         slots: [
           { name: "header", label: "Header", required: true },
           {
@@ -172,7 +180,12 @@ describe("useItemLoading", () => {
     expect(appState.currentItemType.value).toBe("page");
     expect(appState.currentPage.value?.slug).toBe("home");
     expect(appState.currentPage.value?.version).toBe("v-current");
+    expect(appState.currentPage.value?.description).toBe("Saved description");
+    expect(appState.currentPage.value?.settings?.seo?.title).toBe(
+      "Saved SEO title",
+    );
     expect(appState.currentLayout.value?.id).toBe("default");
+    expect(appState.currentLayout.value?.version).toBe("layout-v1");
     expect(appState.composeNonce.value).toBe("nonce-home");
     expect(appState.pageBlocks.value.map((block) => block.id)).toEqual([
       "page-block-1",

@@ -1,5 +1,4 @@
 import type { Ref } from "vue";
-import { actions } from "astro:actions";
 import type { BuilderNode, LayoutDSL } from "../../../../../lib/types/nodes";
 import type { ActiveLayoutSlot } from "../../../../../lib/schemas/slotEditing";
 import {
@@ -184,18 +183,6 @@ export async function insertNodeViaAction(
           }
         }
 
-        const response = await actions.insertNode({
-          collection: mutationPath.collection,
-          id: mutationPath.id,
-          parentId,
-          node: newNode,
-          position: insertPosition,
-        });
-
-        if (response.error) {
-          throw new Error(response.error.message);
-        }
-
         pageBlocks.value = insertNodeInTree(
           pageBlocks.value,
           parentId,
@@ -218,16 +205,6 @@ export async function insertNodeViaAction(
             setSelectedBlock(null);
             return;
           }
-        }
-
-        const response = await actions.deleteNode({
-          collection: mutationPath.collection,
-          id: mutationPath.id,
-          nodeId: newNode.id,
-        });
-
-        if (response.error) {
-          throw new Error(response.error.message);
         }
 
         pageBlocks.value = deleteNodeById(pageBlocks.value, newNode.id);

@@ -340,7 +340,7 @@ describe("useClassEditor", () => {
     });
   });
 
-  it("records utility-class failure when addUtilityClass returns an invalid payload", async () => {
+  it("stages utility classes locally without calling the server", async () => {
     const { useClassEditor } =
       await import("../../admin/features/Inspector/composables/useClassEditor");
 
@@ -365,23 +365,12 @@ describe("useClassEditor", () => {
       "text-xl",
     );
 
-    expect(result).toBe(false);
-    expect(editor.error.value).toBe("Failed to add utility class");
-    expect(selectedNodeRef.value).toEqual({
-      id: "hero-node",
-      classNames: { base: [] },
-      customClasses: [],
+    expect(result).toBe(true);
+    expect(editor.error.value).toBeNull();
+    expect(updateSelectedNodeClassNamesMock).toHaveBeenCalledWith("hero-node", {
+      base: ["text-xl"],
     });
-    expect(broadcastClassUpdateMock).not.toHaveBeenCalled();
-    expect(loggerMock).toHaveBeenCalledWith(
-      "warn",
-      "[useClassEditor] Invalid node class action response",
-      expect.objectContaining({
-        source: "useClassEditor.addUtilityClass",
-        className: "text-xl",
-        issues: expect.any(Array),
-      }),
-    );
+    expect(addUtilityClassMock).not.toHaveBeenCalled();
   });
 
   it("ignores malformed generated CSS payloads without mutating css state", async () => {

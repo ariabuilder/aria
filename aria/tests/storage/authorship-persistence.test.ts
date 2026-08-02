@@ -1,4 +1,4 @@
-import { createClient, type Client, type InValue } from "@libsql/client";
+import { createClient, type Client } from "@libsql/client";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import fs from "fs/promises";
 import os from "os";
@@ -12,44 +12,9 @@ import {
 import { CloudflareStorageAdapter } from "../../lib/storage/cloudflare";
 import { SQLiteStorageAdapter } from "../../lib/storage/sqlite";
 import type { ComponentDSL, LayoutDSL, PageDSL } from "../../lib/types/nodes";
-
-type D1Row = Record<string, unknown>;
+import { createD1Mock } from "../helpers/d1Mock";
 
 type StorageAdapterUnderTest = SQLiteStorageAdapter | CloudflareStorageAdapter;
-
-function createD1Mock(client: Client) {
-  const createStatement = (sql: string, boundArgs: InValue[] = []) => ({
-    bind(...values: InValue[]) {
-      return createStatement(sql, values);
-    },
-    async first<T extends D1Row = D1Row>() {
-      const result = await client.execute({ sql, args: boundArgs });
-      return ((result.rows[0] as unknown as T | undefined) ?? null) as T | null;
-    },
-    async all<T extends D1Row = D1Row>() {
-      const result = await client.execute({ sql, args: boundArgs });
-      return {
-        results: result.rows as unknown as T[],
-      };
-    },
-    async run() {
-      return client.execute({ sql, args: boundArgs });
-    },
-  });
-
-  return {
-    prepare(sql: string) {
-      return createStatement(sql);
-    },
-    async batch(statements: Array<ReturnType<typeof createStatement>>) {
-      const results = [];
-      for (const statement of statements) {
-        results.push(await statement.run());
-      }
-      return results;
-    },
-  };
-}
 
 const editorA: SessionUser = {
   id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
@@ -226,7 +191,7 @@ function runAdapterParityTests(
       expect(entry?.createdBy?.email).toBe(editorA.email);
     });
 
-    it("attributes published version rows to the publisher, not the draft editor", async () => {
+    it("publishes the exact authored draft without creating another version row", async () => {
       const draftAuthorship = buildAuthorshipSaveContext(editorA, "save-page");
       const publishAuthorship = buildAuthorshipSaveContext(
         publisherB,
@@ -246,7 +211,7 @@ function runAdapterParityTests(
         { versionHint: "pub-v1" },
       );
 
-      expect(publishedVersion).toBe("pub-v1");
+      expect(publishedVersion).toBe("draft-v1");
 
       const draftRow = await queryVersionAuthorship(
         client,
@@ -254,22 +219,14 @@ function runAdapterParityTests(
         samplePage.id,
         "draft-v1",
       );
-      const publishedRow = await queryVersionAuthorship(
-        client,
-        "aria_page_versions",
-        samplePage.id,
-        "pub-v1",
-      );
+      const versions = await adapter.getPageVersions(samplePage.id);
 
       expect(String(draftRow?.created_by_id)).toBe(editorA.id);
-      expect(String(publishedRow?.created_by_id)).toBe(publisherB.id);
-      expect(String(publishedRow?.created_by_username)).toBe(
-        publisherB.username,
-      );
+      expect(versions.map((entry) => entry.version)).toEqual(["draft-v1"]);
 
       const authorshipRead = await adapter.getPageAuthorship(samplePage.id);
-      expect(authorshipRead?.publishedBy?.id).toBe(publisherB.id);
-      expect(authorshipRead?.updatedBy?.id).toBe(publisherB.id);
+      expect(authorshipRead?.publishedBy?.id).toBe(editorA.id);
+      expect(authorshipRead?.updatedBy?.id).toBe(editorA.id);
     });
 
     it("persists system actor on singleton site settings writes", async () => {
@@ -320,6 +277,7 @@ runAdapterParityTests("Cloudflare", async () => {
     "0002_api_foundation.sql",
     "0003_api_idempotency_leases.sql",
     "0004_api_lifecycle_hardening.sql",
+    "0008_published_dependency_pins.sql",
   ]) {
     await client.executeMultiple(
       await fs.readFile(

@@ -43,6 +43,7 @@ export function createPageReadStorageDomain(
 
       const page = await context.loadPageVersion(resolved.id, targetVersion);
       if (page) {
+        delete page._publicationDependencies;
         page.status = (resolved.status as PageDSL["status"]) ?? page.status;
         page.systemRole = resolved.systemRole ?? page.systemRole;
         page.accessMode = resolved.accessMode ?? page.accessMode;

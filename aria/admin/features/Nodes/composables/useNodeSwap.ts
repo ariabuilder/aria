@@ -18,7 +18,6 @@ import {
   findParentAndIndex,
 } from "../events/shared/nodeEventTreeUtils";
 import type { ExecuteNodeEventOperation } from "../events/shared/nodeEventHistory";
-import { replaceNodeViaAction } from "../events/shared/replaceNodeViaAction";
 import {
   NodeSwapOptionSchema,
   NodeSwapRequestSchema,
@@ -29,13 +28,6 @@ import {
 import type { useEditorNodeRegistry } from "../../Core/composables/useEditorNodeRegistry";
 
 type EditorNodeRegistry = ReturnType<typeof useEditorNodeRegistry>;
-
-function layoutUsesNodeRegistry(
-  editorNodeRegistry: EditorNodeRegistry | undefined,
-  currentLayout: LayoutDSL | null | undefined,
-): boolean {
-  return Boolean(editorNodeRegistry && (currentLayout?.slots?.length ?? 0) > 0);
-}
 
 type SwapStrategy = {
   id: NodeSwapStrategyId;
@@ -118,7 +110,6 @@ function applyLocalReplacement(params: {
 export function useNodeSwap(options: UseNodeSwapOptions) {
   const {
     pageBlocks,
-    currentLayout,
     executeNodeEventOperation,
     setSelectedBlock,
     resolveMutationPath,
@@ -277,18 +268,9 @@ export function useNodeSwap(options: UseNodeSwapOptions) {
       return;
     }
 
-    const usesRegistry = layoutUsesNodeRegistry(
-      editorNodeRegistry,
-      currentLayout?.value,
-    );
-    const persistLocally = usesRegistry;
-
-    if (!persistLocally) {
-      const mutationPath = resolveMutationPath();
-      if (!mutationPath) {
-        toast.error("Missing editor context for replace operation");
-        return;
-      }
+    if (!resolveMutationPath()) {
+      toast.error("Missing editor context for replace operation");
+      return;
     }
 
     swapInFlight = true;
@@ -323,30 +305,6 @@ export function useNodeSwap(options: UseNodeSwapOptions) {
       const originalNode = cloneDeep(sourceNode);
       const replacementNode = parsedReplacement.data;
 
-      const persistReplacement = async (
-        node: BuilderNode,
-      ): Promise<boolean> => {
-        if (persistLocally) {
-          return true;
-        }
-
-        const mutationPath = resolveMutationPath();
-        if (!mutationPath) {
-          toast.error("Missing editor context for replace operation");
-          return false;
-        }
-
-        const result = await replaceNodeViaAction({
-          mutationPath,
-          node,
-        });
-        if (!result.ok) {
-          toast.error(result.message);
-          return false;
-        }
-        return true;
-      };
-
       const applyLocal = (node: BuilderNode): void => {
         applyLocalReplacement({
           pageBlocks,
@@ -368,17 +326,9 @@ export function useNodeSwap(options: UseNodeSwapOptions) {
         },
         {
           undo: async () => {
-            const ok = await persistReplacement(originalNode);
-            if (!ok) {
-              throw new Error("Failed to undo node replace");
-            }
             applyLocal(originalNode);
           },
           redo: async () => {
-            const ok = await persistReplacement(replacementNode);
-            if (!ok) {
-              throw new Error("Failed to replace node");
-            }
             applyLocal(replacementNode);
           },
         },

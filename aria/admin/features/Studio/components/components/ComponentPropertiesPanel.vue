@@ -2,6 +2,7 @@
 import { log } from "@/lib/utils/logger";
 import { ref, watch, computed } from "vue";
 import { actions } from "astro:actions";
+import { toast } from "vue-sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -41,6 +42,8 @@ import { unwrapStudioCrudActionResult } from "@/features/Studio/composer/composa
 import { useComponentGrouping } from "@/features/Studio/components/composables/useComponentGrouping";
 import { useContentEditingPreferences } from "@/features/Studio/components/composables/useContentEditingPreferences";
 import { useComponentResourceBank } from "@/features/Studio/components/composables/useComponentResourceBank";
+import { commitSavedComponentToClientCaches } from "@/features/Core/composables/componentCacheCoherence";
+import { markComponentThumbnailStale } from "@/features/Studio/components/composables/componentThumbnailInvalidation";
 import { studioIcons } from "@/lib/icons";
 import {
   buildComponentContentStructure,
@@ -646,6 +649,10 @@ async function loadUsage(): Promise<void> {
 
 async function saveChanges(): Promise<void> {
   if (!componentData.value || isSaving.value) return;
+  if (!componentData.value.version) {
+    toast.error("Reload this component before saving");
+    return;
+  }
 
   isSaving.value = true;
 
@@ -751,6 +758,8 @@ async function saveChanges(): Promise<void> {
       return;
     }
 
+    const submittedDraftSnapshot = buildDraftSnapshot();
+    const submittedGroupId = draftGroupId.value;
     const updateResult = unwrapStudioCrudActionResult(
       "update",
       await actions.updateItem({
@@ -759,6 +768,7 @@ async function saveChanges(): Promise<void> {
         data: JsonObjectSchema.parse(
           JSON.parse(JSON.stringify(parsedUpdatedComponent.data)),
         ),
+        expectedVersion: componentData.value.version,
       }),
       {
         source: "ComponentPropertiesPanel.saveChanges",
@@ -767,19 +777,44 @@ async function saveChanges(): Promise<void> {
     );
 
     if (updateResult.success) {
-      if (draftGroupId.value) {
-        await componentGrouping.moveComponentToGroup(
-          props.componentId,
-          draftGroupId.value,
-        );
+      if (!updateResult.version) {
+        toast.error("Unable to confirm the saved component revision");
+        return;
       }
-      componentData.value = parsedUpdatedComponent.data;
-      componentResourceBank.updateCachedComponent(parsedUpdatedComponent.data);
-      updateSavedDraftSnapshot();
+
+      const savedComponent: ComponentDSL = {
+        ...parsedUpdatedComponent.data,
+        version: updateResult.version,
+      };
+      componentData.value = savedComponent;
+      commitSavedComponentToClientCaches(savedComponent);
+      markComponentThumbnailStale(savedComponent.id);
+      savedDraftSnapshot.value = submittedDraftSnapshot;
+      emit("saved", savedComponent);
+
+      if (submittedGroupId) {
+        try {
+          await componentGrouping.moveComponentToGroup(
+            props.componentId,
+            submittedGroupId,
+          );
+        } catch (error) {
+          log(
+            "warn",
+            "[Studio/ComponentProperties] Component saved but group update failed",
+            {
+              componentId: props.componentId,
+              error: error instanceof Error ? error.message : String(error),
+            },
+          );
+          toast.warning("Component saved, but its group was not updated");
+        }
+      }
       if (loadedCodeFor.value === props.componentId) {
         await loadCode();
       }
-      emit("saved", parsedUpdatedComponent.data);
+    } else {
+      toast.error(updateResult.error);
     }
   } finally {
     isSaving.value = false;

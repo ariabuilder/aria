@@ -100,10 +100,6 @@ const ClassEditorDeleteClassesActionSuccessSchema = z.looseObject({
     .optional(),
 });
 
-const NodeCustomClassActionSuccessSchema = z.looseObject({
-  version: NonEmptyStringSchema,
-});
-
 const ClassEditorHistoryOperationTypeSchema = z.enum([
   "create-custom-class",
   "delete-custom-class",
@@ -331,38 +327,6 @@ function unwrapClassEditorStyleActionResult<
   return {
     success: true,
     data: successParsed.data,
-  };
-}
-
-function unwrapNodeCustomClassActionResult(
-  result: ActionTransportResult,
-  fallback: string,
-  context: Record<string, unknown>,
-): { success: true; version: string } | { success: false; error: string } {
-  if (result.error) {
-    return {
-      success: false,
-      error: result.error.message ?? fallback,
-    };
-  }
-
-  const parsedResult = NodeCustomClassActionSuccessSchema.safeParse(
-    result.data,
-  );
-  if (!parsedResult.success) {
-    log("warn", "[useClassEditorHistory] Invalid node class action response", {
-      issues: parsedResult.error.issues,
-      ...context,
-    });
-    return {
-      success: false,
-      error: fallback,
-    };
-  }
-
-  return {
-    success: true,
-    version: parsedResult.data.version,
   };
 }
 
@@ -854,15 +818,6 @@ export function useClassEditorHistory() {
       );
     }
 
-    const redoAction =
-      operation === "add-custom-class"
-        ? actions.nodes.addCustomClass
-        : actions.nodes.removeCustomClass;
-    const undoAction =
-      operation === "add-custom-class"
-        ? actions.nodes.removeCustomClass
-        : actions.nodes.addCustomClass;
-
     return await executeClassEditorOperation(
       {
         type: operation,
@@ -871,35 +826,9 @@ export function useClassEditorHistory() {
       },
       {
         redo: async () => {
-          const result = unwrapNodeCustomClassActionResult(
-            await redoAction(parsedPayload.data),
-            `Failed to ${operation === "add-custom-class" ? "add" : "remove"} custom class`,
-            {
-              operation,
-              payload: parsedPayload.data,
-              source: "useClassEditorHistory.recordNodeCustomClassChange.redo",
-            },
-          );
-          if (!result.success) {
-            throw new Error(result.error);
-          }
-
           callbacks.onRedo(parsedPayload.data);
         },
         undo: async () => {
-          const result = unwrapNodeCustomClassActionResult(
-            await undoAction(parsedPayload.data),
-            `Failed to ${operation === "add-custom-class" ? "remove" : "add"} custom class`,
-            {
-              operation,
-              payload: parsedPayload.data,
-              source: "useClassEditorHistory.recordNodeCustomClassChange.undo",
-            },
-          );
-          if (!result.success) {
-            throw new Error(result.error);
-          }
-
           callbacks.onUndo(parsedPayload.data);
         },
       },

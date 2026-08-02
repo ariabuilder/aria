@@ -36,6 +36,7 @@ export interface UseComposerDraftPersistenceReturn {
   markCurrentDraftSynced: (
     version: string,
     persistedBlocksSnapshot: string,
+    currentDocumentMatchesSavedDraft?: boolean,
   ) => Promise<void>;
   restorePendingDraft: () => Promise<boolean>;
   discardPendingDraft: () => Promise<void>;
@@ -79,6 +80,10 @@ export function useComposerDraftPersistence(
   let writeTimer: ReturnType<typeof setTimeout> | null = null;
   let restorationInProgress = false;
   let draftLoadGeneration = 0;
+  let restoredDraftSource: Pick<
+    DraftEntry,
+    "collection" | "id" | "sessionId"
+  > | null = null;
 
   const activeDocument = computed<DraftDocument | null>(() => {
     if (currentItemType.value === "page") return currentPage.value;
@@ -225,6 +230,11 @@ export function useComposerDraftPersistence(
         };
       }
       hasUnsavedChanges.value = true;
+      restoredDraftSource = {
+        collection: draft.collection,
+        id: draft.id,
+        sessionId: draft.sessionId,
+      };
       pendingDraft.value = null;
       return true;
     } finally {
@@ -236,11 +246,19 @@ export function useComposerDraftPersistence(
   async function discardPendingDraft(): Promise<void> {
     const draft = pendingDraft.value;
     if (draft) {
-      await deleteDraft(draft.collection, draft.id);
+      await deleteDraft(draft.collection, draft.id, draft.sessionId);
     }
     if (pendingDraft.value === draft) {
       pendingDraft.value = null;
       hasDraftConflict.value = false;
+    }
+    if (
+      draft &&
+      restoredDraftSource?.collection === draft.collection &&
+      restoredDraftSource.id === draft.id &&
+      restoredDraftSource.sessionId === draft.sessionId
+    ) {
+      restoredDraftSource = null;
     }
   }
 
@@ -252,28 +270,38 @@ export function useComposerDraftPersistence(
     hasUnsavedChanges.value = false;
     pendingDraft.value = null;
     hasDraftConflict.value = false;
+    restoredDraftSource = null;
   }
 
   async function markCurrentDraftSynced(
     version: string,
     persistedBlocksSnapshot: string,
+    currentDocumentMatchesSavedDraft = true,
   ): Promise<void> {
+    void version;
     const target = activeDraftTarget.value;
     if (!target) return;
 
     clearWriteTimer();
-    if (JSON.stringify(pageBlocks.value) !== persistedBlocksSnapshot) {
+    if (
+      !currentDocumentMatchesSavedDraft ||
+      JSON.stringify(pageBlocks.value) !== persistedBlocksSnapshot
+    ) {
       await flushLocalDraft();
       return;
     }
 
-    await saveDraft(
-      target.collection,
-      target.id,
-      buildDraftDocument(target.document),
-      true,
-      version,
-    );
+    await deleteDraft(target.collection, target.id);
+    const source = restoredDraftSource;
+    if (
+      source &&
+      source.collection === target.collection &&
+      source.id === target.id &&
+      source.sessionId
+    ) {
+      await deleteDraft(source.collection, source.id, source.sessionId);
+    }
+    restoredDraftSource = null;
     pendingDraft.value = null;
     hasDraftConflict.value = false;
   }
@@ -298,12 +326,13 @@ export function useComposerDraftPersistence(
       draftLoadGeneration += 1;
       pendingDraft.value = null;
       hasDraftConflict.value = false;
+      restoredDraftSource = null;
     },
     { flush: "sync" },
   );
 
   watch(
-    [pageBlocks, currentLayout, hasUnsavedChanges],
+    [pageBlocks, currentLayout, activeDocument, hasUnsavedChanges],
     () => scheduleLocalDraftWrite(),
     { deep: true },
   );

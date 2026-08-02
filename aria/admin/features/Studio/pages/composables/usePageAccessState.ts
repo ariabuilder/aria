@@ -18,6 +18,19 @@ type PolicySnapshot = {
   rememberDays: number | null;
 };
 
+export interface LoadPagePolicyOptions {
+  /** Bypass the shared policy cache after a server mutation. */
+  force?: boolean;
+  /** Rebase local field edits onto the authoritative server policy. */
+  preserveLocalChanges?: boolean;
+}
+
+type LocalPolicyChanges = {
+  snapshot: PolicySnapshot;
+  password: string;
+  changed: Set<keyof PolicySnapshot | "password">;
+};
+
 const policyCache = new Map<string, PagePolicyResult>();
 const policyLoads = new Map<string, Promise<PagePolicyResult>>();
 
@@ -73,7 +86,10 @@ export interface UsePageAccessStateReturn {
   isSaving: Ref<boolean>;
   error: Ref<string | null>;
   clearedAssignments: Ref<PagePolicyResult["clearedAssignments"]>;
-  loadPolicy: (slug: string) => Promise<void>;
+  loadPolicy: (
+    slug: string,
+    options?: LoadPagePolicyOptions,
+  ) => Promise<void>;
   applyPolicy: (policy: PagePolicyResult) => void;
   savePolicy: (slug: string) => Promise<void>;
 }
@@ -115,7 +131,34 @@ export function usePageAccessState(): UsePageAccessStateReturn {
     };
   }
 
-  function applyPolicyResult(policy: PagePolicyResult): void {
+  function captureLocalChanges(): LocalPolicyChanges | null {
+    const initial = initialPolicy.value;
+    if (!initial) {
+      return null;
+    }
+
+    const snapshot = captureSnapshot();
+    const changed = new Set<keyof PolicySnapshot | "password">();
+    for (const field of Object.keys(snapshot) as Array<keyof PolicySnapshot>) {
+      if (snapshot[field] !== initial[field]) {
+        changed.add(field);
+      }
+    }
+    if (password.value.trim().length > 0) {
+      changed.add("password");
+    }
+
+    return {
+      snapshot,
+      password: password.value,
+      changed,
+    };
+  }
+
+  function applyPolicyResult(
+    policy: PagePolicyResult,
+    localChanges: LocalPolicyChanges | null = null,
+  ): void {
     systemRole.value = PageSystemRoleSchema.parse(policy.systemRole);
     accessMode.value = PageAccessModeSchema.parse(policy.accessMode);
     promptTitle.value = policy.promptTitle ?? "";
@@ -124,6 +167,28 @@ export function usePageAccessState(): UsePageAccessStateReturn {
     hasPassword.value = policy.hasPassword;
     password.value = "";
     initialPolicy.value = snapshotFromPolicy(policy);
+
+    if (!localChanges) {
+      return;
+    }
+    if (localChanges.changed.has("systemRole")) {
+      systemRole.value = localChanges.snapshot.systemRole;
+    }
+    if (localChanges.changed.has("accessMode")) {
+      accessMode.value = localChanges.snapshot.accessMode;
+    }
+    if (localChanges.changed.has("promptTitle")) {
+      promptTitle.value = localChanges.snapshot.promptTitle;
+    }
+    if (localChanges.changed.has("promptDescription")) {
+      promptDescription.value = localChanges.snapshot.promptDescription;
+    }
+    if (localChanges.changed.has("rememberDays")) {
+      rememberDays.value = localChanges.snapshot.rememberDays;
+    }
+    if (localChanges.changed.has("password")) {
+      password.value = localChanges.password;
+    }
   }
 
   function resetPolicyState(): void {
@@ -177,7 +242,10 @@ export function usePageAccessState(): UsePageAccessStateReturn {
   );
   const isCmsEntryRole = computed(() => systemRole.value === "cms-entry");
 
-  async function loadPolicy(slug: string): Promise<void> {
+  async function loadPolicy(
+    slug: string,
+    options: LoadPagePolicyOptions = {},
+  ): Promise<void> {
     const parsedSlug = z.string().trim().min(1).safeParse(slug);
     if (!parsedSlug.success) {
       return;
@@ -185,10 +253,13 @@ export function usePageAccessState(): UsePageAccessStateReturn {
 
     const generation = loadGeneration + 1;
     loadGeneration = generation;
+    const localChanges = options.preserveLocalChanges
+      ? captureLocalChanges()
+      : null;
 
     const cached = policyCache.get(parsedSlug.data);
-    if (cached) {
-      applyPolicyResult(cached);
+    if (cached && !options.force) {
+      applyPolicyResult(cached, localChanges);
       isLoading.value = false;
       error.value = null;
       return;
@@ -196,10 +267,14 @@ export function usePageAccessState(): UsePageAccessStateReturn {
 
     isLoading.value = true;
     error.value = null;
-    resetPolicyState();
+    if (!options.preserveLocalChanges) {
+      resetPolicyState();
+    }
 
     try {
-      let policyLoad = policyLoads.get(parsedSlug.data);
+      let policyLoad = options.force
+        ? undefined
+        : policyLoads.get(parsedSlug.data);
       if (!policyLoad) {
         policyLoad = actions.pages
           .getPolicy({ slug: parsedSlug.data })
@@ -212,13 +287,16 @@ export function usePageAccessState(): UsePageAccessStateReturn {
 
             const policy = policyResult.data as PagePolicyResult | undefined;
             if (!policy) throw new Error("Failed to load access settings");
-            policyCache.set(parsedSlug.data, policy);
             return policy;
           })
           .finally(() => {
-            policyLoads.delete(parsedSlug.data);
+            if (!options.force) {
+              policyLoads.delete(parsedSlug.data);
+            }
           });
-        policyLoads.set(parsedSlug.data, policyLoad);
+        if (!options.force) {
+          policyLoads.set(parsedSlug.data, policyLoad);
+        }
       }
 
       const policy = await policyLoad;
@@ -227,7 +305,8 @@ export function usePageAccessState(): UsePageAccessStateReturn {
         return;
       }
 
-      applyPolicyResult(policy);
+      policyCache.set(parsedSlug.data, policy);
+      applyPolicyResult(policy, localChanges);
     } catch (loadError) {
       if (generation !== loadGeneration) {
         return;
@@ -237,7 +316,9 @@ export function usePageAccessState(): UsePageAccessStateReturn {
         loadError instanceof Error
           ? loadError.message
           : "Failed to load access settings";
-      initialPolicy.value = null;
+      if (!options.preserveLocalChanges) {
+        initialPolicy.value = null;
+      }
     } finally {
       if (generation === loadGeneration) {
         isLoading.value = false;

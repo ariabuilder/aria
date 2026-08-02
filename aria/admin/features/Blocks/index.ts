@@ -48,7 +48,12 @@ export type {
 
 export { useBlockRegistry } from "./composables/useBlockRegistry";
 export { useComponentActions } from "./composables/useComponentActions";
-export { useComponentFetcher } from "./composables/useComponentFetcher";
+export {
+  useComponentFetcher,
+  commitComponentDefinition,
+  invalidateComponentDefinition,
+  componentDefinitionRevision,
+} from "./composables/useComponentFetcher";
 export { useBlockData } from "./composables/useBlockData";
 
 export { default as BlockLibrary } from "./components/BlockLibrary.vue";

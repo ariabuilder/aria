@@ -40,6 +40,7 @@ import type {
   LayoutDSL,
   ComponentDSL,
   JsonObject,
+  PagePublicationDependencies,
 } from "../types/nodes";
 import type {
   AriaCollection,
@@ -553,19 +554,49 @@ export const AuthorshipSaveContextSchema = z
 export type AuthorshipSaveContext = z.infer<typeof AuthorshipSaveContextSchema>;
 
 /** Options for publishPageDSL. */
+export const PagePublicationDependenciesSchema: z.ZodType<PagePublicationDependencies> =
+  z
+    .object({
+      layout: z
+        .object({
+          id: z.string().trim().min(1),
+          version: z.string().trim().min(1),
+        })
+        .strict()
+        .optional(),
+      components: z.record(
+        z.string().trim().min(1),
+        z.string().trim().min(1),
+      ),
+    })
+    .strict();
+
 export const PublishPageOptionsSchema = z
   .object({
     expectedVersion: z.string().trim().min(1).optional(),
+    scheduleLeaseToken: z.string().trim().min(1).optional(),
     versionHint: z.string().trim().min(1).optional(),
     activityMetadata: z.string().optional(),
     compilerMetadata: z.custom<AriaCompilerMetadata>().optional(),
+    dependencies: PagePublicationDependenciesSchema.optional(),
   })
   .strict();
 
 export type PublishPageOptions = z.infer<typeof PublishPageOptionsSchema>;
 
+export type LinkedLayoutDraftSave = {
+  id: string;
+  dsl: LayoutDSL;
+  expectedVersion: string;
+};
+
+export type PageSaveOptions = VersionSaveOptions & {
+  linkedLayoutDraft?: LinkedLayoutDraftSave;
+};
+
 export const SchedulePageOptionsSchema = z
   .object({
+    expectedVersion: z.string().trim().min(1).optional(),
     versionHint: z.string().trim().min(1).optional(),
     activityMetadata: z.string().optional(),
     compilerMetadata: z.custom<AriaCompilerMetadata>().optional(),
@@ -764,7 +795,7 @@ export interface StorageAdapter {
   savePageDSL(
     id: string,
     dsl: PageDSL,
-    options?: VersionSaveOptions,
+    options?: PageSaveOptions,
     authorship?: AuthorshipSaveContext,
   ): Promise<string>; // Returns version string
   publishPageDSL(

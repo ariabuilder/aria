@@ -11,6 +11,7 @@ import { z } from "astro/zod";
  */
 export const UpdateCoverImageInputSchema = z.object({
   pageSlug: z.string().min(1, "Page slug is required"),
+  expectedVersion: z.string().trim().min(1).optional(),
   src: z.string().min(1, "Image source path is required"),
   alt: z.string().optional().default(""),
   caption: z.string().optional().default(""),
@@ -21,6 +22,7 @@ export type UpdateCoverImageInput = z.infer<typeof UpdateCoverImageInputSchema>;
 
 export const UpdateCoverImageOutputSchema = z.object({
   success: z.boolean(),
+  version: z.string().trim().min(1),
   featuredImage: z
     .object({
       src: z.string(),
@@ -42,6 +44,7 @@ export type UpdateCoverImageOutput = z.infer<typeof UpdateCoverImageOutputSchema
  */
 export const RemoveCoverImageInputSchema = z.object({
   pageSlug: z.string().min(1, "Page slug is required"),
+  expectedVersion: z.string().trim().min(1).optional(),
   clearOgImage: z.boolean().optional().default(true),
 });
 
@@ -52,6 +55,7 @@ export type RemoveCoverImageInput = z.infer<typeof RemoveCoverImageInputSchema>;
  */
 export const RemoveCoverImageOutputSchema = z.object({
   success: z.boolean(),
+  version: z.string().trim().min(1),
   error: z.string().optional(),
   code: z.string().optional(),
 });

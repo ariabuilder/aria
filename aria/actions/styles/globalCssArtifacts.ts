@@ -1084,6 +1084,7 @@ export async function regenerateGlobalCSSArtifacts(
 ): Promise<Omit<GlobalCSSArtifactsResult, "designSystem">> {
   const result = await buildGlobalCSSArtifactsSnapshot(adapter, {
     colorsOnly: options.colorsOnly,
+    utilityNodes: options.utilityNodes,
   });
 
   await saveDesignSystem(adapter, result.designSystem, options.authorship);

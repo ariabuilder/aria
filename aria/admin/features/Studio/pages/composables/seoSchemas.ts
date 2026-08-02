@@ -58,6 +58,7 @@ export const UpdateSeoActionResultSchema = z
       .looseObject({
         slug: z.string().optional(),
         seo: z.record(z.string(), z.unknown()).optional(),
+        version: z.string().trim().min(1).optional(),
       }).optional(),
     error: z
       .looseObject({

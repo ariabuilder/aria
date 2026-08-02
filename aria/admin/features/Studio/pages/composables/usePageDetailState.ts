@@ -148,36 +148,33 @@ function createPageDetailState(): UsePageDetailStateReturn {
       }
 
       isRevalidating.value = true;
-
-      void pageResourceBank
-        .loadPage(targetSlug, {
+      try {
+        // Show the cached page immediately, but do not resolve an awaited
+        // load until the authoritative revision has been installed. Mutation
+        // flows rely on this promise before issuing a guarded publish.
+        const fresh = await pageResourceBank.loadPage(targetSlug, {
           priority: "active",
           revalidate: true,
-        })
-        .then((fresh) => {
-          if (generation !== loadGeneration || activeSlug.value !== targetSlug) {
-            return;
-          }
-          applyLoadedPage(fresh.page, targetSlug);
-        })
-        .catch((err) => {
-          if (generation !== loadGeneration || activeSlug.value !== targetSlug) {
-            return;
-          }
-          handleError(
-            PAGE_DETAIL_ERROR_CODES.PAGE_LOAD_FAILED,
-            err instanceof Error ? err.message : "Failed to refresh page",
-            { severity: "warning", retry: () => loadPage(targetSlug) },
-          );
-        })
-        .finally(() => {
-          if (generation !== loadGeneration || activeSlug.value !== targetSlug) {
-            return;
-          }
+        });
+        if (generation !== loadGeneration || activeSlug.value !== targetSlug) {
+          return;
+        }
+        applyLoadedPage(fresh.page, targetSlug);
+      } catch (err) {
+        if (generation !== loadGeneration || activeSlug.value !== targetSlug) {
+          return;
+        }
+        handleError(
+          PAGE_DETAIL_ERROR_CODES.PAGE_LOAD_FAILED,
+          err instanceof Error ? err.message : "Failed to refresh page",
+          { severity: "warning", retry: () => loadPage(targetSlug) },
+        );
+      } finally {
+        if (generation === loadGeneration && activeSlug.value === targetSlug) {
           isRevalidating.value = false;
           pendingSlug.value = null;
-        });
-
+        }
+      }
       return;
     }
 
@@ -218,6 +215,14 @@ function createPageDetailState(): UsePageDetailStateReturn {
     activityMetadata?: string;
   }): Promise<string | undefined> {
     if (!page.value?.slug) return;
+    if (!page.value.version) {
+      handleError(
+        PAGE_DETAIL_ERROR_CODES.PAGE_SAVE_FAILED,
+        "Reload this page before saving",
+        { severity: "error" },
+      );
+      return;
+    }
 
     isSaving.value = true;
     const previousPage = { ...page.value };
@@ -227,6 +232,7 @@ function createPageDetailState(): UsePageDetailStateReturn {
         collection: "pages",
         slug: page.value.slug,
         data: page.value as unknown as Record<string, unknown>,
+        expectedVersion: page.value.version,
       });
 
       if (error) {
@@ -241,7 +247,21 @@ function createPageDetailState(): UsePageDetailStateReturn {
       }
 
       const responseData = data as Record<string, unknown>;
-      return responseData.version as string | undefined;
+      const version = responseData.version;
+      if (typeof version !== "string" || version.length === 0) {
+        throw new Error("Invalid page save response");
+      }
+      if (page.value?.id === previousPage.id) {
+        page.value = {
+          ...page.value,
+          version,
+          isModifiedSincePublish:
+            page.value.status === "published"
+              ? true
+              : page.value.isModifiedSincePublish,
+        };
+      }
+      return version;
     } catch (err) {
       page.value = previousPage as PageDSL;
       handleError(

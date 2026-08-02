@@ -621,6 +621,39 @@ describe("buildGlobalCSSArtifactsSnapshot", () => {
     expect(adapter.deletePageThumbnail).toHaveBeenCalledWith("about");
     expect(adapter.deleteSnapshot).toHaveBeenCalled();
   });
+
+  it("includes submitted nodes when regenerating publish CSS", async () => {
+    const designSystem = createDefaultUniversalDesignSystem();
+    const adapter = {
+      getSiteSettings: vi.fn(async () => ({ utilityEngine: "unocss" })),
+      getDesignSystem: vi.fn(async () => designSystem),
+      saveDesignSystem: vi.fn().mockResolvedValue(undefined),
+      listPagesDSL: vi.fn(async () => []),
+      listLayoutsDSL: vi.fn(async () => []),
+      listComponentsDSL: vi.fn(async () => []),
+      getPageDSL: vi.fn(async () => null),
+      getLayoutDSL: vi.fn(async () => null),
+      getComponentDSL: vi.fn(async () => null),
+    };
+
+    const submittedNodes = [
+      {
+        id: "publish-only-node",
+        type: "Container",
+        className: "bg-fuchsia-500",
+        children: [],
+      },
+    ] as never;
+
+    await regenerateGlobalCSSArtifacts(adapter as never, {
+      utilityNodes: submittedNodes,
+    });
+
+    const savedDesignSystem = adapter.saveDesignSystem.mock.calls[0]?.[0];
+    expect(savedDesignSystem.artifacts.globalCSS).toContain(
+      ".bg-fuchsia-500",
+    );
+  });
 });
 
 describe("buildStageRenderStylesData", () => {

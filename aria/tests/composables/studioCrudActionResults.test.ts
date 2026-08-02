@@ -75,4 +75,24 @@ describe("studioCrudActionResults", () => {
       }),
     );
   });
+
+  it("preserves the committed version from updateItem", async () => {
+    const { unwrapStudioCrudActionResult } =
+      await import("../../admin/features/Studio/composer/composables/studioCrudActionResults");
+
+    expect(
+      unwrapStudioCrudActionResult("update", {
+        data: {
+          success: true,
+          slug: "header",
+          version: "component-v2",
+        },
+        error: null,
+      }),
+    ).toEqual({
+      success: true,
+      slug: "header",
+      version: "component-v2",
+    });
+  });
 });

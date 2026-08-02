@@ -49,6 +49,7 @@ describe("publishing revision injection", () => {
       title: "Home",
       nodes: [],
       status: "draft",
+      version: "v-saved",
     });
     mockGetPublishedPageDSL.mockResolvedValue(null);
     mockPublishPageDSL.mockResolvedValue("v-published");
@@ -97,6 +98,7 @@ describe("publishing revision injection", () => {
         settings: {
           headHTML: '<meta name="page-head-marker" content="present">',
         },
+        expectedVersion: "v-saved",
         skipCSSRegeneration: true,
       } as never,
       { locals: {} } as never,
@@ -109,6 +111,7 @@ describe("publishing revision injection", () => {
         actor: expect.objectContaining({ id: expect.any(String) }),
       }),
       expect.objectContaining({
+        expectedVersion: "v-saved",
         activityMetadata: expect.stringContaining("page_published"),
       }),
     );
@@ -136,5 +139,72 @@ describe("publishing revision injection", () => {
 
     expect(result.success).toBe(true);
     expect(mockRegenerateGlobalCSSArtifacts).toHaveBeenCalledTimes(1);
+  });
+
+  it("returns the committed publish when snapshot refresh fails afterward", async () => {
+    const { publishing } = await import("../../actions/publishing");
+    mockGetPublishedPageDSL.mockRejectedValueOnce(
+      new Error("snapshot read unavailable"),
+    );
+
+    const result = await (publishing.publish as any).handler(
+      {
+        id: "home",
+        slug: "home",
+        title: "Ignored client title",
+        nodes: [],
+        settings: {},
+        skipCSSRegeneration: true,
+      } as never,
+      { locals: {} } as never,
+    );
+
+    expect(result).toMatchObject({
+      success: true,
+      data: { version: "v-published" },
+    });
+  });
+
+  it("compiles the saved draft rather than untrusted client nodes", async () => {
+    const { publishing } = await import("../../actions/publishing");
+    const savedNode = {
+      id: "saved-node",
+      type: "Text",
+      props: { content: "Saved" },
+      styles: {},
+      children: [],
+    };
+    mockGetPageDSL.mockResolvedValueOnce({
+      id: "home",
+      slug: "home",
+      title: "Saved title",
+      nodes: [savedNode],
+      status: "draft",
+      version: "v-saved",
+    });
+
+    const result = await (publishing.publish as any).handler(
+      {
+        id: "home",
+        slug: "home",
+        title: "Client title",
+        nodes: [
+          {
+            ...savedNode,
+            id: "client-node",
+            props: { content: "Unsaved client edit" },
+          },
+        ],
+        settings: {},
+        expectedVersion: "v-saved",
+      } as never,
+      { locals: {} } as never,
+    );
+
+    expect(result.success).toBe(true);
+    expect(mockRegenerateGlobalCSSArtifacts).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ utilityNodes: [savedNode] }),
+    );
   });
 });

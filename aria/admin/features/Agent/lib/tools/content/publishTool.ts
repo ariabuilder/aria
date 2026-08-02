@@ -18,7 +18,7 @@ import { readResourceForTool } from "./readResource";
 
 /**
  * `aria_publish_page` — Publish a page to production. Reads the current
- * page draft DSL via `readResourceForTool`, then forwards the full page.
+ * saved draft and promotes that exact revision.
  */
 export async function ariaPublishPage(
   context: AgentToolActionContext,
@@ -48,6 +48,17 @@ export async function ariaPublishPage(
   if (!read.ok) return read;
 
   const page = read.data as unknown as Record<string, unknown>;
+  const expectedVersion = page.version;
+  if (
+    typeof expectedVersion !== "string" ||
+    expectedVersion.trim().length === 0
+  ) {
+    return toolErrorResult({
+      code: "CONFLICT",
+      message: "The page has no saved draft revision to publish.",
+      suggestedFix: "Save the page draft, then publish it again.",
+    });
+  }
 
   const actionContext = toToolActionContext(context);
 
@@ -60,13 +71,7 @@ export async function ariaPublishPage(
     handler: async () =>
       callDefinedAction(publishing.publish, actionContext, {
         id: String(page.id ?? parsed.data.slug),
-        slug: parsed.data.slug,
-        title: String(page.title ?? ""),
-        description:
-          page.description != null ? String(page.description) : undefined,
-        layout: page.layout != null ? String(page.layout) : null,
-        nodes: (page.nodes as unknown[]) ?? [],
-        settings: page.settings as Record<string, unknown> | undefined,
+        expectedVersion,
         skipCSSRegeneration: parsed.data.skipCSSRegeneration,
         scheduledFor: parsed.data.scheduledFor,
       }),

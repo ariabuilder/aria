@@ -7,13 +7,20 @@ import path from "path";
 import { getSnapshotCacheKey } from "../../lib/cache/service";
 import { CloudflareStorageAdapter } from "../../lib/storage/cloudflare";
 import type { StylesData } from "../../lib/storage/adapter";
-import { DEFAULT_RECENT_VERSION_LIMIT } from "../../lib/storage/versioning";
+import {
+  DEFAULT_RECENT_VERSION_LIMIT,
+  VersionConflictError,
+} from "../../lib/storage/versioning";
 import type { ComponentDSL, LayoutDSL, PageDSL } from "../../lib/types/nodes";
 import {
   createStylesDataSnapshotFromUniversalDesignSystem,
   normalizeStylesDataToUniversalDesignSystem,
 } from "../../lib/styles/universalDesignSystem";
 import { MediaUsageRepository } from "../../lib/media/catalog/usage";
+import {
+  createCollectionOnAdapter,
+  updateCollectionOnAdapter,
+} from "../../lib/cms/services/collections";
 import type {
   AriaCloudflareEnv,
   RuntimeLocals,
@@ -162,6 +169,7 @@ describe("CloudflareStorageAdapter", () => {
       "0002_api_foundation.sql",
       "0003_api_idempotency_leases.sql",
       "0004_api_lifecycle_hardening.sql",
+      "0008_published_dependency_pins.sql",
     ]) {
       await client.executeMultiple(
         await fs.readFile(
@@ -191,6 +199,157 @@ describe("CloudflareStorageAdapter", () => {
     expect(byId?.title).toBe(samplePage.title);
     expect(bySlug?.slug).toBe(samplePage.slug);
     expect(versions[0]?.version).toBe(version);
+  });
+
+  it("allows exactly one concurrent guarded page save", async () => {
+    const adapter = new CloudflareStorageAdapter({
+      aria_db: createD1Mock(client) as any,
+    });
+    await adapter.savePageDSL(samplePage.id, samplePage, {
+      preserveVersion: true,
+      versionHint: "cas-v1",
+    });
+
+    const results = await Promise.allSettled([
+      adapter.savePageDSL(
+        samplePage.id,
+        { ...samplePage, title: "Left editor" },
+        {
+          expectedVersion: "cas-v1",
+          preserveVersion: true,
+          versionHint: "cas-left",
+        },
+      ),
+      adapter.savePageDSL(
+        samplePage.id,
+        { ...samplePage, title: "Right editor" },
+        {
+          expectedVersion: "cas-v1",
+          preserveVersion: true,
+          versionHint: "cas-right",
+        },
+      ),
+    ]);
+
+    const fulfilled = results.filter((result) => result.status === "fulfilled");
+    const rejected = results.filter((result) => result.status === "rejected");
+    const versions = await adapter.getPageVersions(samplePage.id);
+    const saved = await adapter.getPageDSL(samplePage.id);
+
+    expect(fulfilled).toHaveLength(1);
+    expect(rejected).toHaveLength(1);
+    expect((rejected[0] as PromiseRejectedResult).reason).toBeInstanceOf(
+      VersionConflictError,
+    );
+    expect(versions).toHaveLength(2);
+    expect(saved?.version).toBe(
+      (fulfilled[0] as PromiseFulfilledResult<string>).value,
+    );
+  });
+
+  it("commits a guarded page and layout draft in one D1 batch", async () => {
+    const adapter = new CloudflareStorageAdapter({
+      aria_db: createD1Mock(client) as any,
+    });
+    await adapter.saveLayoutDSL(sampleLayout.id, sampleLayout, {
+      preserveVersion: true,
+      versionHint: "layout-v1",
+    });
+    await adapter.savePageDSL(samplePage.id, samplePage, {
+      preserveVersion: true,
+      versionHint: "page-v1",
+    });
+
+    await adapter.savePageDSL(
+      samplePage.id,
+      { ...samplePage, title: "Atomic update" },
+      {
+        expectedVersion: "page-v1",
+        linkedLayoutDraft: {
+          id: sampleLayout.id,
+          expectedVersion: "layout-v1",
+          dsl: { ...sampleLayout, description: "Atomic layout update" },
+        },
+      },
+    );
+
+    expect((await adapter.getPageDSL(samplePage.id))?.title).toBe(
+      "Atomic update",
+    );
+    expect((await adapter.getLayoutDSL(sampleLayout.id))?.description).toBe(
+      "Atomic layout update",
+    );
+
+    const layoutVersion = (await adapter.getLayoutDSL(sampleLayout.id))?.version;
+    await expect(
+      adapter.savePageDSL(
+        samplePage.id,
+        { ...samplePage, title: "Rejected update" },
+        {
+          expectedVersion: "stale-page-version",
+          linkedLayoutDraft: {
+            id: sampleLayout.id,
+            expectedVersion: layoutVersion!,
+            dsl: { ...sampleLayout, description: "Must not commit" },
+          },
+        },
+      ),
+    ).rejects.toBeInstanceOf(VersionConflictError);
+    expect((await adapter.getLayoutDSL(sampleLayout.id))?.description).toBe(
+      "Atomic layout update",
+    );
+  });
+
+  it("never lets a guarded save and publish overwrite each other's pointers", async () => {
+    const adapter = new CloudflareStorageAdapter({
+      aria_db: createD1Mock(client) as any,
+    });
+    await adapter.savePageDSL(samplePage.id, samplePage, {
+      preserveVersion: true,
+      versionHint: "publish-race-v1",
+    });
+
+    const [saveResult, publishResult] = await Promise.allSettled([
+      adapter.savePageDSL(
+        samplePage.id,
+        { ...samplePage, title: "Edited while publishing" },
+        {
+          expectedVersion: "publish-race-v1",
+          preserveVersion: true,
+          versionHint: "publish-race-v2",
+        },
+      ),
+      adapter.publishPageDSL(samplePage.id, undefined, {
+        expectedVersion: "publish-race-v1",
+      }),
+    ]);
+    const pins = await adapter.getPageVersionPins(samplePage.id);
+    const versions = await adapter.getPageVersions(samplePage.id);
+
+    expect(
+      [saveResult, publishResult].filter(
+        (result) => result.status === "fulfilled",
+      ),
+    ).toHaveLength(1);
+    expect(
+      [saveResult, publishResult].filter(
+        (result) => result.status === "rejected",
+      ),
+    ).toHaveLength(1);
+    if (saveResult.status === "fulfilled") {
+      expect(pins?.draftVersion).toBe("publish-race-v2");
+      expect(pins?.publishedVersion).toBeNull();
+      expect(versions.map((entry) => entry.version)).toContain(
+        "publish-race-v2",
+      );
+    } else {
+      expect(saveResult.reason).toBeInstanceOf(VersionConflictError);
+      expect(pins?.draftVersion).toBe("publish-race-v1");
+      expect(pins?.publishedVersion).toBe("publish-race-v1");
+      expect(versions.map((entry) => entry.version)).toEqual([
+        "publish-race-v1",
+      ]);
+    }
   });
 
   it("automatically prunes page history to the default retention limit", async () => {
@@ -232,7 +391,13 @@ describe("CloudflareStorageAdapter", () => {
     const firstPublishedVersion = await adapter.publishPageDSL(
       samplePage.id,
       undefined,
-      { versionHint: "2000" },
+      {
+        versionHint: "2000",
+        dependencies: {
+          layout: { id: "full-width", version: "layout-v1" },
+          components: { header: "component-v1" },
+        },
+      },
     );
 
     await adapter.savePageDSL(
@@ -251,9 +416,14 @@ describe("CloudflareStorageAdapter", () => {
     const published = await adapter.getPublishedPageDSL(samplePage.id);
     const listed = await adapter.listPagesDSL({ limit: 10, offset: 0 });
 
-    expect(firstPublishedVersion).toBe("2000");
+    expect(firstPublishedVersion).toBe("1000");
     expect(draft?.title).toBe("Cloudflare Draft Update");
     expect(published?.title).toBe("Home");
+    expect(published?._publicationDependencies).toEqual({
+      layout: { id: "full-width", version: "layout-v1" },
+      components: { header: "component-v1" },
+    });
+    expect(draft?._publicationDependencies).toBeUndefined();
     expect(listed[0]?.status).toBe("published");
 
     await adapter.unpublishPageDSL(samplePage.id);
@@ -278,8 +448,10 @@ describe("CloudflareStorageAdapter", () => {
     await adapter.schedulePageDSL(samplePage.id, scheduledFor);
 
     const listed = await adapter.listPagesDSL({ limit: 10, offset: 0 });
+    const versions = await adapter.getPageVersions(samplePage.id);
     expect(listed[0]?.status).toBe("scheduled");
     expect(listed[0]?.scheduledFor).toBe(scheduledFor);
+    expect(versions.map((entry) => entry.version)).toEqual(["1000"]);
   });
 
   it("clears scheduling metadata when unpublishing a scheduled page", async () => {
@@ -618,6 +790,64 @@ describe("CloudflareStorageAdapter", () => {
     ).toBeNull();
   });
 
+  it("keeps D1 page roles synchronized with CMS assignments", async () => {
+    const adapter = new CloudflareStorageAdapter({
+      aria_db: createD1Mock(client) as any,
+    });
+    const listPage: PageDSL = {
+      ...samplePage,
+      id: "page-tags",
+      slug: "tags",
+      title: "Tags",
+    };
+    const entryPage: PageDSL = {
+      ...samplePage,
+      id: "page-tag",
+      slug: "tag",
+      title: "Tag",
+    };
+    await adapter.savePageDSL(listPage.id, listPage);
+    await adapter.savePageDSL(entryPage.id, entryPage);
+
+    const collection = await createCollectionOnAdapter(adapter, {
+      name: "tags",
+      label: "Tags",
+      kind: "tags",
+      fields: [],
+    });
+    const assigned = await updateCollectionOnAdapter(adapter, {
+      id: collection.id,
+      expectedUpdatedAt: collection.updatedAt,
+      patch: {
+        listPageId: listPage.id,
+        templatePageId: entryPage.id,
+      },
+    });
+
+    expect((await adapter.getPagePolicy(listPage.id))?.systemRole).toBe(
+      "cms-collection",
+    );
+    expect((await adapter.getPagePolicy(entryPage.id))?.systemRole).toBe(
+      "cms-entry",
+    );
+
+    await updateCollectionOnAdapter(adapter, {
+      id: collection.id,
+      expectedUpdatedAt: assigned.updatedAt,
+      patch: {
+        listPageId: null,
+        templatePageId: null,
+      },
+    });
+
+    expect((await adapter.getPagePolicy(listPage.id))?.systemRole).toBe(
+      "standard",
+    );
+    expect((await adapter.getPagePolicy(entryPage.id))?.systemRole).toBe(
+      "standard",
+    );
+  });
+
   it("invalidates draft and published page thumbnails when page revisions change", async () => {
     const adapter = new CloudflareStorageAdapter({
       aria_db: createD1Mock(client) as any,
@@ -736,6 +966,7 @@ describe("CloudflareStorageAdapter", () => {
 
     const firstVersion = await adapter.savePageDSL(samplePage.id, samplePage);
     const publishedVersion = await adapter.publishPageDSL(samplePage.id);
+    expect(publishedVersion).toBe(firstVersion);
 
     await new Promise((resolve) => setTimeout(resolve, 10));
     const secondVersion = await adapter.savePageDSL(samplePage.id, {
@@ -758,7 +989,7 @@ describe("CloudflareStorageAdapter", () => {
     const remainingVersions = await adapter.getPageVersions(samplePage.id);
 
     expect(result.keptVersions).toEqual([thirdVersion, publishedVersion]);
-    expect(result.deletedVersions).toEqual([secondVersion, firstVersion]);
+    expect(result.deletedVersions).toEqual([secondVersion]);
     expect(remainingVersions.map((entry) => entry.version)).toEqual([
       thirdVersion,
       publishedVersion,

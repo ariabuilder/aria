@@ -164,6 +164,7 @@ export interface ActionContextLike {
 export type SaveResourceOptions = {
   locals?: App.Locals;
   versionSaveOptions?: VersionSaveOptions;
+  linkedLayoutDraft?: import("../lib/storage/adapter").LinkedLayoutDraftSave;
 };
 
 /**
@@ -836,18 +837,49 @@ export async function saveResource(
         version = await adapter.savePageDSL(
           slug,
           data as Parameters<StorageAdapter["savePageDSL"]>[1],
-          versionOptions,
+          {
+            ...versionOptions,
+            ...(saveOptions?.linkedLayoutDraft
+              ? { linkedLayoutDraft: saveOptions.linkedLayoutDraft }
+              : {}),
+          },
           parsedAuthorship,
         );
-        await touchContentRevisionForAction(
-          adapter,
-          {
-            mutationKind: "save-page",
-            mutationTarget: slug,
-          },
-          context,
-        );
-        await invalidateComposeCache(context, "page", slug, undefined, "crud");
+        await Promise.allSettled([
+          touchContentRevisionForAction(
+            adapter,
+            {
+              mutationKind: "save-page",
+              mutationTarget: slug,
+            },
+            context,
+          ),
+          invalidateComposeCache(context, "page", slug, undefined, "crud"),
+          ...(saveOptions?.linkedLayoutDraft
+            ? [
+                touchContentRevisionForAction(
+                  adapter,
+                  {
+                    mutationKind: "save-layout" as const,
+                    mutationTarget: saveOptions.linkedLayoutDraft.id,
+                  },
+                  context,
+                ),
+                invalidateComposeCache(
+                  context,
+                  "layout",
+                  saveOptions.linkedLayoutDraft.id,
+                  undefined,
+                  "crud",
+                ),
+                invalidateDependentPageCaches(
+                  context,
+                  "layout",
+                  saveOptions.linkedLayoutDraft.id,
+                ),
+              ]
+            : []),
+        ]);
         break;
       case "layouts":
         version = await adapter.saveLayoutDSL(
@@ -856,22 +888,24 @@ export async function saveResource(
           versionOptions,
           parsedAuthorship,
         );
-        await touchContentRevisionForAction(
-          adapter,
-          {
-            mutationKind: "save-layout",
-            mutationTarget: slug,
-          },
-          context,
-        );
-        await invalidateComposeCache(
-          context,
-          "layout",
-          slug,
-          undefined,
-          "crud",
-        );
-        await invalidateDependentPageCaches(context, "layout", slug);
+        await Promise.allSettled([
+          touchContentRevisionForAction(
+            adapter,
+            {
+              mutationKind: "save-layout",
+              mutationTarget: slug,
+            },
+            context,
+          ),
+          invalidateComposeCache(
+            context,
+            "layout",
+            slug,
+            undefined,
+            "crud",
+          ),
+          invalidateDependentPageCaches(context, "layout", slug),
+        ]);
         break;
       case "components":
         version = await adapter.saveComponentDSL(
@@ -880,22 +914,24 @@ export async function saveResource(
           versionOptions,
           parsedAuthorship,
         );
-        await touchContentRevisionForAction(
-          adapter,
-          {
-            mutationKind: "save-component",
-            mutationTarget: slug,
-          },
-          context,
-        );
-        await invalidateComposeCache(
-          context,
-          "component",
-          slug,
-          undefined,
-          "crud",
-        );
-        await invalidateDependentPageCaches(context, "component", slug);
+        await Promise.allSettled([
+          touchContentRevisionForAction(
+            adapter,
+            {
+              mutationKind: "save-component",
+              mutationTarget: slug,
+            },
+            context,
+          ),
+          invalidateComposeCache(
+            context,
+            "component",
+            slug,
+            undefined,
+            "crud",
+          ),
+          invalidateDependentPageCaches(context, "component", slug),
+        ]);
         break;
       default:
         throw createError(

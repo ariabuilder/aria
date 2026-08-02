@@ -131,12 +131,12 @@ function injectIntoBody(
 
 async function loadAssignedLayoutRegionNodes(options: {
   layout: LayoutDSL | null;
-  adapter: StorageAdapter;
+  getComponentDSL: StorageAdapter["getComponentDSL"];
 }): Promise<{
   headerNodes: BuilderNode[];
   footerNodes: BuilderNode[];
 }> {
-  const { layout, adapter } = options;
+  const { layout, getComponentDSL } = options;
   if (!layout) {
     return {
       headerNodes: [],
@@ -149,8 +149,8 @@ async function loadAssignedLayoutRegionNodes(options: {
   const footerComponentId = effectiveRegions?.footerComponent;
 
   const [headerComp, footerComp] = await Promise.all([
-    headerComponentId ? adapter.getComponentDSL(headerComponentId) : null,
-    footerComponentId ? adapter.getComponentDSL(footerComponentId) : null,
+    headerComponentId ? getComponentDSL(headerComponentId) : null,
+    footerComponentId ? getComponentDSL(footerComponentId) : null,
   ]);
 
   return {
@@ -162,7 +162,7 @@ async function loadAssignedLayoutRegionNodes(options: {
 async function renderLayoutRegionFragments(options: {
   headerNodes: BuilderNode[];
   footerNodes: BuilderNode[];
-  adapter: StorageAdapter;
+  getComponentDSL: StorageAdapter["getComponentDSL"];
   breakpoints?: NodeToHtmlDocumentOptions["breakpoints"];
   globalCSSEnabled?: boolean;
   inlineGeneratedDocumentCss?: boolean;
@@ -176,13 +176,11 @@ async function renderLayoutRegionFragments(options: {
     globalCSSEnabled: options.globalCSSEnabled,
     inlineGeneratedDocumentCss: options.inlineGeneratedDocumentCss,
   });
-  const getComponentDSL = options.adapter.getComponentDSL.bind(options.adapter);
-
   // Keep one deterministic SVG instance sequence for the whole document.
   const header = options.headerNodes.length
     ? await nodesToHtmlFragmentAsync(
         options.headerNodes,
-        getComponentDSL,
+        options.getComponentDSL,
         0,
         options.breakpoints,
         fragmentStyleMode,
@@ -193,7 +191,7 @@ async function renderLayoutRegionFragments(options: {
   const footer = options.footerNodes.length
     ? await nodesToHtmlFragmentAsync(
         options.footerNodes,
-        getComponentDSL,
+        options.getComponentDSL,
         0,
         options.breakpoints,
         fragmentStyleMode,
@@ -346,15 +344,27 @@ export async function renderPageDslToHtml(
   let layout: LayoutDSL | null = null;
   let headerNodes: BuilderNode[] = [];
   let footerNodes: BuilderNode[] = [];
+  const publicationDependencies = options.page._publicationDependencies;
+  const publishedLayout = publicationDependencies?.layout;
+  const getComponentDSL: StorageAdapter["getComponentDSL"] = (id, version) =>
+    options.adapter.getComponentDSL(
+      id,
+      version ?? publicationDependencies?.components[id],
+    );
 
   if (options.page.layout || options.layoutOverride) {
     try {
       layout =
         options.layoutOverride ??
-        (await options.adapter.getLayoutDSL(options.page.layout!));
+        (await options.adapter.getLayoutDSL(
+          options.page.layout!,
+          publishedLayout && publishedLayout.id === options.page.layout
+            ? publishedLayout.version
+            : undefined,
+        ));
       const regionNodes = await loadAssignedLayoutRegionNodes({
         layout,
-        adapter: options.adapter,
+        getComponentDSL,
       });
       headerNodes = regionNodes.headerNodes;
       footerNodes = regionNodes.footerNodes;
@@ -424,7 +434,6 @@ export async function renderPageDslToHtml(
   // the manifest or shards again.
   const { expandComponentReferencesServer } =
     await import("../blocks/nodeUtils");
-  const getComponentDSL = options.adapter.getComponentDSL.bind(options.adapter);
   const iconSourceNodes = combineBuilderNodeSets(
     await expandComponentReferencesServer(
       slotOnlyLayout ? (mergedSlotNodes ?? pageNodes) : pageNodes,
@@ -460,7 +469,7 @@ export async function renderPageDslToHtml(
   const assignedRegions = await renderLayoutRegionFragments({
     headerNodes,
     footerNodes,
-    adapter: options.adapter,
+    getComponentDSL,
     breakpoints: canonicalBreakpoints,
     globalCSSEnabled,
     inlineGeneratedDocumentCss,

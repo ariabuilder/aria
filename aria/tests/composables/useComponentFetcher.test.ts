@@ -109,6 +109,113 @@ describe("useComponentFetcher", () => {
     expect(fetcher.cachedComponents.value.size).toBe(1);
   });
 
+  it("serves the exact committed definition after a successful save", async () => {
+    getItemMock.mockResolvedValue({
+      data: {
+        id: "header",
+        name: "Header",
+        nodes: [{ ...validNode, id: "old-navigation" }],
+      },
+      error: null,
+    });
+
+    const {
+      commitComponentDefinition,
+      componentDefinitionRevision,
+      useComponentFetcher,
+    } =
+      await import("../../admin/features/Blocks/composables/useComponentFetcher");
+    const fetcher = useComponentFetcher();
+
+    await fetcher.fetchComponentDefinition("header");
+    const revisionBeforeCommit = componentDefinitionRevision.value;
+
+    commitComponentDefinition({
+      id: "header",
+      name: "Header",
+      nodes: [{ ...validNode, id: "saved-navigation" }],
+    });
+
+    const saved = await fetcher.fetchComponentDefinition("header");
+
+    expect(saved[0]?.id).toBe("saved-navigation");
+    expect(getItemMock).toHaveBeenCalledTimes(1);
+    expect(componentDefinitionRevision.value).toBe(revisionBeforeCommit + 1);
+  });
+
+  it("does not let a pre-save request overwrite or detach a newer request", async () => {
+    let resolveOld:
+      | ((value: {
+          data: { id: string; name: string; nodes: (typeof validNode)[] };
+          error: null;
+        }) => void)
+      | undefined;
+    let resolveNew:
+      | ((value: {
+          data: { id: string; name: string; nodes: (typeof validNode)[] };
+          error: null;
+        }) => void)
+      | undefined;
+    const oldRequest = new Promise<{
+      data: { id: string; name: string; nodes: (typeof validNode)[] };
+      error: null;
+    }>((resolve) => {
+      resolveOld = resolve;
+    });
+    const newRequest = new Promise<{
+      data: { id: string; name: string; nodes: (typeof validNode)[] };
+      error: null;
+    }>((resolve) => {
+      resolveNew = resolve;
+    });
+    getItemMock.mockReturnValueOnce(oldRequest).mockReturnValueOnce(newRequest);
+
+    const { invalidateComponentDefinition, useComponentFetcher } =
+      await import("../../admin/features/Blocks/composables/useComponentFetcher");
+    const fetcher = useComponentFetcher();
+
+    const oldFetch = fetcher.fetchComponentDefinition("header");
+    await vi.waitFor(() => expect(getItemMock).toHaveBeenCalledTimes(1));
+
+    invalidateComponentDefinition("header");
+    const newFetch = fetcher.fetchComponentDefinition("header");
+    await vi.waitFor(() => expect(getItemMock).toHaveBeenCalledTimes(2));
+
+    resolveOld?.({
+      data: {
+        id: "header",
+        name: "Header",
+        nodes: [{ ...validNode, id: "old-navigation" }],
+      },
+      error: null,
+    });
+    await expect(oldFetch).resolves.toEqual([
+      expect.objectContaining({ id: "old-navigation" }),
+    ]);
+
+    const deduplicatedNewFetch = fetcher.fetchComponentDefinition("header");
+    expect(getItemMock).toHaveBeenCalledTimes(2);
+
+    resolveNew?.({
+      data: {
+        id: "header",
+        name: "Header",
+        nodes: [{ ...validNode, id: "new-navigation" }],
+      },
+      error: null,
+    });
+
+    await expect(newFetch).resolves.toEqual([
+      expect.objectContaining({ id: "new-navigation" }),
+    ]);
+    await expect(deduplicatedNewFetch).resolves.toEqual([
+      expect.objectContaining({ id: "new-navigation" }),
+    ]);
+    const cached = await fetcher.fetchComponentDefinition("header");
+    expect(cached[0]?.id).toBe("new-navigation");
+    expect(getItemMock).toHaveBeenCalledTimes(2);
+  });
+
   it("scopes expanded descendant ids per component instance", async () => {
     getItemMock.mockImplementation(async ({ slug }: { slug: string }) => {
       if (slug === "button") {

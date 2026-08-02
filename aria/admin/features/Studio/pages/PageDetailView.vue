@@ -73,7 +73,6 @@ import { isJsonObject, type JsonObject } from "@/lib/types/nodes";
 import type { SectionInfo } from "./components";
 import { studioIcons } from "@/lib/icons";
 import { usePageSeo } from "./composables/usePageSeo";
-import { useDebouncedPageSeoSave } from "./composables/useDebouncedPageSeoSave";
 import type { SeoFieldValues } from "./composables/useSeoState";
 import { usePageRevert } from "./composables/usePageRevert";
 import { usePageActivity } from "./composables/usePageActivity";
@@ -84,7 +83,10 @@ import {
   toMediaAssetForPreview,
   type PageMediaDisplayItem,
 } from "@/lib/schemas/pageMedia";
-import { usePageAccessState } from "./composables/usePageAccessState";
+import {
+  invalidatePagePolicyCache,
+  usePageAccessState,
+} from "./composables/usePageAccessState";
 import { usePageCmsTemplateAssignments } from "./composables/usePageCmsTemplateAssignments";
 import {
   PageDetailFormSchema,
@@ -149,7 +151,7 @@ const { offerRedirectAfterSlugChange } = useSlugChangeRedirect();
 
 const isSaving = ref(false);
 const isPublishing = ref(false);
-const isPageStructureSaving = ref(false);
+const PAGE_DETAIL_OPERATION_TOAST_ID = "page-detail-operation";
 const previewRefreshToken = ref<string | null>(null);
 const deleteDialog = useDialogState();
 const versionDeleteDialog = useDialogState();
@@ -317,44 +319,56 @@ const seoCanonical = computed({
   set: (value: string) => handleSeoFieldUpdate("canonical", value),
 });
 
-const debouncedSeoSave = useDebouncedPageSeoSave({
-  slug: pageSlug,
-  getSeo: () => page.value?.settings?.seo,
-  canSave: canEditPageSeo,
-  onSaved: (savedSeo) => {
-    const current = page.value;
-    if (!current) return;
-    page.value = {
-      ...current,
-      settings: {
-        ...(current.settings ?? {}),
-        seo: savedSeo,
-      },
-    };
-    debouncedSeoSave.markSaved(savedSeo);
+function serializeSeoDraft(seo: unknown): string {
+  return JSON.stringify(seo ?? {});
+}
 
-    const slug = pageSlug.value.trim();
-    if (slug) {
-      pageResourceBank.updateCachedPage(slug, (entry) => ({
-        ...entry,
-        page: {
-          ...entry.page,
-          settings: {
-            ...(entry.page.settings ?? {}),
-            seo: savedSeo,
-          },
-        },
-      }));
-    }
-  },
-});
+const savedSeoSnapshot = ref<string | null>(null);
+const isSeoDirty = computed(
+  () =>
+    savedSeoSnapshot.value !== null &&
+    serializeSeoDraft(page.value?.settings?.seo) !== savedSeoSnapshot.value,
+);
+
+function markSeoDraftSaved(seo: unknown): void {
+  savedSeoSnapshot.value = serializeSeoDraft(seo);
+}
+
+function serializePageContentDraft(
+  nodes: unknown,
+  featuredImage: unknown,
+): string {
+  return JSON.stringify({
+    nodes: nodes ?? [],
+    featuredImage: featuredImage ?? null,
+  });
+}
+
+const savedPageContentSnapshot = ref<string | null>(null);
+const isPageContentDirty = computed(
+  () =>
+    savedPageContentSnapshot.value !== null &&
+    serializePageContentDraft(
+      page.value?.nodes,
+      page.value?.featuredImage,
+    ) !== savedPageContentSnapshot.value,
+);
+
+function markPageContentDraftSaved(
+  nodes: unknown,
+  featuredImage: unknown,
+): void {
+  savedPageContentSnapshot.value = serializePageContentDraft(
+    nodes,
+    featuredImage,
+  );
+}
 
 function handleSeoFieldUpdate<K extends keyof SeoFieldValues>(
   field: K,
   value: SeoFieldValues[K],
 ): void {
   updateSeoField(field, value);
-  debouncedSeoSave.scheduleSave();
 }
 
 const {
@@ -517,13 +531,11 @@ const { activeTab, visibleTabs: visibleDetailTabs } = usePageDetailTabs({
   canEditPageSeo,
   canManagePagePolicy,
   onTabActivated: async (tab) => {
-    if (tab === "seo") {
-      await debouncedSeoSave.flushSave();
-      debouncedSeoSave.markSaved(page.value?.settings?.seo);
-    }
     if ((tab === "type" || tab === "access") && pageSlug.value) {
       await refreshPagesNow();
-      await loadPageAccessPolicy(pageSlug.value);
+      if (!isPageAccessPolicyDirty.value) {
+        await loadPageAccessPolicy(pageSlug.value);
+      }
     }
     if (tab === "media" && page.value?.slug) {
       await loadPageMedia(page.value.slug);
@@ -531,15 +543,8 @@ const { activeTab, visibleTabs: visibleDetailTabs } = usePageDetailTabs({
   },
 });
 
-watch(activeTab, async (tab, previousTab) => {
-  if (previousTab === "seo" && tab !== "seo") {
-    await debouncedSeoSave.flushSave();
-  }
-});
-
 onUnmounted(() => {
   setPageDetailRemoteLoadMerge(null);
-  void debouncedSeoSave.flushSave();
   window.removeEventListener(
     AGENT_PAGE_SEO_UPDATED_EVENT,
     handleAgentPageSeoUpdated,
@@ -603,6 +608,8 @@ watch(pageSlug, async (slug, previousSlug) => {
     setValues(PAGE_DETAIL_FORM_INITIAL);
     initialValues.value = {};
     isDirty.value = false;
+    savedSeoSnapshot.value = null;
+    savedPageContentSnapshot.value = null;
     resetPageMedia();
     hasConfirmedNotFoundOverride.value = false;
     pendingNotFoundSave.value = false;
@@ -652,9 +659,10 @@ const pagePresenceId = computed(
 );
 
 watch(
-  [pagePresenceId, isDirty],
-  ([resourceId, dirty]) => {
+  [pagePresenceId, isDirty, isSeoDirty, isPageContentDirty],
+  ([resourceId, formDirty, seoDirty, contentDirty]) => {
     if (!resourceId) return;
+    const dirty = formDirty || seoDirty || contentDirty;
     studioLive.setPresence({
       surface: "studio",
       resourceType: "page",
@@ -683,15 +691,31 @@ const publishDisabledReason = computed(() => {
   return null;
 });
 
+const hasUnsavedPageChanges = computed(
+  () =>
+    isDirty.value ||
+    isSeoDirty.value ||
+    isPageContentDirty.value ||
+    isPageAccessPolicyDirty.value,
+);
 const saveTooltip = computed(() => {
   if (isSaving.value) return t("pages.detail.saving");
-  if (!isDirty.value) return t("pages.detail.noChanges");
+  if (!hasUnsavedPageChanges.value) return t("pages.detail.noChanges");
   return pageStatus.value === "published"
     ? t("pages.detail.saveChanges")
     : t("pages.detail.saveDraft");
 });
+const isSaveDisabled = computed(
+  () => isSaving.value || !hasUnsavedPageChanges.value,
+);
 
-const isSaveDisabled = computed(() => isSaving.value || !isDirty.value);
+const PageDetailSaveResultSchema = z
+  .object({
+    success: z.literal(true),
+    slug: z.string().trim().min(1),
+    version: z.string().trim().min(1),
+  })
+  .loose();
 
 const previewUrl = computed(() => {
   const slug = page.value?.slug ?? pageSlug.value;
@@ -826,26 +850,19 @@ function openPreview(): void {
   window.open(url, "_blank", "noopener,noreferrer");
 }
 
-function getPublishPayload():
-  | {
-      id: string;
-      slug: string;
-      title: string | undefined;
-      layout: string | undefined;
-      nodes: NonNullable<typeof page.value>["nodes"];
-      settings: NonNullable<typeof page.value>["settings"];
-    }
-  | null {
-  const builderPage = currentBuilderPage.value;
-  if (!builderPage || !page.value) return null;
-  return {
-    id: builderPage.id,
-    slug: builderPage.slug,
-    title: page.value.title,
-    layout: page.value.layout ?? undefined,
-    nodes: page.value.nodes ?? [],
-    settings: page.value.settings ?? {},
-  };
+function assertPublishActionSucceeded(result: {
+  data?: unknown;
+  error?: { message?: string };
+}): void {
+  if (result.error) {
+    throw new Error(result.error.message || "Publishing failed");
+  }
+  const body = result.data as
+    | { success?: boolean; error?: { message?: string } }
+    | undefined;
+  if (!body || body.success !== true) {
+    throw new Error(body?.error?.message || "Publishing failed");
+  }
 }
 
 async function refreshAfterPublishMutation(slug: string): Promise<void> {
@@ -863,10 +880,13 @@ async function refreshAfterAgentSeoUpdate(slug: string): Promise<void> {
     return;
   }
 
+  const preserveLocalSeo = isSeoDirty.value;
   pageResourceBank.invalidatePage(slug);
   await refreshPagesNow();
   await composableLoadPage(slug);
-  debouncedSeoSave.markSaved(page.value?.settings?.seo);
+  if (!preserveLocalSeo) {
+    markSeoDraftSaved(page.value?.settings?.seo);
+  }
 }
 
 function handleAgentPageSeoUpdated(event: Event): void {
@@ -895,9 +915,6 @@ async function reloadPageDetail(): Promise<void> {
   const targetSlug = pageSlug.value;
   if (!targetSlug || targetSlug === "new") return;
 
-  if (debouncedSeoSave.isDirty()) {
-    await debouncedSeoSave.flushSave();
-  }
   await composableLoadPage(targetSlug);
   await populateFormFromPage();
 }
@@ -905,12 +922,13 @@ async function reloadPageDetail(): Promise<void> {
 onMounted(async () => {
   setPageDetailRemoteLoadMerge((current, incoming) => ({
     ...incoming,
+    nodes: isPageContentDirty.value ? current.nodes : incoming.nodes,
+    featuredImage: isPageContentDirty.value
+      ? current.featuredImage
+      : incoming.featuredImage,
     settings: {
       ...incoming.settings,
-      seo:
-        debouncedSeoSave.isDirty() || debouncedSeoSave.hasPendingSave.value
-          ? current.settings?.seo
-          : incoming.settings?.seo,
+      seo: isSeoDirty.value ? current.settings?.seo : incoming.settings?.seo,
     },
   }));
 
@@ -949,7 +967,8 @@ async function populateFormFromPage() {
     pageActivity.applyActivity(cachedResource.activity);
   }
 
-  debouncedSeoSave.markSaved(p.settings?.seo);
+  markSeoDraftSaved(p.settings?.seo);
+  markPageContentDraftSaved(p.nodes, p.featuredImage);
 
   // Snapshot for dirty checking
   initialValues.value = { ...values } as Record<string, unknown>;
@@ -1015,12 +1034,17 @@ async function handleRevertVersion(versionId: string): Promise<void> {
         await refreshPageDetailAfterMutation(slug);
       },
       undo: async () => {
+        const expectedVersion = page.value?.version;
+        if (!expectedVersion) {
+          throw new Error("Reload this page before restoring its previous state");
+        }
         const updateResult = unwrapStudioCrudActionResult(
           "update",
           await actions.updateItem({
             collection: "pages",
             slug,
             data: restoreData,
+            expectedVersion,
           }),
           {
             collection: "pages",
@@ -1084,12 +1108,25 @@ async function confirmDeleteVersion(): Promise<void> {
   }
 }
 
-const onSubmit = handleSubmit(async (formData) => {
-  isSaving.value = true;
+const submitPageDetailForm = handleSubmit(async (formData) => {
   const currentSlug = pageSlug.value;
 
   try {
+    const expectedVersion = page.value?.version;
+    if (!expectedVersion) {
+      throw new Error("Reload this page before saving");
+    }
     const full = await fetchRestoreData(currentSlug);
+    const submittedSeo: unknown = JSON.parse(
+      JSON.stringify(page.value?.settings?.seo ?? {}),
+    );
+    const submittedNodes: unknown = JSON.parse(
+      JSON.stringify(page.value?.nodes ?? []),
+    );
+    const submittedFeaturedImage: unknown = page.value?.featuredImage
+      ? JSON.parse(JSON.stringify(page.value.featuredImage))
+      : undefined;
+    const persistedSettings = isJsonObject(full.settings) ? full.settings : {};
     Object.assign(full, {
       title: formData.title,
       slug: formData.slug,
@@ -1097,19 +1134,52 @@ const onSubmit = handleSubmit(async (formData) => {
       layout: formData.layout || undefined,
       status: formData.status,
       parent: formData.parent || undefined,
+      settings: {
+        ...persistedSettings,
+        seo: submittedSeo,
+      },
+      nodes: submittedNodes,
     });
+    if (submittedFeaturedImage) {
+      full.featuredImage = submittedFeaturedImage as JsonObject;
+    } else {
+      delete full.featuredImage;
+    }
     // Page-level regions are legacy data. Header and footer are owned by the
     // selected layout; a page without a layout has no shared chrome.
     delete full.regions;
 
-    const { error } = await actions.updateItem({
+    const result = await actions.updateItem({
       collection: "pages",
       slug: currentSlug,
       data: full,
+      expectedVersion,
     });
-    if (error) {
-      toast.error(t("pages.detail.pageSaveFailed"));
-      return;
+    if (result.error) {
+      throw new Error(
+        result.error.message || t("pages.detail.pageSaveFailed"),
+      );
+    }
+    const saved = PageDetailSaveResultSchema.safeParse(result.data);
+    if (!saved.success) {
+      throw new Error("Invalid page save response");
+    }
+    const savedVersion = saved.data.version;
+
+    if (page.value?.id === full.id) {
+      page.value = {
+        ...page.value,
+        title: formData.title,
+        slug: formData.slug,
+        description: formData.description?.trim() || undefined,
+        layout: formData.layout || undefined,
+        parent: formData.parent || undefined,
+        version: savedVersion,
+        isModifiedSincePublish:
+          page.value.status === "published"
+            ? true
+            : page.value.isModifiedSincePublish,
+      };
     }
 
     pageResourceBank.invalidatePage(currentSlug);
@@ -1127,12 +1197,6 @@ const onSubmit = handleSubmit(async (formData) => {
       }
     }
 
-    if (policySaveError) {
-      toast.error(`Page saved, but access settings failed: ${policySaveError}`);
-    } else {
-      toast.success(t("pages.detail.pageSaved"));
-    }
-
     if (formData.slug !== currentSlug && hasCapability("manageRedirects")) {
       offerRedirectAfterSlugChange({
         pages: pages.value.map((page) => ({
@@ -1145,47 +1209,141 @@ const onSubmit = handleSubmit(async (formData) => {
       });
     }
 
-    await composableLoadPage(formData.slug || currentSlug);
-    await refreshPagesNow();
-  } catch {
-    toast.error(t("common.failed"));
-  } finally {
-    isSaving.value = false;
+    // The action response is the authoritative commit token. Do not replace it
+    // with a cache round-trip before a possible publish.
+    initialValues.value = {
+      title: formData.title,
+      slug: formData.slug,
+      description: formData.description ?? "",
+      layout: formData.layout ?? "",
+      status: formData.status,
+      parent: formData.parent ?? null,
+    };
+    markSeoDraftSaved(submittedSeo);
+    markPageContentDraftSaved(submittedNodes, submittedFeaturedImage);
+    checkDirty();
+    await refreshPagesNow().catch(() => undefined);
+
+    if (policySaveError) {
+      toast.error(`Page saved, but access settings failed: ${policySaveError}`, {
+        id: PAGE_DETAIL_OPERATION_TOAST_ID,
+      });
+    } else {
+      toast.success(t("pages.detail.pageSaved"), {
+        id: PAGE_DETAIL_OPERATION_TOAST_ID,
+      });
+    }
+    return savedVersion;
+  } catch (err) {
+    toast.error(
+      err instanceof Error ? err.message : t("pages.detail.pageSaveFailed"),
+      { id: PAGE_DETAIL_OPERATION_TOAST_ID },
+    );
+    return null;
   }
 });
 
+let pageDetailSavePromise: Promise<string | null> | null = null;
+
+async function savePageDetails(): Promise<string | null> {
+  if (pageDetailSavePromise) {
+    return pageDetailSavePromise;
+  }
+
+  const run = (async () => {
+    isSaving.value = true;
+    try {
+      const result = await submitPageDetailForm();
+      return typeof result === "string" ? result : null;
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : t("pages.detail.pageSaveFailed"),
+        { id: PAGE_DETAIL_OPERATION_TOAST_ID },
+      );
+      return null;
+    } finally {
+      isSaving.value = false;
+    }
+  })();
+
+  pageDetailSavePromise = run;
+  try {
+    return await run;
+  } finally {
+    if (pageDetailSavePromise === run) {
+      pageDetailSavePromise = null;
+    }
+  }
+}
+
+async function savePendingPageDetailEdits(): Promise<string> {
+  if (isDirty.value || isSeoDirty.value || isPageContentDirty.value) {
+    const version = await savePageDetails();
+    if (
+      !version ||
+      isDirty.value ||
+      isSeoDirty.value ||
+      isPageContentDirty.value
+    ) {
+      throw new Error("Page changes could not be saved");
+    }
+  }
+
+  if (isPageAccessPolicyDirty.value) {
+    await savePageAccessPolicy(pageSlug.value);
+    if (isPageAccessPolicyDirty.value) {
+      throw new Error("Access settings could not be saved");
+    }
+  }
+
+  const version = page.value?.version;
+  if (!version) {
+    throw new Error("Reload this page before publishing");
+  }
+  return version;
+}
+
 async function handlePublishNow(): Promise<void> {
-  const builderPage = currentBuilderPage.value;
-  const payload = getPublishPayload();
-  if (!builderPage || !payload || isPublishing.value) return;
+  if (isPublishing.value) return;
 
   isPublishing.value = true;
   try {
-    if (builderPage.status === "archived") {
+    const requestedVersion = await savePendingPageDetailEdits();
+    const pageToPublish = page.value;
+    if (!pageToPublish?.id || !pageToPublish.slug) {
+      throw new Error("Reload this page before publishing");
+    }
+    if (pageToPublish.status === "archived") {
       const unarchiveResult = await actions.publishing.unarchive({
-        id: builderPage.id,
-        slug: builderPage.slug,
+        id: pageToPublish.id,
+        slug: pageToPublish.slug,
       });
       if (unarchiveResult.error) {
         throw new Error(unarchiveResult.error.message);
       }
     }
 
-    const result = await actions.publishing.publish(payload);
-    if (result.error) throw new Error(result.error.message);
-    await refreshAfterPublishMutation(builderPage.slug);
-    toast.success(t("pages.detail.pagePublished"));
-  } catch {
-    toast.error(t("pages.detail.pagePublishFailed"));
+    const result = await actions.publishing.publish({
+      id: pageToPublish.id,
+      expectedVersion: requestedVersion,
+    });
+    assertPublishActionSucceeded(result);
+    await refreshAfterPublishMutation(pageToPublish.slug);
+    toast.success(t("pages.detail.pagePublished"), {
+      id: PAGE_DETAIL_OPERATION_TOAST_ID,
+    });
+  } catch (err) {
+    toast.error(
+      err instanceof Error ? err.message : t("pages.detail.pagePublishFailed"),
+      { id: PAGE_DETAIL_OPERATION_TOAST_ID },
+    );
   } finally {
     isPublishing.value = false;
   }
 }
 
 async function handleSchedulePublish(scheduledFor?: string): Promise<void> {
-  const builderPage = currentBuilderPage.value;
-  const payload = getPublishPayload();
-  if (!builderPage || !payload || isPublishing.value) return;
+  if (isPublishing.value) return;
   if (!canSchedule.value) {
     toast.error(getForbiddenMessage("publishing.publish"));
     return;
@@ -1193,17 +1351,31 @@ async function handleSchedulePublish(scheduledFor?: string): Promise<void> {
 
   isPublishing.value = true;
   try {
+    const requestedVersion = await savePendingPageDetailEdits();
+    const pageToPublish = page.value;
+    if (!pageToPublish?.id || !pageToPublish.slug) {
+      throw new Error("Reload this page before scheduling");
+    }
     const result = await actions.publishing.publish({
-      ...payload,
+      id: pageToPublish.id,
+      expectedVersion: requestedVersion,
       scheduledFor,
     });
-    if (result.error) throw new Error(result.error.message);
-    await refreshAfterPublishMutation(builderPage.slug);
+    assertPublishActionSucceeded(result);
+    await refreshAfterPublishMutation(pageToPublish.slug);
     toast.success(
       scheduledFor ? t("pages.detail.pageScheduled") : t("pages.detail.pagePublished"),
+      { id: PAGE_DETAIL_OPERATION_TOAST_ID },
     );
-  } catch {
-    toast.error(scheduledFor ? t("pages.detail.pageScheduleFailed") : t("pages.detail.pagePublishFailed"));
+  } catch (err) {
+    toast.error(
+      err instanceof Error
+        ? err.message
+        : scheduledFor
+          ? t("pages.detail.pageScheduleFailed")
+          : t("pages.detail.pagePublishFailed"),
+      { id: PAGE_DETAIL_OPERATION_TOAST_ID },
+    );
   } finally {
     isPublishing.value = false;
   }
@@ -1295,7 +1467,8 @@ async function executeDelete() {
 const isModified = computed(
   () =>
     currentBuilderPage.value?.status === "published" &&
-    currentBuilderPage.value?.isModifiedSincePublish,
+    (currentBuilderPage.value?.isModifiedSincePublish ||
+      hasUnsavedPageChanges.value),
 );
 
 async function handleDuplicateClick(): Promise<void> {
@@ -1326,29 +1499,19 @@ async function handleLayoutChange(newLayout: string): Promise<void> {
     }
 
     page.value = result.nextPage;
-    pageResourceBank.invalidatePage(page.value.slug ?? pageSlug.value);
     layout.value = result.nextLayout ?? "";
-    initialValues.value = {
-      ...values,
-      layout: result.nextLayout ?? "",
-    } as Record<string, unknown>;
-    isDirty.value = false;
     bumpPreviewRefreshToken();
-    await refreshPagesNow();
-    toast.success(t("pages.detail.layoutUpdated"));
   } finally {
     isSaving.value = false;
   }
 }
 
-async function persistPageStructure(
+function persistPageStructure(
   nextNodes: NonNullable<typeof page.value>["nodes"],
-  successMessage: string,
-): Promise<void> {
+): void {
   const currentPage = page.value;
-  const currentSlug = pageSlug.value;
 
-  if (!currentPage?.slug || !currentSlug || isPageStructureSaving.value) {
+  if (!currentPage?.slug || isSaving.value) {
     return;
   }
 
@@ -1357,47 +1520,11 @@ async function persistPageStructure(
     return;
   }
 
-  const previousNodes = currentPage.nodes ?? [];
-  isPageStructureSaving.value = true;
   page.value = {
     ...currentPage,
     nodes: nextNodes,
   };
   bumpPreviewRefreshToken();
-
-  try {
-    const full = await fetchRestoreData(currentSlug);
-    const serializedNodes: unknown = JSON.parse(JSON.stringify(nextNodes));
-    Object.assign(full, { nodes: serializedNodes });
-
-    const { error } = await actions.updateItem({
-      collection: "pages",
-      slug: currentSlug,
-      data: full,
-    });
-
-    if (error) {
-      throw new Error(error.message ?? "Failed to update page structure");
-    }
-
-    pageResourceBank.invalidatePage(currentSlug);
-    await refreshPagesNow();
-    if (page.value?.id) {
-      markPageThumbnailStale(page.value.id);
-    }
-    toast.success(successMessage);
-  } catch (err) {
-    page.value = {
-      ...currentPage,
-      nodes: previousNodes,
-    };
-    bumpPreviewRefreshToken();
-    toast.error(
-      err instanceof Error ? err.message : "Failed to update page structure",
-    );
-  } finally {
-    isPageStructureSaving.value = false;
-  }
 }
 
 function handleToggleSectionVisibility(sectionId: string): void {
@@ -1419,7 +1546,7 @@ function handleToggleSectionVisibility(sectionId: string): void {
     };
   });
 
-  void persistPageStructure(nextNodes, "Section visibility updated");
+  persistPageStructure(nextNodes);
 }
 
 function handleMoveSection(
@@ -1446,7 +1573,7 @@ function handleMoveSection(
     },
   }));
 
-  void persistPageStructure(nextNodes, "Page structure reordered");
+  persistPageStructure(nextNodes);
 }
 
 function handleRenameSection(sectionId: string, newName: string): void {
@@ -1456,7 +1583,7 @@ function handleRenameSection(sectionId: string, newName: string): void {
   const nextNodes = applySectionLabel(currentNodes, sectionId, newName);
   if (!nextNodes) return;
 
-  void persistPageStructure(nextNodes, "Section renamed");
+  persistPageStructure(nextNodes);
 }
 
 function handleParentChange(newParent: string): void {
@@ -1471,15 +1598,16 @@ function handleVisibilityChange(
 
 /**
  * Handle cover image update
- * The server save already happened in PageCoverImage — we just sync the
- * local reactive state so the UI reflects the change immediately.
+ * Cover changes remain local until the page's single guarded save.
  */
-async function handleUpdateCover(
+function handleUpdateCover(
   src: string,
   alt?: string,
   caption?: string,
-): Promise<void> {
+  autoSetOgImage = false,
+): void {
   if (!page.value) return;
+  const currentSeo = page.value.settings?.seo ?? {};
   page.value = {
     ...page.value,
     featuredImage: {
@@ -1487,17 +1615,37 @@ async function handleUpdateCover(
       alt: alt || undefined,
       caption: caption || undefined,
     },
+    settings: {
+      ...(page.value.settings ?? {}),
+      seo:
+        autoSetOgImage && !currentSeo.ogImage
+          ? { ...currentSeo, ogImage: src }
+          : currentSeo,
+    },
   };
 }
 
 /**
- * Handle cover image removal
- * The server save already happened in PageCoverImage — we just sync the
- * local reactive state so the UI reflects the change immediately.
+ * Remove the cover from the local page draft and clear an OG image that was
+ * derived from that cover.
  */
-async function handleRemoveCover(): Promise<void> {
+function handleRemoveCover(): void {
   if (!page.value) return;
-  const updated = { ...page.value };
+  const removedSrc = page.value.featuredImage?.src;
+  const currentSeo = page.value.settings?.seo;
+  const nextSeo = currentSeo ? { ...currentSeo } : undefined;
+  if (nextSeo?.ogImage === removedSrc) {
+    delete nextSeo.ogImage;
+  }
+  const updated = {
+    ...page.value,
+    settings: nextSeo
+      ? {
+          ...(page.value.settings ?? {}),
+          seo: nextSeo,
+        }
+      : page.value.settings,
+  };
   delete updated.featuredImage;
   page.value = updated;
 }
@@ -1563,12 +1711,30 @@ function handleSelectCmsEntryRole(): void {
 async function handleTypeTabCollectionAssigned(): Promise<void> {
   isPageTypeAssignmentSyncing.value = true;
   try {
-    await cmsTemplateAssignments.refresh();
-    await refreshPagesNow();
-    dispatchCmsPageUsageUpdated();
-    if (pageSlug.value) {
-      await loadPageAccessPolicy(pageSlug.value);
+    const currentSlug = pageSlug.value;
+    if (currentSlug) {
+      // Collection assignment is authoritative for CMS page roles. Bypass the
+      // pre-assignment policy cache, then rebase any unrelated local policy
+      // edits onto the role that the server just synchronized.
+      invalidatePagePolicyCache(currentSlug);
+      pageResourceBank.invalidatePage(currentSlug);
+      await loadPageAccessPolicy(currentSlug, {
+        force: true,
+        preserveLocalChanges: true,
+      });
+      if (page.value) {
+        page.value = {
+          ...page.value,
+          systemRole: pageAccessSystemRole.value,
+          accessMode: pageAccessMode.value,
+        };
+      }
     }
+    await Promise.all([
+      cmsTemplateAssignments.refresh(),
+      refreshPagesNow(),
+    ]);
+    dispatchCmsPageUsageUpdated();
   } finally {
     isPageTypeAssignmentSyncing.value = false;
   }
@@ -1755,10 +1921,11 @@ function handleDeleteClick() {
 
           <HeaderActionTooltip :label="saveTooltip" :disabled="isSaveDisabled">
             <Button
+              type="button"
               variant="headerAction"
               size="icon-header"
               :disabled="isSaveDisabled"
-              @click="() => onSubmit()"
+              @click="savePageDetails"
             >
               <span
                 v-if="isSaving"
@@ -1806,7 +1973,12 @@ function handleDeleteClick() {
 
           <PagePublishSplitButton
             :status="pageStatus"
-            :is-modified-since-publish="Boolean(currentBuilderPage?.isModifiedSincePublish)"
+            :is-modified-since-publish="
+              Boolean(
+                currentBuilderPage?.isModifiedSincePublish ||
+                  hasUnsavedPageChanges,
+              )
+            "
             :can-publish="canPublish"
             :is-busy="isPublishing"
             :scheduled-for="pageScheduledFor"
@@ -1885,7 +2057,7 @@ function handleDeleteClick() {
                 :sections="sections"
                 :can-edit="canEditPageStructure"
                 :is-loading="isLoading && !isLoaded"
-                :is-saving="isPageStructureSaving"
+                :is-saving="isSaving"
                 @toggle-visibility="handleToggleSectionVisibility"
                 @move-section="handleMoveSection"
                 @rename-section="handleRenameSection"
@@ -1899,8 +2071,8 @@ function handleDeleteClick() {
               :page-slug="pageSlug"
               :page-title="page?.title"
               :agent-seo-context="agentSeoContext"
-              :is-saving="debouncedSeoSave.isSaving.value"
-              :has-pending-save="debouncedSeoSave.hasPendingSave.value"
+              :is-saving="isSaving"
+              :has-pending-save="isSeoDirty"
               v-model:meta-title="seoMetaTitle"
               v-model:meta-description="seoMetaDescription"
               v-model:og-title="seoOgTitle"
@@ -2099,7 +2271,6 @@ function handleDeleteClick() {
 
               <PageCoverImage
                 v-if="page?.slug"
-                :page-slug="page.slug"
                 :cover-src="page?.featuredImage?.src"
                 :cover-alt="page?.featuredImage?.alt"
                 :cover-caption="page?.featuredImage?.caption"

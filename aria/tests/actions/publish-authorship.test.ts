@@ -82,7 +82,7 @@ describe("publish authorship via authorized mutation context", () => {
     await fs.rm(tempDir, { recursive: true, force: true });
   });
 
-  it("stamps the published version with the publisher actor from authorship context", async () => {
+  it("promotes the authored draft without manufacturing a publish revision", async () => {
     const { authorship: draftAuthorship } = await resolveAuthorizedMutation(
       createContext(draftEditor),
       "save.page",
@@ -111,25 +111,24 @@ describe("publish authorship via authorized mutation context", () => {
       { versionHint: "action-pub-v1" },
     );
 
-    expect(publishedVersion).toBe("action-pub-v1");
+    expect(publishedVersion).toBe("action-draft-v1");
 
     const draftRow = await client.execute({
       sql: `SELECT created_by_id FROM aria_page_versions WHERE id = ? AND version = ?`,
       args: [samplePage.id, "action-draft-v1"],
     });
-    const publishedRow = await client.execute({
-      sql: `SELECT created_by_id, created_by_username FROM aria_page_versions WHERE id = ? AND version = ?`,
-      args: [samplePage.id, "action-pub-v1"],
+    const versionRows = await client.execute({
+      sql: `SELECT version FROM aria_page_versions WHERE id = ? ORDER BY created_at`,
+      args: [samplePage.id],
     });
 
     expect(String(draftRow.rows[0]?.created_by_id)).toBe(draftEditor.id);
-    expect(String(publishedRow.rows[0]?.created_by_id)).toBe(publisher.id);
-    expect(String(publishedRow.rows[0]?.created_by_username)).toBe(
-      publisher.username,
-    );
+    expect(versionRows.rows.map((row) => String(row.version))).toEqual([
+      "action-draft-v1",
+    ]);
 
     const assetAuthorship = await adapter.getPageAuthorship(samplePage.id);
-    expect(assetAuthorship?.publishedBy?.id).toBe(publisher.id);
-    expect(assetAuthorship?.updatedBy?.id).toBe(publisher.id);
+    expect(assetAuthorship?.publishedBy?.id).toBe(draftEditor.id);
+    expect(assetAuthorship?.updatedBy?.id).toBe(draftEditor.id);
   });
 });

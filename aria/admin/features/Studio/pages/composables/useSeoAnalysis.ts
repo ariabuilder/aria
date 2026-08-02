@@ -73,11 +73,13 @@ export interface SeoAnalysisReturn {
 interface CachedSeoState {
   seoData: Ref<SeoData>
   persistedSeoData: Ref<SeoData>
+  rawPageNodes: Ref<BuilderNode[]>
   pageNodes: Ref<BuilderNode[]>
   isLoading: Ref<boolean>
   isSaving: Ref<boolean>
   error: Ref<string | null>
   fetchPromise: Promise<void> | null
+  expansionGeneration: number
 }
 
 const stateCache = new Map<string, CachedSeoState>()
@@ -91,11 +93,13 @@ function getOrCreateState(pageSlug: string): CachedSeoState {
     stateCache.set(pageSlug, {
       seoData: ref<SeoData>({}),
       persistedSeoData: ref<SeoData>({}),
+      rawPageNodes: createPageNodesRef(),
       pageNodes: createPageNodesRef(),
       isLoading: ref(false),
       isSaving: ref(false),
       error: ref(null),
       fetchPromise: null,
+      expansionGeneration: 0,
     })
   }
   return stateCache.get(pageSlug)!
@@ -253,6 +257,7 @@ export function useSeoAnalysis(
 ): SeoAnalysisReturn {
   const getCurrentSlug = () => (toValue(pageSlug) || "").trim()
   const { recordSeoUpdate } = useSeoHistory()
+  const { revision: componentDefinitionRevision } = useComponentFetcher()
 
   const seoData = computed<SeoData>({
     get: () => getOrCreateState(getCurrentSlug()).seoData.value,
@@ -425,12 +430,24 @@ export function useSeoAnalysis(
     }
   })
 
+  async function reexpandPageNodes(slug: string): Promise<void> {
+    const state = getOrCreateState(slug)
+    const generation = ++state.expansionGeneration
+    const expanded = await expandSeoAnalysisNodes(state.rawPageNodes.value)
+    if (
+      generation === state.expansionGeneration &&
+      getCurrentSlug() === slug
+    ) {
+      state.pageNodes.value = expanded
+    }
+  }
+
   async function refresh(): Promise<void> {
     const slug = getCurrentSlug()
     if (!slug) return
 
     const state = getOrCreateState(slug)
-    const { seoData, persistedSeoData, pageNodes, isLoading, error } = state
+    const { seoData, persistedSeoData, isLoading, error } = state
 
     if (state.fetchPromise) {
       await state.fetchPromise
@@ -475,11 +492,10 @@ export function useSeoAnalysis(
           persistedSeoData.value = cloneSeoData(normalizedSeo)
         }
 
-        pageNodes.value = await expandSeoAnalysisNodes(
-          parsedComposeData.success
-            ? (parsedComposeData.data.pageBlocks ?? [])
-            : [],
-        )
+        state.rawPageNodes.value = parsedComposeData.success
+          ? (parsedComposeData.data.pageBlocks ?? [])
+          : []
+        await reexpandPageNodes(slug)
       } catch (e) {
         error.value =
           e instanceof Error ? e.message : "Failed to load SEO data"
@@ -548,16 +564,25 @@ export function useSeoAnalysis(
     const slug = getCurrentSlug()
     if (!slug) return
     const state = getOrCreateState(slug)
-    const { seoData, persistedSeoData, pageNodes, isLoading, isSaving, error } =
-      state
+    const {
+      seoData,
+      persistedSeoData,
+      rawPageNodes,
+      pageNodes,
+      isLoading,
+      isSaving,
+      error,
+    } = state
 
     seoData.value = {}
     persistedSeoData.value = {}
+    rawPageNodes.value = []
     pageNodes.value = []
     isLoading.value = false
     isSaving.value = false
     error.value = null
     state.fetchPromise = null
+    state.expansionGeneration += 1
   }
 
   watch(
@@ -576,6 +601,14 @@ export function useSeoAnalysis(
     },
     { immediate: true },
   )
+
+  watch(componentDefinitionRevision, () => {
+    const slug = getCurrentSlug()
+    if (!slug) return
+    const state = getOrCreateState(slug)
+    if (state.rawPageNodes.value.length === 0) return
+    void reexpandPageNodes(slug)
+  })
 
   return {
     seoData,

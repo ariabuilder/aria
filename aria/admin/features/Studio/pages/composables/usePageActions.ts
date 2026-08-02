@@ -106,14 +106,24 @@ export function usePageActions(): UsePageActionsReturn {
         throw new Error("Failed to load page data for publish");
       }
       const full = parsed.data;
-      await actions.publishing.publish({
+      if (!full.version) {
+        throw new Error("Page has no saved revision to publish");
+      }
+      const publishResult = await actions.publishing.publish({
         id: page.id,
-        slug: page.slug,
-        title: full.title || page.title,
-        layout: full.layout,
-        nodes: full.nodes,
-        settings: full.settings,
+        expectedVersion: full.version,
       });
+      if (publishResult.error) {
+        throw new Error(publishResult.error.message);
+      }
+      const publishBody = publishResult.data as
+        | { success?: boolean; error?: { message?: string } }
+        | undefined;
+      if (!publishBody || publishBody.success !== true) {
+        throw new Error(
+          publishBody?.error?.message || "Failed to publish page",
+        );
+      }
       await refreshPagesNow();
       toast.success("Page published");
     }
@@ -185,11 +195,16 @@ export function usePageActions(): UsePageActionsReturn {
       if (error || !data)
         throw new Error(error?.message || "Failed to load page");
       const full = data as Record<string, unknown>;
+      const expectedVersion = full.version;
+      if (typeof expectedVersion !== "string" || expectedVersion.length === 0) {
+        throw new Error("Reload this page before renaming it");
+      }
       full.title = title;
       const result = await actions.updateItem({
         collection: "pages",
         slug,
         data: full,
+        expectedVersion,
       });
       if (result.error) throw new Error(result.error.message);
       await refreshPagesNow();

@@ -358,7 +358,10 @@ const {
   computeSlotBuckets,
   buildSlotContainer,
 } = useSlotRendering();
-const { expandComponentReferencesClient } = useComponentFetcher();
+const {
+  expandComponentReferencesClient,
+  revision: componentDefinitionRevision,
+} = useComponentFetcher();
 
 async function expandBlocksForCanvas(
   blocks: readonly BuilderNode[],
@@ -2328,7 +2331,12 @@ onUnmounted(() => {
  * Only renders if iframe is ready to avoid unnecessary work.
  */
 watch(
-  () => [props.blocks, cmsRenderKey.value] as const,
+  () =>
+    [
+      props.blocks,
+      cmsRenderKey.value,
+      componentDefinitionRevision.value,
+    ] as const,
   async ([newBlocks]) => {
     traceStartup("stage-frame:blocks-watch", {
       instanceId: stageFrameInstanceId,

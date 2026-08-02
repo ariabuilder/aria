@@ -24,6 +24,7 @@ import { normalizeNodesIcons } from "../lib/icons/action-normalizers";
 import { savePageSnapshot } from "../lib/rendering/pageSnapshots";
 import { assertPageLayoutChangeAllowed } from "../lib/pages/layoutPolicy.server";
 import { normalizePageLayoutRef } from "../lib/pages/layoutPolicy";
+import { LayoutDSLSchema } from "../lib/schemas/nodes";
 
 type LogLevel = "debug" | "info" | "warn" | "error";
 
@@ -213,9 +214,20 @@ export const save = {
     input: z.object({
       id: IdSchema,
       blocks: z.array(BuilderNodeSchema),
+      title: z.string().optional(),
+      description: z.string().optional(),
       layout: z.string().optional(),
+      settings: JsonObjectSchema.optional(),
       nonce: z.string().optional(),
-      expectedVersion: z.string().trim().min(1).optional(),
+      expectedVersion: z.string().trim().min(1),
+      layoutDraft: z
+        .object({
+          id: IdSchema,
+          expectedVersion: z.string().trim().min(1),
+          dsl: LayoutDSLSchema,
+        })
+        .strict()
+        .optional(),
     }),
     handler: async (input, context) => {
       const { authorship } = await resolveAuthorizedMutation(
@@ -274,6 +286,15 @@ export const save = {
             : normalizePageLayoutRef(page.layout);
 
         await assertPageLayoutChangeAllowed(context, page.layout, nextLayout);
+        if (
+          input.layoutDraft &&
+          normalizePageLayoutRef(input.layoutDraft.id) !== nextLayout
+        ) {
+          throw createError(
+            ERROR_CODES.INVALID_INPUT,
+            "The layout draft does not match the page layout",
+          );
+        }
 
         // Update page with new blocks and layout
         // Strip server-derived tracking fields (e.g. isModifiedSincePublish)
@@ -281,8 +302,11 @@ export const save = {
         const { isModifiedSincePublish: _, ...pageRest } = page;
         const updatedPage = {
           ...pageRest,
+          title: input.title ?? page.title,
+          description: input.description ?? page.description,
           nodes: normalizedBlocks,
           layout: nextLayout,
+          settings: input.settings ?? page.settings,
           status: page.status || ("draft" as const),
           updatedAt: new Date().toISOString(),
         };
@@ -297,21 +321,44 @@ export const save = {
           {
             locals: context.locals,
             versionSaveOptions: { expectedVersion: input.expectedVersion },
+            linkedLayoutDraft: input.layoutDraft,
           },
         );
+        const layoutVersion = input.layoutDraft
+          ? (await adapter.getLayoutDSL(input.layoutDraft.id))?.version
+          : undefined;
 
-        await savePageSnapshot(
-          {
-            page: updatedPage as PageDSL,
-            stage: "draft",
-          },
-          adapter,
-          { locals: context.locals },
-        );
-
-        if (isDestructiveBlankOverwrite && input.nonce) {
-          await consumeComposeNonceAfterSave(context, sanitizedId, input.nonce);
-        }
+        const postCommitResults = await Promise.allSettled([
+          savePageSnapshot(
+            {
+              page: updatedPage as PageDSL,
+              stage: "draft",
+            },
+            adapter,
+            { locals: context.locals },
+          ),
+          ...(isDestructiveBlankOverwrite && input.nonce
+            ? [
+                consumeComposeNonceAfterSave(
+                  context,
+                  sanitizedId,
+                  input.nonce,
+                ),
+              ]
+            : []),
+        ]);
+        postCommitResults.forEach((result, index) => {
+          if (result.status === "rejected") {
+            log("warn", "Post-save side effect failed", {
+              id: sanitizedId,
+              index,
+              error:
+                result.reason instanceof Error
+                  ? result.reason.message
+                  : String(result.reason),
+            });
+          }
+        });
 
         const duration = endPerformanceTracking(operation);
         log("info", `Page saved: ${sanitizedId}`, {
@@ -320,7 +367,7 @@ export const save = {
           duration: `${duration}ms`,
         });
 
-        return { version };
+        return { version, layoutVersion };
       } catch (error) {
         endPerformanceTracking(operation);
         return handleError(error, operation);
@@ -342,7 +389,7 @@ export const save = {
       category: z.string().optional(),
       description: z.string().optional(),
       nonce: z.string().optional(),
-      expectedVersion: z.string().trim().min(1).optional(),
+      expectedVersion: z.string().trim().min(1),
     }),
     handler: async (input, context) => {
       const { authorship } = await resolveAuthorizedMutation(
@@ -425,7 +472,7 @@ export const save = {
       blocks: z.array(BuilderNodeSchema),
       title: z.string().optional(),
       nonce: z.string().optional(),
-      expectedVersion: z.string().trim().min(1).optional(),
+      expectedVersion: z.string().trim().min(1),
     }),
     handler: async (input, context) => {
       const { authorship } = await resolveAuthorizedMutation(

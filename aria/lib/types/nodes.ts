@@ -379,6 +379,14 @@ export interface BuilderNode {
   [key: string]: unknown;
 }
 
+export interface PagePublicationDependencies {
+  layout?: {
+    id: string;
+    version: string;
+  };
+  components: Record<string, string>;
+}
+
 /**
  * Page DSL (Domain Specific Language)
  * Represents a complete page structure
@@ -542,6 +550,12 @@ export interface PageDSL {
 
   /** Derived: true when draft_version !== published_version */
   isModifiedSincePublish?: boolean;
+
+  /**
+   * Server-derived immutable dependency pins for a published page revision.
+   * Never authored by Composer or included in draft content hashes.
+   */
+  _publicationDependencies?: PagePublicationDependencies;
 
   /** Computed page analytics cached at save-time */
   _computedMetrics?: {

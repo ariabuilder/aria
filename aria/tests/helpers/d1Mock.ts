@@ -24,7 +24,16 @@ export function createD1Mock(client: Client) {
       return result.rows.map((row) => Object.values(row)) as T;
     },
     async run() {
-      return client.execute({ sql, args: boundArgs });
+      const result = await client.execute({ sql, args: boundArgs });
+      return {
+        success: true as const,
+        results: result.rows,
+        meta: {
+          changes: result.rowsAffected,
+          last_row_id: Number(result.lastInsertRowid ?? 0),
+          changed_db: result.rowsAffected > 0,
+        },
+      };
     },
   });
 
@@ -35,13 +44,22 @@ export function createD1Mock(client: Client) {
     async batch(statements: Array<ReturnType<typeof createStatement>>) {
       // D1 batch is transactional. Keeping the mock atomic lets parity tests
       // expose ordering and constraint bugs instead of masking them locally.
-      return client.batch(
+      const results = await client.batch(
         statements.map((statement) => ({
           sql: statement.__sql,
           args: statement.__args,
         })),
         "write",
       );
+      return results.map((result) => ({
+        success: true as const,
+        results: result.rows,
+        meta: {
+          changes: result.rowsAffected,
+          last_row_id: Number(result.lastInsertRowid ?? 0),
+          changed_db: result.rowsAffected > 0,
+        },
+      }));
     },
   };
 }

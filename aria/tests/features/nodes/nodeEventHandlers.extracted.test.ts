@@ -276,9 +276,8 @@ describe("extracted node event handlers", () => {
       data: createNode("new-section", "section"),
     });
 
-    expect(actionsMock.insertNode).toHaveBeenCalledWith(
-      expect.objectContaining({ parentId: "parent" }),
-    );
+    expect(actionsMock.insertNode).not.toHaveBeenCalled();
+    expect(pageBlocks.value[0]?.children?.[0]?.id).toBe("new-section");
     expect(handleElementAdded).toHaveBeenCalledWith(
       expect.objectContaining({ id: "new-section" }),
     );
@@ -366,9 +365,7 @@ describe("extracted node event handlers", () => {
       position: 0,
     });
 
-    expect(actionsMock.insertNode).toHaveBeenCalledWith(
-      expect.objectContaining({ parentId: null, position: 0 }),
-    );
+    expect(actionsMock.insertNode).not.toHaveBeenCalled();
     expect(pageBlocks.value[0]?.id).toBe("root-text");
   });
 
@@ -394,9 +391,7 @@ describe("extracted node event handlers", () => {
     });
 
     expect(clearInsertionContext).toHaveBeenCalledTimes(1);
-    expect(actionsMock.insertNode).toHaveBeenCalledWith(
-      expect.objectContaining({ parentId: null }),
-    );
+    expect(actionsMock.insertNode).not.toHaveBeenCalled();
   });
 
   it("falls back to the selected page slot when context belongs to another slot", async () => {
@@ -444,12 +439,7 @@ describe("extracted node event handlers", () => {
     });
 
     expect(clearInsertionContext).toHaveBeenCalledTimes(1);
-    expect(actionsMock.insertNode).toHaveBeenCalledWith(
-      expect.objectContaining({
-        parentId: null,
-        node: expect.objectContaining({ slot: "footer" }),
-      }),
-    );
+    expect(actionsMock.insertNode).not.toHaveBeenCalled();
     expect(currentLayout.value!.slots?.[1]?.defaultContent?.[0]?.id).toBe(
       "default-footer",
     );
@@ -474,7 +464,7 @@ describe("extracted node event handlers", () => {
 
     await handleDeleteBlock("a");
 
-    expect(actionsMock.deleteNode).toHaveBeenCalledTimes(1);
+    expect(actionsMock.deleteNode).not.toHaveBeenCalled();
     expect(collectNodeIds(pageBlocks.value)).toEqual(["b"]);
     expect(setSelectedBlock).toHaveBeenCalledWith(null);
     expect(toastMock.success).toHaveBeenCalledWith("Deleted Container block");
@@ -545,7 +535,7 @@ describe("extracted node event handlers", () => {
 
     await handleDuplicateBlock("a");
 
-    expect(actionsMock.insertNode).toHaveBeenCalledTimes(1);
+    expect(actionsMock.insertNode).not.toHaveBeenCalled();
     expect(collectNodeIds(pageBlocks.value)).toEqual(["a", "a-copy", "b"]);
     expect(setSelectedBlock).toHaveBeenCalledWith("a-copy");
     expect(toastMock.success).toHaveBeenCalledWith(
@@ -574,7 +564,7 @@ describe("extracted node event handlers", () => {
 
     await handlePasteBlock("a");
 
-    expect(actionsMock.insertNode).toHaveBeenCalledTimes(1);
+    expect(actionsMock.insertNode).not.toHaveBeenCalled();
     expect(actionsMock.insertNodes).not.toHaveBeenCalled();
     expect(collectNodeIds(pageBlocks.value)).toEqual(["a", "clip-copy", "b"]);
     expect(setSelectedBlock).toHaveBeenCalledWith("clip-copy");
@@ -748,13 +738,7 @@ describe("extracted node event handlers", () => {
     await handlePasteBlock("a");
 
     expect(importHtmlToNodes).toHaveBeenCalledTimes(1);
-    expect(actionsMock.insertNodes).toHaveBeenCalledTimes(1);
-    expect(actionsMock.insertNodes).toHaveBeenCalledWith(
-      expect.objectContaining({
-        parentId: "a",
-        position: 0,
-      }),
-    );
+    expect(actionsMock.insertNodes).not.toHaveBeenCalled();
     expect(actionsMock.insertNode).not.toHaveBeenCalled();
     expect(actionsMock.styles.createClass).toHaveBeenCalledWith({
       name: "hero-shell",
@@ -813,12 +797,7 @@ describe("extracted node event handlers", () => {
     });
 
     expect(importHtmlToNodes).toHaveBeenCalledTimes(1);
-    expect(actionsMock.insertNodes).toHaveBeenLastCalledWith(
-      expect.objectContaining({
-        parentId: null,
-        position: 2,
-      }),
-    );
+    expect(actionsMock.insertNodes).not.toHaveBeenCalled();
     expect(collectNodeIds(pageBlocks.value)).toEqual([
       "header",
       "main-1",
@@ -876,7 +855,7 @@ describe("extracted node event handlers", () => {
     expect(importHtmlToNodes).toHaveBeenCalledWith(
       '<div class="px-4 sm:px-6 lg:px-8"><h1>Bringing Art to everything</h1></div>',
     );
-    expect(actionsMock.insertNodes).toHaveBeenCalledTimes(1);
+    expect(actionsMock.insertNodes).not.toHaveBeenCalled();
     expect(setSelectedBlock).toHaveBeenCalledWith("import-hero");
   });
 
@@ -1046,8 +1025,8 @@ describe("extracted node event handlers", () => {
 
     await handleReplaceBlockWithComponent("heading-1", "hero-banner");
 
-    expect(actionsMock.deleteNode).toHaveBeenCalledTimes(1);
-    expect(actionsMock.insertNode).toHaveBeenCalledTimes(1);
+    expect(actionsMock.deleteNode).not.toHaveBeenCalled();
+    expect(actionsMock.insertNode).not.toHaveBeenCalled();
     expect(pageBlocks.value[0]).toMatchObject({
       id: "heading-1",
       type: "Component",

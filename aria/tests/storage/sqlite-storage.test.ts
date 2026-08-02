@@ -10,7 +10,10 @@ import { BLOG_ENTRY_TEMPLATE_PAGE_ID } from "../../lib/storage/starterContent";
 import { STARTER_BLOG_PAGES_COMPOSER_SLUG } from "../../lib/storage/starterCmsEntries";
 import type { StylesData } from "../../lib/storage/adapter";
 import { buildAuthorshipSaveContext } from "../../lib/authorship/stamping";
-import { DEFAULT_RECENT_VERSION_LIMIT } from "../../lib/storage/versioning";
+import {
+  DEFAULT_RECENT_VERSION_LIMIT,
+  VersionConflictError,
+} from "../../lib/storage/versioning";
 import type { ComponentDSL, LayoutDSL, PageDSL } from "../../lib/types/nodes";
 import {
   createStylesDataSnapshotFromUniversalDesignSystem,
@@ -291,6 +294,262 @@ describe("SQLiteStorageAdapter", () => {
     expect(versions.map((entry) => entry.version)).toEqual([firstVersion]);
   });
 
+  it("allows exactly one concurrent guarded page save", async () => {
+    await adapter.savePageDSL(samplePage.id, samplePage, {
+      preserveVersion: true,
+      versionHint: "cas-v1",
+    });
+
+    const results = await Promise.allSettled([
+      adapter.savePageDSL(
+        samplePage.id,
+        { ...samplePage, title: "Left editor" },
+        {
+          expectedVersion: "cas-v1",
+          preserveVersion: true,
+          versionHint: "cas-left",
+        },
+      ),
+      adapter.savePageDSL(
+        samplePage.id,
+        { ...samplePage, title: "Right editor" },
+        {
+          expectedVersion: "cas-v1",
+          preserveVersion: true,
+          versionHint: "cas-right",
+        },
+      ),
+    ]);
+
+    const fulfilled = results.filter((result) => result.status === "fulfilled");
+    const rejected = results.filter((result) => result.status === "rejected");
+    const versions = await adapter.getPageVersions(samplePage.id);
+    const saved = await adapter.getPageDSL(samplePage.id);
+
+    expect(fulfilled).toHaveLength(1);
+    expect(rejected).toHaveLength(1);
+    expect((rejected[0] as PromiseRejectedResult).reason).toBeInstanceOf(
+      VersionConflictError,
+    );
+    expect(versions).toHaveLength(2);
+    expect(saved?.version).toBe(
+      (fulfilled[0] as PromiseFulfilledResult<string>).value,
+    );
+  });
+
+  it("commits a guarded page and layout draft in one storage batch", async () => {
+    await adapter.saveLayoutDSL(sampleLayout.id, sampleLayout, {
+      preserveVersion: true,
+      versionHint: "layout-v1",
+    });
+    await adapter.savePageDSL(samplePage.id, samplePage, {
+      preserveVersion: true,
+      versionHint: "page-v1",
+    });
+
+    await adapter.savePageDSL(
+      samplePage.id,
+      { ...samplePage, title: "Atomic update" },
+      {
+        expectedVersion: "page-v1",
+        linkedLayoutDraft: {
+          id: sampleLayout.id,
+          expectedVersion: "layout-v1",
+          dsl: { ...sampleLayout, description: "Atomic layout update" },
+        },
+      },
+    );
+
+    expect((await adapter.getPageDSL(samplePage.id))?.title).toBe(
+      "Atomic update",
+    );
+    expect((await adapter.getLayoutDSL(sampleLayout.id))?.description).toBe(
+      "Atomic layout update",
+    );
+
+    const layoutVersion = (await adapter.getLayoutDSL(sampleLayout.id))?.version;
+    await expect(
+      adapter.savePageDSL(
+        samplePage.id,
+        { ...samplePage, title: "Rejected update" },
+        {
+          expectedVersion: "stale-page-version",
+          linkedLayoutDraft: {
+            id: sampleLayout.id,
+            expectedVersion: layoutVersion!,
+            dsl: { ...sampleLayout, description: "Must not commit" },
+          },
+        },
+      ),
+    ).rejects.toBeInstanceOf(VersionConflictError);
+    expect((await adapter.getLayoutDSL(sampleLayout.id))?.description).toBe(
+      "Atomic layout update",
+    );
+  });
+
+  it("does not commit a linked layout when the page changes after preflight", async () => {
+    await adapter.saveLayoutDSL(sampleLayout.id, sampleLayout, {
+      preserveVersion: true,
+      versionHint: "layout-race-v1",
+    });
+    await adapter.savePageDSL(samplePage.id, samplePage, {
+      preserveVersion: true,
+      versionHint: "page-race-v1",
+    });
+    await client.execute(`
+      INSERT INTO aria_page_versions (
+        id, version, slug, title, status, dsl_json, created_at, content_hash
+      )
+      SELECT
+        id, 'page-race-v2', slug, title, status, dsl_json, created_at, content_hash
+      FROM aria_page_versions
+      WHERE id = 'page-home' AND version = 'page-race-v1'
+    `);
+
+    const originalBatch = client.batch.bind(client);
+    let injectedCompetingSave = false;
+    (client as unknown as { batch: typeof client.batch }).batch = async (
+      ...args
+    ) => {
+      if (!injectedCompetingSave) {
+        injectedCompetingSave = true;
+        await client.execute({
+          sql: `UPDATE aria_page_meta
+                SET draft_version = ?, current_version = ?
+                WHERE id = ?`,
+          args: ["page-race-v2", "page-race-v2", samplePage.id],
+        });
+      }
+      return originalBatch(...args);
+    };
+
+    await expect(
+      adapter.savePageDSL(
+        samplePage.id,
+        { ...samplePage, title: "Must not commit" },
+        {
+          expectedVersion: "page-race-v1",
+          linkedLayoutDraft: {
+            id: sampleLayout.id,
+            expectedVersion: "layout-race-v1",
+            dsl: { ...sampleLayout, description: "Must not commit" },
+          },
+        },
+      ),
+    ).rejects.toBeInstanceOf(VersionConflictError);
+
+    expect((await adapter.getPageVersionPins(samplePage.id))?.draftVersion).toBe(
+      "page-race-v2",
+    );
+    expect((await adapter.getLayoutDSL(sampleLayout.id))?.version).toBe(
+      "layout-race-v1",
+    );
+    expect((await adapter.getLayoutDSL(sampleLayout.id))?.description).toBe(
+      sampleLayout.description,
+    );
+  });
+
+  it("never lets a guarded save and publish overwrite each other's pointers", async () => {
+    await adapter.savePageDSL(samplePage.id, samplePage, {
+      preserveVersion: true,
+      versionHint: "publish-race-v1",
+    });
+
+    const [saveResult, publishResult] = await Promise.allSettled([
+      adapter.savePageDSL(
+        samplePage.id,
+        { ...samplePage, title: "Edited while publishing" },
+        {
+          expectedVersion: "publish-race-v1",
+          preserveVersion: true,
+          versionHint: "publish-race-v2",
+        },
+      ),
+      adapter.publishPageDSL(samplePage.id, undefined, {
+        expectedVersion: "publish-race-v1",
+      }),
+    ]);
+    const pins = await adapter.getPageVersionPins(samplePage.id);
+    const versions = await adapter.getPageVersions(samplePage.id);
+
+    expect(
+      [saveResult, publishResult].filter(
+        (result) => result.status === "fulfilled",
+      ),
+    ).toHaveLength(1);
+    expect(
+      [saveResult, publishResult].filter(
+        (result) => result.status === "rejected",
+      ),
+    ).toHaveLength(1);
+    if (saveResult.status === "fulfilled") {
+      expect(pins?.draftVersion).toBe("publish-race-v2");
+      expect(pins?.publishedVersion).toBeNull();
+      expect(versions.map((entry) => entry.version)).toContain(
+        "publish-race-v2",
+      );
+    } else {
+      expect(saveResult.reason).toBeInstanceOf(VersionConflictError);
+      expect(pins?.draftVersion).toBe("publish-race-v1");
+      expect(pins?.publishedVersion).toBe("publish-race-v1");
+      expect(versions.map((entry) => entry.version)).toEqual([
+        "publish-race-v1",
+      ]);
+    }
+  });
+
+  it("does not attach dependency pins when publish loses its revision fence", async () => {
+    await adapter.savePageDSL(samplePage.id, samplePage, {
+      preserveVersion: true,
+      versionHint: "publish-pin-race-v1",
+    });
+    await client.execute(`
+      INSERT INTO aria_page_versions (
+        id, version, slug, title, status, dsl_json, created_at, content_hash
+      )
+      SELECT
+        id, 'publish-pin-race-v2', slug, title, status, dsl_json, created_at, content_hash
+      FROM aria_page_versions
+      WHERE id = 'page-home' AND version = 'publish-pin-race-v1'
+    `);
+
+    const originalBatch = client.batch.bind(client);
+    let injectedCompetingSave = false;
+    (client as unknown as { batch: typeof client.batch }).batch = async (
+      ...args
+    ) => {
+      if (!injectedCompetingSave) {
+        injectedCompetingSave = true;
+        await client.execute({
+          sql: `UPDATE aria_page_meta
+                SET draft_version = ?, current_version = ?
+                WHERE id = ?`,
+          args: [
+            "publish-pin-race-v2",
+            "publish-pin-race-v2",
+            samplePage.id,
+          ],
+        });
+      }
+      return originalBatch(...args);
+    };
+
+    await expect(
+      adapter.publishPageDSL(samplePage.id, undefined, {
+        expectedVersion: "publish-pin-race-v1",
+        dependencies: { components: { "hero-banner": "component-v1" } },
+      }),
+    ).rejects.toBeInstanceOf(VersionConflictError);
+
+    const dependencyRow = await client.execute({
+      sql: `SELECT dependency_versions_json
+            FROM aria_page_versions
+            WHERE id = ? AND version = ?`,
+      args: [samplePage.id, "publish-pin-race-v1"],
+    });
+    expect(dependencyRow.rows[0]?.dependency_versions_json).toBeNull();
+  });
+
   it("does not create a draft revision when resaving an enriched published page", async () => {
     await adapter.savePageDSL(samplePage.id, {
       ...samplePage,
@@ -354,7 +613,13 @@ describe("SQLiteStorageAdapter", () => {
     const firstPublishedVersion = await adapter.publishPageDSL(
       samplePage.id,
       undefined,
-      { versionHint: "2000" },
+      {
+        versionHint: "2000",
+        dependencies: {
+          layout: { id: "full-width", version: "layout-v1" },
+          components: { header: "component-v1" },
+        },
+      },
     );
 
     await adapter.savePageDSL(
@@ -373,9 +638,14 @@ describe("SQLiteStorageAdapter", () => {
     const published = await adapter.getPublishedPageDSL(samplePage.id);
     const listed = await adapter.listPagesDSL({ limit: 10, offset: 0 });
 
-    expect(firstPublishedVersion).toBe("2000");
+    expect(firstPublishedVersion).toBe("1000");
     expect(draft?.title).toBe("Home Draft Update");
     expect(published?.title).toBe("Home");
+    expect(published?._publicationDependencies).toEqual({
+      layout: { id: "full-width", version: "layout-v1" },
+      components: { header: "component-v1" },
+    });
+    expect(draft?._publicationDependencies).toBeUndefined();
     expect(listed[0]?.status).toBe("published");
 
     await adapter.unpublishPageDSL(samplePage.id);
@@ -396,8 +666,10 @@ describe("SQLiteStorageAdapter", () => {
     await adapter.schedulePageDSL(samplePage.id, scheduledFor);
 
     const listed = await adapter.listPagesDSL({ limit: 10, offset: 0 });
+    const versions = await adapter.getPageVersions(samplePage.id);
     expect(listed[0]?.status).toBe("scheduled");
     expect(listed[0]?.scheduledFor).toBe(scheduledFor);
+    expect(versions.map((entry) => entry.version)).toEqual(["1000"]);
   });
 
   it("clears scheduling metadata when unpublishing a scheduled page", async () => {
@@ -700,6 +972,7 @@ describe("SQLiteStorageAdapter", () => {
   it("prunes intermediate page history while keeping latest and pinned revisions", async () => {
     const firstVersion = await adapter.savePageDSL(samplePage.id, samplePage);
     const publishedVersion = await adapter.publishPageDSL(samplePage.id);
+    expect(publishedVersion).toBe(firstVersion);
 
     await new Promise((resolve) => setTimeout(resolve, 10));
     const secondVersion = await adapter.savePageDSL(samplePage.id, {
@@ -722,7 +995,7 @@ describe("SQLiteStorageAdapter", () => {
     const remainingVersions = await adapter.getPageVersions(samplePage.id);
 
     expect(result.keptVersions).toEqual([thirdVersion, publishedVersion]);
-    expect(result.deletedVersions).toEqual([secondVersion, firstVersion]);
+    expect(result.deletedVersions).toEqual([secondVersion]);
     expect(remainingVersions.map((entry) => entry.version)).toEqual([
       thirdVersion,
       publishedVersion,

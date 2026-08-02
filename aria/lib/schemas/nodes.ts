@@ -596,6 +596,22 @@ export const PageDSLSchema: z.ZodType<PageDSL> = z
 
     // Derived: true when draft_version !== published_version
     isModifiedSincePublish: z.boolean().optional(),
+    _publicationDependencies: z
+      .object({
+        layout: z
+          .object({
+            id: z.string().trim().min(1),
+            version: z.string().trim().min(1),
+          })
+          .strict()
+          .optional(),
+        components: z.record(
+          z.string().trim().min(1),
+          z.string().trim().min(1),
+        ),
+      })
+      .strict()
+      .optional(),
 
     // Computed page analytics cached at save-time
     _computedMetrics: z

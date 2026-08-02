@@ -6,6 +6,7 @@ import type { ClaimedCmsEntry, ClaimedPage } from "./schemas";
 import { createCmsAuditEvent } from "../../cms/services/accessPolicy";
 import type { RuntimeLocals } from "../../cloudflare/env";
 import { scheduleIntegrationEventWakeup } from "../../integrations/wakeup";
+import { resolvePagePublicationDependencies } from "../pageDependencies";
 
 export async function executeCmsEntryPublication(
   adapter: StorageAdapter,
@@ -49,7 +50,10 @@ export async function executeCmsEntryPublication(
 
 export async function executePagePublication(
   adapter: StorageAdapter,
-  page: Pick<ClaimedPage, "id" | "version" | "currentVersion">,
+  page: Pick<
+    ClaimedPage,
+    "id" | "version" | "currentVersion" | "scheduleLeaseToken"
+  >,
 ): Promise<string | null> {
   if (page.currentVersion !== page.version) {
     throw new Error(
@@ -57,7 +61,13 @@ export async function executePagePublication(
     );
   }
   const authorship = buildSystemAuthorshipSaveContext("save-page");
+  const savedPage = await adapter.getPageDSL(page.id, page.version);
+  if (!savedPage) {
+    throw new Error(`Scheduled page revision not found: ${page.id}`);
+  }
   return adapter.publishPageDSL(page.id, authorship, {
     expectedVersion: page.version,
+    scheduleLeaseToken: page.scheduleLeaseToken,
+    dependencies: await resolvePagePublicationDependencies(savedPage, adapter),
   });
 }

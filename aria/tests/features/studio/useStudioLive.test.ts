@@ -1,13 +1,23 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+const { invalidateComponentClientCachesMock } = vi.hoisted(() => ({
+  invalidateComponentClientCachesMock: vi.fn(),
+}));
+
+vi.mock("@/features/Core/composables/componentCacheCoherence", () => ({
+  invalidateComponentClientCaches: invalidateComponentClientCachesMock,
+}));
+
 describe("Studio Live availability", () => {
   beforeEach(() => {
+    vi.clearAllMocks();
     vi.resetModules();
     vi.useFakeTimers();
   });
 
   afterEach(() => {
     vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
     vi.useRealTimers();
   });
 
@@ -46,6 +56,26 @@ describe("Studio Live availability", () => {
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(useStudioLive().reconnectAttempt.value).toBe(0);
+    disconnectStudioLive();
+  });
+
+  it("invalidates both component cache layers for realtime updates", async () => {
+    vi.stubGlobal("BroadcastChannel", undefined);
+    const { disconnectStudioLive, publishLocalStudioInvalidation } =
+      await import("../../../admin/features/Studio/realtime/useStudioLive");
+
+    publishLocalStudioInvalidation({
+      eventId: "b76ea260-f3c3-48e0-8c52-df2cfdfab6c0",
+      siteRevision: 42,
+      resourceType: "component",
+      resourceId: "header",
+      scopes: ["content", "render"],
+    });
+
+    expect(invalidateComponentClientCachesMock).toHaveBeenCalledWith(
+      "header",
+      "realtime",
+    );
     disconnectStudioLive();
   });
 });

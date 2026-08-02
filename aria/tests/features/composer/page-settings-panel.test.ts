@@ -180,7 +180,7 @@ describe("PageSettingsPanel", () => {
     });
   });
 
-  it("saves page policy through the dedicated pages action before metadata", async () => {
+  it("saves page policy immediately and stages metadata for Save draft", async () => {
     const PageSettingsPanel = (
       await import("../../../admin/features/Composer/components/PageSettingsPanel.vue")
     ).default;
@@ -239,15 +239,10 @@ describe("PageSettingsPanel", () => {
       promptDescription: "Enter the password to continue.",
       rememberForDays: 7,
     });
-    expect(updateItemMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        collection: "pages",
-        slug: "home",
-        expectedVersion: "page-home-v1",
-      }),
-    );
+    expect(getItemMock).not.toHaveBeenCalled();
+    expect(updateItemMock).not.toHaveBeenCalled();
     expect(wrapper.emitted("pageSaved")).toEqual([
-      [expect.objectContaining({ slug: "home", version: "page-home-v2" })],
+      [expect.objectContaining({ slug: "home", title: "Home" })],
     ]);
 
     wrapper.unmount();
@@ -312,7 +307,7 @@ describe("PageSettingsPanel", () => {
     wrapper.unmount();
   });
 
-  it("does not emit when getItem returns a malformed page payload", async () => {
+  it("does not read the server page while staging metadata", async () => {
     getItemMock.mockResolvedValue({
       data: {
         id: "home",
@@ -369,14 +364,16 @@ describe("PageSettingsPanel", () => {
     await saveButton!.trigger("click");
     await flushPromises();
 
-    expect(wrapper.emitted("pageSaved")).toBeUndefined();
-    expect(wrapper.text()).toContain("Failed to load current page");
+    expect(wrapper.emitted("pageSaved")).toEqual([
+      [expect.objectContaining({ slug: "home", title: "Home" })],
+    ]);
+    expect(getItemMock).not.toHaveBeenCalled();
     expect(updateItemMock).not.toHaveBeenCalled();
 
     wrapper.unmount();
   });
 
-  it("does not emit when updateItem returns a malformed success payload", async () => {
+  it("does not create a metadata revision before Save draft", async () => {
     updateItemMock.mockResolvedValue({
       data: {
         success: true,
@@ -431,14 +428,10 @@ describe("PageSettingsPanel", () => {
     await saveButton!.trigger("click");
     await flushPromises();
 
-    expect(updateItemMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        collection: "pages",
-        slug: "home",
-      }),
-    );
-    expect(wrapper.emitted("pageSaved")).toBeUndefined();
-    expect(wrapper.text()).toContain("Failed to save page settings");
+    expect(updateItemMock).not.toHaveBeenCalled();
+    expect(wrapper.emitted("pageSaved")).toEqual([
+      [expect.objectContaining({ slug: "home", title: "Home" })],
+    ]);
 
     wrapper.unmount();
   });

@@ -1,13 +1,10 @@
 import { actions } from "astro:actions";
 import { toast } from "vue-sonner";
-import { invalidateComposeCache } from "@/composables/composeClientCache";
-import { isForbiddenActionError } from "@/lib/actionErrors";
 import {
   migratePageRootNodeSlots,
   type LayoutSlotRef,
 } from "../../../../../lib/layouts/resolveNodeSlot";
 import { normalizePageLayoutRef } from "../../../../../lib/pages/layoutPolicy";
-import { isJsonObject } from "@/lib/types/nodes";
 import type { BuilderNode, PageDSL } from "@/lib/types/nodes";
 
 export const LAYOUT_CHANGE_FORBIDDEN_MESSAGE =
@@ -74,30 +71,6 @@ export async function updatePageLayout(options: {
     nodes: migratedNodes,
     updatedAt: new Date().toISOString(),
   };
-
-  const serialized: unknown = JSON.parse(JSON.stringify(nextPage));
-  if (!isJsonObject(serialized)) {
-    toast.error("Failed to update layout");
-    return { success: false, previousLayout, nextLayout };
-  }
-
-  const { data, error } = await actions.updateItem({
-    collection: "pages",
-    slug: page.slug,
-    data: serialized,
-  });
-
-  if (error) {
-    if (isForbiddenActionError(error)) {
-      toast.error(LAYOUT_CHANGE_FORBIDDEN_MESSAGE);
-    } else {
-      toast.error("Failed to update layout");
-    }
-    return { success: false, previousLayout, nextLayout };
-  }
-
-  void data;
-  invalidateComposeCache("page", page.slug);
 
   return { success: true, nextPage, previousLayout, nextLayout };
 }

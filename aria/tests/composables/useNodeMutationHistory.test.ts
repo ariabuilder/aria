@@ -72,30 +72,11 @@ describe("useNodeMutationHistory", () => {
       breakpoint: "default",
     });
 
-    expect(result).toEqual({ success: true, version: "v2" });
-    expect(mutateMock).toHaveBeenCalledWith({
-      collection: "pages",
-      id: "home",
-      nodeId: "node-1",
-      updates: {
-        props: { title: "Hello" },
-      },
-      breakpoint: "default",
-      version: "v1",
-    });
+    expect(result).toEqual({ success: true });
+    expect(mutateMock).not.toHaveBeenCalled();
 
     await lastOperation?.undo();
-
-    expect(mutateMock).toHaveBeenLastCalledWith({
-      collection: "pages",
-      id: "home",
-      nodeId: "node-1",
-      updates: {
-        props: { title: "Before" },
-      },
-      breakpoint: "default",
-      version: "v1",
-    });
+    expect(mutateMock).not.toHaveBeenCalled();
   });
 
   it("records metadata mutations through history and supports undo", async () => {
@@ -141,30 +122,11 @@ describe("useNodeMutationHistory", () => {
       breakpoint: "default",
     });
 
-    expect(result).toEqual({ success: true, version: "v2" });
-    expect(mutateMock).toHaveBeenCalledWith({
-      collection: "pages",
-      id: "home",
-      nodeId: "node-1",
-      updates: {
-        metadata: nextMetadata,
-      },
-      breakpoint: "default",
-      version: "v1",
-    });
+    expect(result).toEqual({ success: true });
+    expect(mutateMock).not.toHaveBeenCalled();
 
     await lastOperation?.undo();
-
-    expect(mutateMock).toHaveBeenLastCalledWith({
-      collection: "pages",
-      id: "home",
-      nodeId: "node-1",
-      updates: {
-        metadata: previousMetadata,
-      },
-      breakpoint: "default",
-      version: "v1",
-    });
+    expect(mutateMock).not.toHaveBeenCalled();
   });
 
   it("records CMS data source mutations through history and supports undo", async () => {
@@ -208,30 +170,11 @@ describe("useNodeMutationHistory", () => {
       breakpoint: "default",
     });
 
-    expect(result).toEqual({ success: true, version: "v2" });
-    expect(mutateMock).toHaveBeenCalledWith({
-      collection: "pages",
-      id: "home",
-      nodeId: "node-1",
-      updates: {
-        dataSource: nextDataSource,
-      },
-      breakpoint: "default",
-      version: "v1",
-    });
+    expect(result).toEqual({ success: true });
+    expect(mutateMock).not.toHaveBeenCalled();
 
     await lastOperation?.undo();
-
-    expect(mutateMock).toHaveBeenLastCalledWith({
-      collection: "pages",
-      id: "home",
-      nodeId: "node-1",
-      updates: {
-        dataSource: previousDataSource,
-      },
-      breakpoint: "default",
-      version: "v1",
-    });
+    expect(mutateMock).not.toHaveBeenCalled();
   });
 
   it("reconciles local state after the initial mutation, undo, and redo", async () => {
@@ -304,7 +247,7 @@ describe("useNodeMutationHistory", () => {
     expect(mutateMock).not.toHaveBeenCalled();
   });
 
-  it("surfaces invalid mutate responses from the action layer", async () => {
+  it("does not depend on mutation action responses", async () => {
     const { useNodeMutationHistory } =
       await import("../../admin/features/Inspector/composables/useNodeMutationHistory");
 
@@ -333,9 +276,7 @@ describe("useNodeMutationHistory", () => {
       breakpoint: "default",
     });
 
-    expect(result).toEqual({
-      success: false,
-      error: "Invalid node mutation response",
-    });
+    expect(result).toEqual({ success: true });
+    expect(mutateMock).not.toHaveBeenCalled();
   });
 });

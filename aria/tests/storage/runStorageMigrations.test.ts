@@ -125,6 +125,7 @@ describe("runPendingStorageMigrations", () => {
       "0005_integration_events.sql",
       "0006_webhook_delivery.sql",
       "0007_oauth_provider.sql",
+      "0008_published_dependency_pins.sql",
     ]);
 
     for (const migrationId of migrationIds) {
