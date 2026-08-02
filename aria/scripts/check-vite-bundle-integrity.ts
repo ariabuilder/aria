@@ -273,6 +273,11 @@ async function inspectWorkerRuntimeFile(
       message: "Node subprocess support reached the Worker bundle",
     },
     {
+      pattern: /\bcreateRequire\s*\(\s*import\.meta\.url\s*\)/u,
+      message:
+        "CommonJS createRequire() loader reached the Worker bundle",
+    },
+    {
       pattern:
         /Unable to resolve npm's JavaScript CLI|aria-wrangler-sql-|Unsupported deployment command/u,
       message: "Node command orchestration reached the Worker bundle",

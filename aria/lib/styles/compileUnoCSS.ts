@@ -11,7 +11,7 @@ import {
   type UserUnoConfigOverrides,
 } from "./userUnoConfig";
 import type { ResolvedUserTheme } from "./resolvedUserTheme";
-import type { UserConfig } from "unocss";
+import type { UserConfig } from "@unocss/core";
 
 /**
  * Generate compiled CSS: UnoCSS utilities + custom fonts + custom classes.
@@ -40,7 +40,10 @@ export async function compileUnoCSS(
   let utilityCss = "";
 
   try {
-    const { createGenerator } = await import("unocss");
+    // Import the Worker-safe compiler core directly. The broad `unocss`
+    // package also exports Node-oriented transformers; bundling that entry
+    // pulls css-tree's createRequire()-based JSON loader into workerd.
+    const { createGenerator } = await import("@unocss/core");
     const parsedOverrides = parseUserUnoConfigOverrides(unocssConfig);
     const userConfig = createUserUnoConfig(
       parsedOverrides,

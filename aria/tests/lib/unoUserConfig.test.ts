@@ -27,6 +27,9 @@ describe("user Uno defaults", () => {
           "hsl(var(--destructive-foreground) / <alpha-value>)",
       }),
     );
+    expect(config.transformers.map((transformer) => transformer.name)).toEqual([
+      "@unocss/transformer-variant-group",
+    ]);
   });
 
   it("keeps runtime Uno tags aligned with the shared system button shortcuts", () => {
