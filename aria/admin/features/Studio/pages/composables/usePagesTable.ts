@@ -116,7 +116,7 @@ export function usePagesTable(options: UsePagesTableOptions) {
       defaultValue: [],
     },
   });
-  const columns = computed<ColumnDef<PageTreeNode, any>[]>(() => [
+  const columns = computed(() => [
     createSelectColumn<PageTreeNode>() as ColumnDef<PageTreeNode, unknown>,
     columnHelper.accessor((row) => row.page.featuredImage?.src, {
       id: "cover",

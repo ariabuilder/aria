@@ -5,16 +5,15 @@
 
 import type { BuilderNode } from "../types/nodes";
 import {
-  getSlotDefaultContent,
   resolvePublishSlotContent,
   type LayoutWithSlotsLike,
 } from "./slotEditing";
 import {
   getLayoutDefaultSlotName,
-  isNodeInLayoutDefaultSlot,
   resolveNodeSlotForLayout,
   sortRootBlocksByLayoutSlot,
 } from "./resolveNodeSlot";
+import { resolveCanonicalLayoutSlotContent } from "../rendering/canonical/resolveLayoutSlots";
 
 export type ResolveLayoutSlotContentFn = (
   pageNodes: readonly BuilderNode[],
@@ -38,26 +37,9 @@ export function resolveSlotRootsForDisplay(
   const pageRoots = pageNodes.filter(
     (node) => !node.metadata?.layoutDefaultInjected,
   );
-  const pageSlotNodes = pageRoots.filter(
-    (node) => resolveNodeSlotForLayout(node, layout) === slotName,
-  );
-  const defaultSlot = getLayoutDefaultSlotName(layout);
-  const slotDef = layout?.slots?.find((slot) => slot.name === slotName);
-
-  if (slotDef?.isDefault || slotName === defaultSlot) {
-    if (pageSlotNodes.length > 0) {
-      return pageSlotNodes.map(cloneNodeForMerge);
-    }
-    return pageRoots
-      .filter((node) => isNodeInLayoutDefaultSlot(node, layout))
-      .map(cloneNodeForMerge);
-  }
-
-  return getSlotDefaultContent(layout, slotName).map((node) =>
-    cloneNodeForMerge({
-      ...node,
-      slot: node.slot || slotName,
-    }),
+  if (!layout) return [];
+  return resolveCanonicalLayoutSlotContent(pageRoots, layout, slotName).map(
+    (node) => ({ ...node, slot: node.slot || slotName }),
   );
 }
 

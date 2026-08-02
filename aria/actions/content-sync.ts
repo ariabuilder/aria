@@ -24,6 +24,7 @@ import { deriveContentSyncStatus } from "../lib/content-sync/service/status";
 import {
   getCloudflareEnv,
   getStringRuntimeSetting,
+  type AriaCloudflareEnv,
 } from "../lib/cloudflare/env";
 import type { StorageAdapter } from "../lib/storage/adapter";
 import {
@@ -31,12 +32,10 @@ import {
   type RuntimeLocals,
 } from "../lib/storage/getStorageAdapter";
 
-type ContentSyncRuntimeEnv = {
-  aria_db?: D1Database;
-  aria_cache?: KVNamespace;
-  aria_r2?: R2Bucket;
-  R2_PUBLIC_URL?: string;
-};
+type ContentSyncRuntimeEnv = Pick<
+  AriaCloudflareEnv,
+  "aria_db" | "aria_cache" | "aria_r2" | "R2_PUBLIC_URL"
+>;
 
 type ContentSyncActionContext = {
   locals?: RuntimeLocals;
@@ -162,7 +161,7 @@ async function getRemoteContentAdapter(
     const { createRemoteD1Database } = await import("../lib/storage/remote-d1");
 
     return new CloudflareStorageAdapter({
-      aria_db: (await createRemoteD1Database()) as any,
+      aria_db: await createRemoteD1Database(),
     });
   }
 
@@ -177,8 +176,8 @@ async function getRemoteContentAdapter(
 
   const adapter = new CloudflareStorageAdapter({
     aria_db: env.aria_db,
-    aria_cache: env.aria_cache as any,
-    aria_r2: env.aria_r2 as any,
+    aria_cache: env.aria_cache,
+    aria_r2: env.aria_r2,
     R2_PUBLIC_URL:
       typeof env.R2_PUBLIC_URL === "string" ? env.R2_PUBLIC_URL : undefined,
   });

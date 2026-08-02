@@ -27,7 +27,7 @@ type D1HttpPreparedStatement = {
   all<T extends D1HttpQueryRow = D1HttpQueryRow>(): Promise<{
     results?: T[];
   }>;
-  run(): Promise<unknown>;
+  run(): Promise<D1HttpQueryResult>;
 };
 
 /** Reads the Cloudflare API token required for D1 HTTP requests. */

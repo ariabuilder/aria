@@ -1,4 +1,4 @@
-import { createClient } from "@libsql/client";
+import { createClient, type InValue } from "@libsql/client";
 import path from "node:path";
 
 import {
@@ -43,7 +43,10 @@ try {
     : {
         /** Executes a verification query through the local LibSQL client. */
         async execute(sql: string, args: readonly unknown[] = []) {
-          const query = await localClient!.execute({ sql, args: args as any });
+          const query = await localClient!.execute({
+            sql,
+            args: args as InValue[],
+          });
           return { rows: query.rows as Record<string, unknown>[] };
         },
       };

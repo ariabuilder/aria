@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { ref } from "vue";
-// @ts-ignore - vue-resizable-panels types issue
 import { Panel } from "vue-resizable-panels";
 import type { PanelProps, ImperativePanelHandle } from "vue-resizable-panels";
 import { cn } from "@/components/ui/utils";

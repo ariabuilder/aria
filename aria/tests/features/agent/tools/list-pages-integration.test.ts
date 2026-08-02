@@ -5,6 +5,7 @@ import { ariaListPages } from "../../../../admin/features/Agent/lib/tools/conten
 import type { AgentToolActionContext } from "../../../../admin/features/Agent/lib/tools/types";
 import type { SessionUser } from "../../../../lib/auth/types";
 import { SQLiteStorageAdapter } from "../../../../lib/storage/sqlite";
+import { getActionHandler } from "../../../helpers/actionHandler";
 
 const TEST_USER_ID = "550e8400-e29b-41d4-a716-446655440000";
 
@@ -63,8 +64,8 @@ describe("ariaListPages integration", () => {
   });
 
   it("pages.listInventory handler returns data directly", async () => {
-    const raw = await (pages.listInventory as any).handler(
-      {},
+    const raw = await getActionHandler(pages.listInventory)(
+      undefined,
       {
         locals: {} as App.Locals,
         request: new Request("https://aria.test/admin"),

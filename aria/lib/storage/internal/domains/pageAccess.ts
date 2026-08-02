@@ -26,6 +26,7 @@ import {
 } from "../../../authorship/schemas";
 import { parseStoredActivityMetadata } from "../../../schemas/activity";
 import { toStoredPagePolicy, toStoredPagePolicySummary } from "../../helpers";
+import type { ResolvedPageIdentity } from "./contextTypes";
 
 export type PageAccessStorageDomain = Pick<
   StorageAdapter,
@@ -43,16 +44,6 @@ export type PageAccessStorageDomain = Pick<
   | "getPageVersionPins"
   | "deletePageVersion"
 >;
-
-type ResolvedPageIdentity = {
-  id: string;
-  status: string | null;
-  systemRole: StoredPageSystemRole | null;
-  accessMode: StoredPageAccessMode | null;
-  draftVersion: string | null;
-  publishedVersion: string | null;
-  currentVersion: string;
-};
 
 type PageAccessStorageContext = {
   resolvePageIdentity(idOrSlug: string): Promise<ResolvedPageIdentity | null>;

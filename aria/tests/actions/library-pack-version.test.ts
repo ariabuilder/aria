@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { ComponentDSL, PackManifest } from "../../lib/types/nodes";
+import { getActionHandler } from "../helpers/actionHandler";
 
 const { getComponentDSLMock, saveComponentDSLMock, touchContentRevisionMock } =
   vi.hoisted(() => ({
@@ -137,7 +138,7 @@ describe("library pack versions", () => {
     const { library } = await import("../../actions/library");
 
     await expect(
-      (library.installPack as any).handler(
+      getActionHandler(library.installPack)(
         { packId: manifest.id, force: false },
         { locals: {} } as never,
       ),
@@ -161,7 +162,7 @@ describe("library pack versions", () => {
     });
 
     await expect(
-      (library.installComponent as any).handler(
+      getActionHandler(library.installComponent)(
         {
           packId: manifest.id,
           componentId: "valid",

@@ -28,6 +28,7 @@ import {
   normalizeSurfaceForPersistence,
   resolveStoredSemanticSourceHash,
 } from "./surfaceNormalization";
+import type { SharedVersionStorageContext } from "./contextTypes";
 
 export type DslAssetStorageDomain = Pick<
   StorageAdapter,
@@ -43,8 +44,17 @@ export type DslAssetStorageDomain = Pick<
   | "pruneVersionHistory"
 >;
 
-type DslAssetStorageContext = {
-  normalizeVersion: any;
+type DslAssetStorageContext = Pick<
+  SharedVersionStorageContext,
+  | "normalizeVersion"
+  | "resolveLayoutVersionState"
+  | "getStoredVersionRow"
+  | "resolveStoredVersionContentHash"
+  | "syncMediaUsageBestEffort"
+  | "pruneStoredVersionHistory"
+  | "resolveComponentVersionState"
+  | "resolvePageIdentity"
+> & {
   queryFirst<T extends Record<string, unknown>>(
     sql: string,
     args?: readonly unknown[],
@@ -53,15 +63,8 @@ type DslAssetStorageContext = {
     sql: string,
     args?: readonly unknown[],
   ): Promise<T[]>;
-  resolveLayoutVersionState: any;
-  getStoredVersionRow: any;
-  resolveStoredVersionContentHash: any;
-  syncMediaUsageBestEffort: any;
   nowIso: () => string;
   run(sql: string, args?: readonly unknown[]): Promise<void>;
-  pruneStoredVersionHistory: any;
-  resolveComponentVersionState: any;
-  resolvePageIdentity: any;
   bindArgs(args: readonly unknown[]): readonly unknown[];
 };
 

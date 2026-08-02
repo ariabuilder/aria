@@ -22,7 +22,7 @@ afterEach(() => client.close());
 describe("editorial workflow adapter parity", () => {
   it.each([
     ["SQLite", () => new SQLiteStorageAdapter(client, { seedStarterLayouts: false, seedStarterPages: false, seedStarterCms: false, seedStarterDesign: false, seedStarterSiteSettings: false })],
-    ["D1", () => new CloudflareStorageAdapter({ aria_db: createD1Mock(client) } as any)],
+    ["D1", () => new CloudflareStorageAdapter({ aria_db: createD1Mock(client) })],
   ])("keeps autosaves ordered and leases advisory on %s", async (_name, createAdapter) => {
     const adapter = createAdapter();
     const first = await adapter.saveCmsEntryAutosave({ id: "save-1", entryId: "entry", collectionId: "posts", locale: "en", baseVersion: "v1", actorId: "editor", clientSequence: 1, payload: { title: "First" }, checksum: "a".repeat(16), createdAt: now, expiresAt: later });
@@ -43,7 +43,7 @@ describe("editorial workflow adapter parity", () => {
 
   it.each([
     ["SQLite", () => new SQLiteStorageAdapter(client, { seedStarterLayouts: false, seedStarterPages: false, seedStarterCms: false, seedStarterDesign: false, seedStarterSiteSettings: false })],
-    ["D1", () => new CloudflareStorageAdapter({ aria_db: createD1Mock(client) } as any)],
+    ["D1", () => new CloudflareStorageAdapter({ aria_db: createD1Mock(client) })],
   ])("compare-and-swaps reviews and scopes annotation resolution on %s", async (_name, createAdapter) => {
     const adapter = createAdapter();
     const review = await adapter.saveCmsEntryWorkflow({

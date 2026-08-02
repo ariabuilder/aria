@@ -15,7 +15,7 @@ describe("requestLocals", () => {
   });
 
   it("normalizes legacy preferences on request locals", () => {
-    const locals: RequestRuntimeLocals = {
+    const legacyLocals: unknown = {
       user: {
         id: "123e4567-e89b-12d3-a456-426614174000",
         username: "andy",
@@ -26,10 +26,11 @@ describe("requestLocals", () => {
           appearance: {
             themeMode: "dark",
             uiZoom: 100,
-          } as any,
+          },
         },
       },
     };
+    const locals = legacyLocals as RequestRuntimeLocals;
 
     expect(readSessionUserFromLocals(locals)).toEqual({
       id: "123e4567-e89b-12d3-a456-426614174000",

@@ -200,7 +200,9 @@ describe("speech dictation", () => {
   it("uses non-continuous recognition on webkit engines", async () => {
     mockGetUserMedia();
 
-    let lastInstance: any = null;
+    const lastInstance: { current: MockSpeechRecognition | null } = {
+      current: null,
+    };
 
     class MockSpeechRecognition extends EventTarget {
       continuous = true;
@@ -212,7 +214,7 @@ describe("speech dictation", () => {
 
       constructor() {
         super();
-        lastInstance = this;
+        lastInstance.current = this;
       }
 
       start = vi.fn();
@@ -227,8 +229,8 @@ describe("speech dictation", () => {
     await dictation.startListening();
 
     expect(dictation.isSupported).toBe(true);
-    expect(lastInstance?.continuous).toBe(false);
-    expect(lastInstance?.interimResults).toBe(true);
+    expect(lastInstance.current?.continuous).toBe(false);
+    expect(lastInstance.current?.interimResults).toBe(true);
 
     dictation.stopListening();
   });

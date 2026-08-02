@@ -86,7 +86,6 @@ try {
         const rendered = await renderPageDslToHtml({
           page: notFoundPage,
           adapter,
-          locals: Astro.locals,
           logger: (level, message, meta) => {
             log(level, `[404] ${message}`, meta);
           },

@@ -282,7 +282,7 @@ export class AriaStudioAgent extends AIChatAgent<AgentWorkerEnv> {
     const modelMessages = await convertToModelMessages(this.messages, {
       tools,
       ignoreIncompleteToolCalls: true,
-    } as any);
+    });
 
     const timeoutController = new AbortController();
     const timeoutHandle = setTimeout(

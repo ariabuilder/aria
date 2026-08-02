@@ -2,7 +2,28 @@ import { describe, expect, it, vi } from "vitest";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { CloudflareStorageAdapter } from "../../lib/storage/cloudflare";
+import {
+  CloudflareStorageAdapter,
+  type R2BucketLike,
+} from "../../lib/storage/cloudflare";
+
+function createR2Stub(
+  overrides: Partial<R2BucketLike>,
+): R2BucketLike {
+  return {
+    async get() {
+      return null;
+    },
+    async put(key) {
+      return { key };
+    },
+    async delete() {},
+    async list() {
+      return { objects: [], truncated: false };
+    },
+    ...overrides,
+  };
+}
 
 describe("CloudflareStorageAdapter media URL fallback", () => {
   it("lists local uploads alongside R2 objects during development", async () => {
@@ -16,10 +37,10 @@ describe("CloudflareStorageAdapter media URL fallback", () => {
 
       const adapter = new CloudflareStorageAdapter({
         localUploadDir: uploadDir,
-        aria_r2: {
+        aria_r2: createR2Stub({
           list: vi.fn(async () => ({ objects: [], truncated: false })),
-        },
-      } as any);
+        }),
+      });
 
       const items = await adapter.listMedia();
 
@@ -38,7 +59,7 @@ describe("CloudflareStorageAdapter media URL fallback", () => {
   it("listMedia falls back to /uploads URLs when R2_PUBLIC_URL is missing", async () => {
     const adapter = new CloudflareStorageAdapter({
       mirrorMediaLocally: false,
-      aria_r2: {
+      aria_r2: createR2Stub({
         list: vi.fn(async () => ({
           objects: [
             {
@@ -50,7 +71,7 @@ describe("CloudflareStorageAdapter media URL fallback", () => {
           ],
           truncated: false,
         })),
-      } as any,
+      }),
     });
 
     const items = await adapter.listMedia();
@@ -63,7 +84,7 @@ describe("CloudflareStorageAdapter media URL fallback", () => {
   it("listMedia ignores hidden objects", async () => {
     const adapter = new CloudflareStorageAdapter({
       mirrorMediaLocally: false,
-      aria_r2: {
+      aria_r2: createR2Stub({
         list: vi.fn(async () => ({
           objects: [
             {
@@ -85,7 +106,7 @@ describe("CloudflareStorageAdapter media URL fallback", () => {
           ],
           truncated: false,
         })),
-      } as any,
+      }),
     });
 
     const items = await adapter.listMedia();
@@ -97,7 +118,7 @@ describe("CloudflareStorageAdapter media URL fallback", () => {
   it("listMedia ignores site export objects", async () => {
     const adapter = new CloudflareStorageAdapter({
       mirrorMediaLocally: false,
-      aria_r2: {
+      aria_r2: createR2Stub({
         list: vi.fn(async () => ({
           objects: [
             {
@@ -123,7 +144,7 @@ describe("CloudflareStorageAdapter media URL fallback", () => {
           ],
           truncated: false,
         })),
-      } as any,
+      }),
     });
 
     const items = await adapter.listMedia();
@@ -135,7 +156,7 @@ describe("CloudflareStorageAdapter media URL fallback", () => {
   it("listMedia ignores generated thumbnail objects", async () => {
     const adapter = new CloudflareStorageAdapter({
       mirrorMediaLocally: false,
-      aria_r2: {
+      aria_r2: createR2Stub({
         list: vi.fn(async () => ({
           objects: [
             {
@@ -153,7 +174,7 @@ describe("CloudflareStorageAdapter media URL fallback", () => {
           ],
           truncated: false,
         })),
-      } as any,
+      }),
     });
 
     const items = await adapter.listMedia();
@@ -166,9 +187,9 @@ describe("CloudflareStorageAdapter media URL fallback", () => {
     const put = vi.fn(async () => ({ key: "uploads/photo.jpg" }));
     const adapter = new CloudflareStorageAdapter({
       mirrorMediaLocally: false,
-      aria_r2: {
+      aria_r2: createR2Stub({
         put,
-      } as any,
+      }),
     });
 
     const file = new File(["hello"], "photo.jpg", { type: "image/jpeg" });

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { computed } from "vue";
 import { OTPInput, type OTPInputProps } from "vue-input-otp";
 import { cn } from "@/lib/utils";
 
@@ -8,7 +9,13 @@ interface InputOTPProps extends /* @vue-ignore */ OTPInputProps {
   class?: string;
 }
 
-defineProps<InputOTPProps>();
+const props = defineProps<InputOTPProps>();
+const forwardedProps = computed(() => {
+  const forwarded = { ...props };
+  delete forwarded.containerClass;
+  return forwarded;
+});
+
 defineEmits<{
   "update:modelValue": [value: string];
   complete: [value: string];
@@ -20,10 +27,10 @@ defineEmits<{
     :container-class="
       cn(
         'flex items-center gap-2 has-[:disabled]:opacity-50',
-        ($props as any).containerClass,
+        props.containerClass,
       )
     "
-    v-bind="$props"
+    v-bind="forwardedProps"
     @update:model-value="$emit('update:modelValue', $event)"
     @complete="$emit('complete', $event)"
   >

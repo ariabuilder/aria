@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { flushPromises, mount } from "@vue/test-utils";
 import { defineComponent, h, ref } from "vue";
+import type { BuilderNodeFixture } from "../helpers/builderNodeFixture";
 
 vi.mock("@/components/ui/color-picker", async () => {
   const { defineComponent, h } = await import("vue");
@@ -33,12 +34,12 @@ vi.mock("@/components/ui/color-picker", async () => {
 });
 
 const fetchMock = vi.fn();
-const selectedNodeRef = ref<any>(null);
+const selectedNodeRef = ref<BuilderNodeFixture | null>(null);
 const selectedNodeIdRef = ref<string | null>(null);
 const breakpointNameRef = ref("base");
 const isLoadingRef = ref(false);
 const errorRef = ref<string | null>(null);
-const selectionTreeRootNodesRef = ref<any[]>([]);
+const selectionTreeRootNodesRef = ref<BuilderNodeFixture[]>([]);
 const savePropertyMock = vi.fn();
 const savePropertiesMock = vi.fn();
 const previewStylePropertiesMock = vi.fn();

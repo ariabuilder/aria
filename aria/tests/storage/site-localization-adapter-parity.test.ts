@@ -151,7 +151,7 @@ function adapters(): Array<{ name: string; adapter: LocalizationAdapter }> {
       name: "D1",
       adapter: new CloudflareStorageAdapter({
         aria_db: createD1Mock(client),
-      } as any),
+      }),
     },
   ];
 }

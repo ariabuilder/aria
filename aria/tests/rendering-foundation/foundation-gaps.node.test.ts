@@ -56,22 +56,17 @@ describe("Rendering v2 named parity gaps", () => {
     },
   );
 
-  it.fails(
-    "PARITY-03 [owner Phase 4] models exhaustive R2 cursor pagination",
-    async () => {
-      const exportStorage = await source("aria/lib/export/storage.ts");
-      expect(exportStorage).toMatch(/\btruncated\b/u);
-      expect(exportStorage).toMatch(/\bcursor\b/u);
-    },
-  );
+  it("PARITY-03 [resolved Phase 4] models exhaustive R2 cursor pagination", async () => {
+    const exportStorage = await source("aria/lib/export/storage.ts");
+    expect(exportStorage).toMatch(/\btruncated\b/u);
+    expect(exportStorage).toMatch(/\bcursor\b/u);
+  });
 
   it.fails(
     "PARITY-05 [owner Phase 6] rejects Uno compilation failures",
     async () => {
       const compiler = await source("aria/lib/styles/compileUnoCSS.ts");
-      expect(compiler).not.toContain(
-        "falling back to custom CSS only",
-      );
+      expect(compiler).not.toContain("falling back to custom CSS only");
     },
   );
 });

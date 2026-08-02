@@ -4,6 +4,7 @@ import {
   MEDIA_TRANSFORM_INPUT_MAX_BYTES,
   MEDIA_UPLOAD_MAX_BYTES,
 } from "../../lib/media/uploadLimits";
+import { getActionHandler } from "../helpers/actionHandler";
 
 vi.mock("astro:actions", () => ({
   ActionError: class MockActionError extends Error {
@@ -112,7 +113,7 @@ describe("media.upload", () => {
     } as File;
 
     await expect(
-      (media.upload as any).handler({ file }, createContext()),
+      getActionHandler(media.upload)({ file }, createContext()),
     ).rejects.toMatchObject({
       code: "CONTENT_TOO_LARGE",
       message:
@@ -129,7 +130,7 @@ describe("media.upload", () => {
     } as File;
 
     await expect(
-      (media.upload as any).handler({ file }, createContext()),
+      getActionHandler(media.upload)({ file }, createContext()),
     ).rejects.toMatchObject({
       code: "CONTENT_TOO_LARGE",
       message:
@@ -146,7 +147,7 @@ describe("media.upload", () => {
     );
 
     await expect(
-      (media.upload as any).handler({ file }, createContext()),
+      getActionHandler(media.upload)({ file }, createContext()),
     ).resolves.toMatchObject({
       success: true,
       type: "icon",
@@ -171,7 +172,7 @@ describe("media.upload", () => {
     const file = createFile("aria-favicon-light.png", "image/png", createPng());
 
     await expect(
-      (media.upload as any).handler({ file }, createContext()),
+      getActionHandler(media.upload)({ file }, createContext()),
     ).resolves.toMatchObject({
       success: true,
       type: "image",

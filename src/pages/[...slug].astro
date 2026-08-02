@@ -4,7 +4,6 @@
  * Public requests resolve the published page revision only. Preview.
  */
 
-import type { RuntimeLocals } from "../../aria/lib/cloudflare/env";
 import { getStorageAdapterAsync } from "../../aria/lib/storage/getStorageAdapter";
 import type { LayoutDSL, PageDSL } from "../../aria/lib/types/nodes";
 import { LayoutDSLSchema, PageDSLSchema } from "../../aria/lib/schemas/nodes";
@@ -349,7 +348,6 @@ async function renderPageToHtml(
   page: PageDSL,
   requestPath: string,
   adapter: Awaited<ReturnType<typeof getStorageAdapterAsync>>,
-  locals: RuntimeLocals,
   logger: (level: string, message: string, meta?: Record<string, unknown>) => void,
   accessMode?: PageDSL['accessMode'],
   cms?: Parameters<typeof renderPageDslToHtml>[0]['cms'],
@@ -380,7 +378,6 @@ async function renderPageToHtml(
   return renderPageDslToHtml({
     page,
     adapter,
-    locals,
     pathOrSlug: requestPath,
     globalCSSHref,
     accessMode: accessMode ?? page.accessMode,
@@ -481,7 +478,11 @@ function setPublicCacheTags(
  * Structured logger with severity levels for better observability.
  */
 function createLogger(context: string) {
-  return (level: string, message: string, meta?: any) => {
+  return (
+    level: string,
+    message: string,
+    meta?: Record<string, unknown>,
+  ) => {
     const logMessage = `[${context}] ${message}`;
     const logData = meta ? { ...meta } : undefined;
 
@@ -774,7 +775,6 @@ try {
           localizedTemplate.page,
           routePathname,
           adapter,
-          Astro.locals,
           logger,
           policy.accessMode,
           cmsOptions,
@@ -997,7 +997,6 @@ try {
             page,
             Astro.url.pathname,
             adapter,
-            Astro.locals,
             logger,
             policy.accessMode,
             undefined,

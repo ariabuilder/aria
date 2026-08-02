@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { BuilderNode } from "../../lib/types/nodes";
+import { getActionHandler } from "../helpers/actionHandler";
 
 const mockGetSiteSettings = vi.fn();
 const mockSaveSiteSettings = vi.fn();
@@ -103,7 +104,10 @@ describe("icon action handlers integration", () => {
       nodes: [],
       layout: "default",
     });
-    mockGetPageVersionPins.mockResolvedValue(null);
+    mockGetPageVersionPins.mockResolvedValue({
+      currentVersion: "v-current",
+      draftVersion: "v-current",
+    });
 
     mockSavePageDSL.mockResolvedValue("v-next");
     mockTouchContentRevision.mockResolvedValue(undefined);
@@ -113,7 +117,7 @@ describe("icon action handlers integration", () => {
   it("settings.updateIcons normalizes and persists icon settings", async () => {
     const { settings } = await import("../../actions/settings");
 
-    const result = await (settings.updateIcons as any).handler(
+    const result = await getActionHandler(settings.updateIcons)(
       {
         enabledPacks: {
           lucide: false,
@@ -142,7 +146,7 @@ describe("icon action handlers integration", () => {
   it("settings.updateIcons rejects disabled default pack", async () => {
     const { settings } = await import("../../actions/settings");
 
-    const result = await (settings.updateIcons as any).handler(
+    const result = await getActionHandler(settings.updateIcons)(
       {
         enabledPacks: {
           lucide: false,
@@ -173,11 +177,12 @@ describe("icon action handlers integration", () => {
       }),
     ];
 
-    const result = await (save.page as any).handler(
+    const result = await getActionHandler(save.page)(
       {
         id: "home",
         blocks,
         layout: "default",
+        expectedVersion: "v-current",
       },
       { locals: {} } as never,
     );
@@ -214,11 +219,12 @@ describe("icon action handlers integration", () => {
       }),
     ];
 
-    const request = (save.page as any).handler(
+    const request = getActionHandler(save.page)(
       {
         id: "home",
         blocks,
         layout: "default",
+        expectedVersion: "v-current",
       },
       { locals: {} } as never,
     );
@@ -244,11 +250,12 @@ describe("icon action handlers integration", () => {
     });
 
     await expect(
-      (save.page as any).handler(
+      getActionHandler(save.page)(
         {
           id: "home",
           blocks: [],
           layout: "default",
+          expectedVersion: "v-current",
         },
         { locals: {} } as never,
       ),
@@ -277,7 +284,7 @@ describe("icon action handlers integration", () => {
       layout: "default",
     });
 
-    const result = await (nodes.mutate as any).handler(
+    const result = await getActionHandler(nodes.mutate)(
       {
         collection: "pages",
         id: "home",
@@ -330,7 +337,7 @@ describe("icon action handlers integration", () => {
       layout: "default",
     });
 
-    const result = await (nodes.mutate as any).handler(
+    const result = await getActionHandler(nodes.mutate)(
       {
         collection: "pages",
         id: "home",
@@ -369,7 +376,7 @@ describe("icon action handlers integration", () => {
       layout: "default",
     });
 
-    const result = await (nodes.insertNode as any).handler(
+    const result = await getActionHandler(nodes.insertNode)(
       {
         collection: "pages",
         id: "home",
@@ -415,7 +422,7 @@ describe("icon action handlers integration", () => {
     });
 
     await expect(
-      (nodes.insertNode as any).handler(
+      getActionHandler(nodes.insertNode)(
         {
           collection: "pages",
           id: "home",
@@ -461,7 +468,7 @@ describe("icon action handlers integration", () => {
     });
 
     await expect(
-      (nodes.mutate as any).handler(
+      getActionHandler(nodes.mutate)(
         {
           collection: "pages",
           id: "home",

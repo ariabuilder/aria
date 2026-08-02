@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { flushPromises, mount } from "@vue/test-utils";
 import { computed, defineComponent, h, nextTick, ref } from "vue";
+import type { BuilderNodeFixture } from "../helpers/builderNodeFixture";
 
 const getConfigMock = vi.fn();
 const loggerMock = vi.fn();
@@ -8,7 +9,7 @@ const loggerMock = vi.fn();
 const selectedNodeRef = ref(null);
 const selectedNodeIdRef = ref<string | null>(null);
 const selectedNodeIdsRef = ref<string[]>([]);
-const additionalSelectedNodesRef = ref<any[]>([]);
+const additionalSelectedNodesRef = ref<BuilderNodeFixture[]>([]);
 const breakpointNameRef = ref("base");
 const isLoadingRef = ref(false);
 const errorRef = ref<string | null>(null);

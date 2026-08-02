@@ -5,13 +5,13 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { defineComponent, h } from "vue";
-import { mount } from "@vue/test-utils";
+import { mount, type VueWrapper } from "@vue/test-utils";
 import { useSignals } from "../../admin/composables/useSignals";
 
 describe("useSignals", () => {
   let signals: ReturnType<typeof useSignals>;
   let mockIframe: HTMLIFrameElement;
-  let wrapper: any;
+  let wrapper: VueWrapper;
 
   beforeEach(() => {
     // Create a mock iframe

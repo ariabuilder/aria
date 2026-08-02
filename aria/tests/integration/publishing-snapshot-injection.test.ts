@@ -4,6 +4,7 @@ import {
   createActionsSharedAuthMockModule,
   resetActionsSharedAuthMocks,
 } from "../mocks/actions-shared";
+import { getActionHandler } from "../helpers/actionHandler";
 
 const mockGetSiteSettings = vi.fn();
 const mockGetDesignSystem = vi.fn();
@@ -87,7 +88,7 @@ describe("publishing revision injection", () => {
   it("publishes a page revision with custom code and analytics merged", async () => {
     const { publishing } = await import("../../actions/publishing");
 
-    const result = await (publishing.publish as any).handler(
+    const result = await getActionHandler(publishing.publish)(
       {
         id: "home",
         slug: "home",
@@ -121,7 +122,7 @@ describe("publishing revision injection", () => {
   it("reuses the shared CSS regeneration helper before publish", async () => {
     const { publishing } = await import("../../actions/publishing");
 
-    const result = await (publishing.publish as any).handler(
+    const result = await getActionHandler(publishing.publish)(
       {
         id: "home",
         slug: "home",
@@ -147,7 +148,7 @@ describe("publishing revision injection", () => {
       new Error("snapshot read unavailable"),
     );
 
-    const result = await (publishing.publish as any).handler(
+    const result = await getActionHandler(publishing.publish)(
       {
         id: "home",
         slug: "home",
@@ -183,7 +184,7 @@ describe("publishing revision injection", () => {
       version: "v-saved",
     });
 
-    const result = await (publishing.publish as any).handler(
+    const result = await getActionHandler(publishing.publish)(
       {
         id: "home",
         slug: "home",

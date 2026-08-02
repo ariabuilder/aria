@@ -3,9 +3,10 @@ import {
   getCoreRowModel,
   getFilteredRowModel,
   getSortedRowModel,
-  type ColumnDef,
   type ColumnFiltersState,
+  type RowSelectionState,
   type SortingState,
+  type Updater,
   type VisibilityState,
   useVueTable,
 } from "@tanstack/vue-table";
@@ -201,7 +202,7 @@ export function useClassManagerTable(options: UseClassManagerTableOptions) {
     );
   }
 
-  const columns = computed<ColumnDef<ClassManagerRow, any>[]>(() => {
+  const columns = computed(() => {
     const nextColumns = [
       createSelectColumn<ClassManagerRow>(),
       columnHelper.accessor((row) => row.searchText, {
@@ -506,7 +507,7 @@ export function useClassManagerTable(options: UseClassManagerTableOptions) {
         enableColumnFilter: false,
         enableGlobalFilter: false,
       }),
-    ] satisfies ColumnDef<ClassManagerRow, any>[];
+    ];
 
     return nextColumns;
   });
@@ -540,7 +541,7 @@ export function useClassManagerTable(options: UseClassManagerTableOptions) {
       },
     },
     enableRowSelection: true,
-    onRowSelectionChange: (updater: any) => {
+    onRowSelectionChange: (updater: Updater<RowSelectionState>) => {
       rowSelection.value =
         typeof updater === "function" ? updater(rowSelection.value) : updater;
     },

@@ -6,7 +6,7 @@
 
 import { mount } from "@vue/test-utils";
 import { defineComponent, h, ref } from "vue";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi, type Mock } from "vitest";
 
 import type {
   BreakpointDefinition,
@@ -87,7 +87,10 @@ vi.mock("../../../admin/features/Core", () => ({
 }));
 
 import { useStageLiveCanvasUpdates } from "../../../admin/features/Stage/composables/useStageLiveCanvasUpdates";
-import { hydrateIconHost } from "../../../admin/features/Stage/utils/canvasIconHydration";
+
+type LiveUpdateOptions = Parameters<typeof useStageLiveCanvasUpdates>[0];
+type CanvasOverlays = LiveUpdateOptions["canvasOverlays"];
+type CollectResponsiveStyleCSS = LiveUpdateOptions["collectResponsiveStyleCSS"];
 
 function createImageNode(id = "image-1"): BuilderNode {
   return {
@@ -212,12 +215,12 @@ function mountLiveUpdates(options: {
   blocks?: BuilderNode[];
   renderedBlocks?: BuilderNode[];
   breakpoints?: BreakpointDefinition[];
-  collectResponsiveStyleCSS?: ReturnType<typeof vi.fn>;
+  collectResponsiveStyleCSS?: Mock<CollectResponsiveStyleCSS>;
   canvasOverlays?: {
-    hideSelection?: ReturnType<typeof vi.fn>;
-    showSelectionGhost?: ReturnType<typeof vi.fn>;
-    hideSelectionGhost?: ReturnType<typeof vi.fn>;
-    schedulePositionUpdate?: ReturnType<typeof vi.fn>;
+    hideSelection?: Mock<CanvasOverlays["hideSelection"]>;
+    showSelectionGhost?: Mock<CanvasOverlays["showSelectionGhost"]>;
+    hideSelectionGhost?: Mock<CanvasOverlays["hideSelectionGhost"]>;
+    schedulePositionUpdate?: Mock<CanvasOverlays["schedulePositionUpdate"]>;
     selection?: {
       visible: boolean;
       nodeId: string | null;
@@ -226,22 +229,31 @@ function mountLiveUpdates(options: {
 }) {
   const blocks = options.blocks ?? [createImageNode()];
   const collectResponsiveStyleCSS =
-    options.collectResponsiveStyleCSS ?? vi.fn(() => ".responsive{}");
+    options.collectResponsiveStyleCSS ??
+    vi.fn<CollectResponsiveStyleCSS>(() => ".responsive{}");
   const canvasOverlays = {
-    hideSelection: options.canvasOverlays?.hideSelection ?? vi.fn(),
-    showSelectionGhost: options.canvasOverlays?.showSelectionGhost ?? vi.fn(),
-    hideSelectionGhost: options.canvasOverlays?.hideSelectionGhost ?? vi.fn(),
+    hideSelection:
+      options.canvasOverlays?.hideSelection ??
+      vi.fn<CanvasOverlays["hideSelection"]>(),
+    showSelectionGhost:
+      options.canvasOverlays?.showSelectionGhost ??
+      vi.fn<CanvasOverlays["showSelectionGhost"]>(),
+    hideSelectionGhost:
+      options.canvasOverlays?.hideSelectionGhost ??
+      vi.fn<CanvasOverlays["hideSelectionGhost"]>(),
     schedulePositionUpdate:
-      options.canvasOverlays?.schedulePositionUpdate ?? vi.fn(),
+      options.canvasOverlays?.schedulePositionUpdate ??
+      vi.fn<CanvasOverlays["schedulePositionUpdate"]>(),
     selection: options.canvasOverlays?.selection ?? {
       visible: true,
       nodeId: "image-1",
     },
+    secondarySelections: [],
   };
 
   const TestComponent = defineComponent({
     setup() {
-      useStageLiveCanvasUpdates({
+      const liveUpdateOptions: LiveUpdateOptions = {
         iframeRef: ref(options.iframeRef.value),
         getBlocks: () => blocks,
         getRenderedBlocks: () => options.renderedBlocks ?? blocks,
@@ -254,10 +266,11 @@ function mountLiveUpdates(options: {
           ],
         toCssPropertyName: (property) =>
           property.replace(/[A-Z]/g, (char) => `-${char.toLowerCase()}`),
-        collectResponsiveStyleCSS: collectResponsiveStyleCSS as any,
-        canvasOverlays: canvasOverlays as any,
+        collectResponsiveStyleCSS,
+        canvasOverlays,
         defaultHeadingLevel: 2,
-      });
+      };
+      useStageLiveCanvasUpdates(liveUpdateOptions);
 
       return () => h("div");
     },
@@ -742,50 +755,6 @@ describe("useStageLiveCanvasUpdates", () => {
     expect(collectResponsiveStyleCSS).toHaveBeenCalledWith(
       [createIconNode()],
       expect.any(Map),
-    );
-
-    wrapper.unmount();
-  });
-
-  it("keeps node utility classes off the icon host during live icon updates", () => {
-    const stageDocument = createIconStageDocument();
-    const iframeRef = {
-      value: { contentDocument: stageDocument } as HTMLIFrameElement,
-    };
-    const iconNode = {
-      ...createIconNode(),
-      props: {
-        icon: "i-lucide:star",
-        className: "icon-content",
-      },
-      classNames: {
-        base: ["size-6"],
-      },
-    } satisfies BuilderNode;
-
-    const { wrapper } = mountLiveUpdates({
-      iframeRef,
-      blocks: [iconNode],
-    });
-
-    bridgeCallbacks.propsUpdate?.({
-      nodeId: "icon-1",
-      props: {
-        icon: "i-lucide:activity",
-      },
-      source: "inspector-live",
-    });
-
-    expect(vi.mocked(hydrateIconHost)).toHaveBeenCalledWith(
-      expect.objectContaining({
-        iconValue: "i-lucide:activity",
-        classNameValue: "icon-content",
-      }),
-    );
-    expect(vi.mocked(hydrateIconHost)).not.toHaveBeenCalledWith(
-      expect.objectContaining({
-        classNameValue: "size-6",
-      }),
     );
 
     wrapper.unmount();

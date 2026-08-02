@@ -1,4 +1,8 @@
-import { createClient, type Client } from "@libsql/client";
+import {
+  createClient,
+  type Client,
+  type InValue,
+} from "@libsql/client";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import fs from "fs/promises";
 import os from "os";
@@ -6,25 +10,49 @@ import path from "path";
 
 import { ContentSyncRepository } from "../../lib/content-sync/service/repository";
 
-type SqlRow = Record<string, unknown>;
+type RepositoryDatabase = NonNullable<
+  ConstructorParameters<typeof ContentSyncRepository>[1]
+>;
+type RepositoryStatement = ReturnType<RepositoryDatabase["prepare"]>;
 
-function createSqlDatabase(client: Client) {
-  const createStatement = (sql: string, boundArgs: unknown[] = []) => ({
+function toLibsqlValues(values: readonly unknown[]): InValue[] {
+  return values.map((value): InValue => {
+    if (
+      value === null ||
+      typeof value === "string" ||
+      typeof value === "number" ||
+      typeof value === "bigint" ||
+      typeof value === "boolean" ||
+      value instanceof Uint8Array ||
+      value instanceof Date
+    ) {
+      return value;
+    }
+
+    throw new TypeError("Unsupported content-sync SQL argument.");
+  });
+}
+
+function createSqlDatabase(client: Client): RepositoryDatabase {
+  const createStatement = (
+    sql: string,
+    boundArgs: InValue[] = [],
+  ): RepositoryStatement => ({
     bind(...values: unknown[]) {
-      return createStatement(sql, values);
+      return createStatement(sql, toLibsqlValues(values));
     },
-    async first<T extends SqlRow = SqlRow>() {
-      const result = await client.execute({ sql, args: boundArgs as any[] });
+    async first<T = unknown>() {
+      const result = await client.execute({ sql, args: boundArgs });
       return ((result.rows[0] as unknown as T | undefined) ?? null) as T | null;
     },
-    async all<T extends SqlRow = SqlRow>() {
-      const result = await client.execute({ sql, args: boundArgs as any[] });
+    async all<T = unknown>() {
+      const result = await client.execute({ sql, args: boundArgs });
       return {
         results: result.rows as unknown as T[],
       };
     },
     async run() {
-      return client.execute({ sql, args: boundArgs as any[] });
+      return client.execute({ sql, args: boundArgs });
     },
   });
 
@@ -52,7 +80,7 @@ describe("ContentSyncRepository", () => {
   it("persists dry-run jobs and items on a sqlite-like backend", async () => {
     const repository = new ContentSyncRepository(
       undefined,
-      createSqlDatabase(client) as any,
+      createSqlDatabase(client),
     );
 
     await repository.createDryRunJob({
@@ -111,11 +139,12 @@ describe("ContentSyncRepository", () => {
   });
 
   it("uses the D1 binding path for apply jobs and sync anchors", async () => {
+    const bindingName: string = "aria_db";
     const repository = new ContentSyncRepository({
       cfBindings: {
-          aria_db: createSqlDatabase(client),
-        },
-    } as any);
+        [bindingName]: createSqlDatabase(client),
+      },
+    });
 
     await repository.createDryRunJob({
       id: "plan-1",
@@ -193,7 +222,7 @@ describe("ContentSyncRepository", () => {
   it("reconciles stale running apply jobs as failed", async () => {
     const repository = new ContentSyncRepository(
       undefined,
-      createSqlDatabase(client) as any,
+      createSqlDatabase(client),
     );
 
     await repository.createDryRunJob({

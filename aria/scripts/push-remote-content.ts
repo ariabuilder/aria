@@ -139,7 +139,7 @@ async function createPushTargetAdapter(options: CliOptions) {
   const d1 = await createRemoteD1Database(DATABASE_BINDING, { remote: true });
 
   return new CloudflareStorageAdapter({
-    aria_db: d1 as any,
+    aria_db: d1,
   });
 }
 

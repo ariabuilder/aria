@@ -1,8 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { flushPromises, mount } from "@vue/test-utils";
 import { defineComponent, h, ref } from "vue";
+import type { BuilderNodeFixture } from "../helpers/builderNodeFixture";
 
-const selectedNodeRef = ref<any>(null);
+const selectedNodeRef = ref<BuilderNodeFixture | null>(null);
 const selectedNodeIdRef = ref<string | null>(null);
 const breakpointNameRef = ref("base");
 const isLoadingRef = ref(false);

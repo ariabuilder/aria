@@ -6,6 +6,11 @@ import type {
   AriaEntryRecord,
   AriaEntryRevision,
 } from "../../lib/cms/types";
+import type {
+  LayoutLocaleRecord,
+  PageLocaleRecord,
+} from "../../lib/localization/siteTranslationSchemas";
+import { createDefaultUniversalDesignSystem } from "../../lib/styles/universalDesignSystem";
 
 function createStorageAdapterMock(
   overrides: Partial<StorageAdapter> = {},
@@ -78,7 +83,7 @@ function createStorageAdapterMock(
 describe("DefaultContentSyncPlanner", () => {
   it("plans localized page and layout records independently of canonical resources", async () => {
     const planner = new DefaultContentSyncPlanner();
-    const pageLocale = {
+    const pageLocale: PageLocaleRecord = {
       meta: {
         pageId: "about",
         locale: "fr",
@@ -90,8 +95,8 @@ describe("DefaultContentSyncPlanner", () => {
       },
       versions: [],
       routes: [],
-    } as any;
-    const layoutLocale = {
+    };
+    const layoutLocale: LayoutLocaleRecord = {
       meta: {
         layoutId: "main",
         locale: "fr",
@@ -102,7 +107,7 @@ describe("DefaultContentSyncPlanner", () => {
         updatedAt: "2026-03-16T12:01:00.000Z",
       },
       versions: [],
-    } as any;
+    };
 
     const result = await planner.plan({
       request: {
@@ -281,34 +286,43 @@ describe("DefaultContentSyncPlanner", () => {
 
   it("marks mismatched singleton resources as conflicts for manual policy", async () => {
     const planner = new DefaultContentSyncPlanner();
+    const now = "2026-03-16T12:00:00.000Z";
+    const localDesignSystem = createDefaultUniversalDesignSystem();
+    localDesignSystem.artifacts.globalCSSHash = "local-css";
+    localDesignSystem.semanticClasses.hero = {
+      id: "hero",
+      name: "hero",
+      variants: [],
+      pseudoVariants: [],
+      compoundVariants: [],
+      usageCount: 0,
+      createdAt: now,
+      updatedAt: now,
+    };
+    const remoteDesignSystem = createDefaultUniversalDesignSystem();
+    remoteDesignSystem.artifacts.globalCSSHash = "remote-css";
+    remoteDesignSystem.semanticClasses.hero = {
+      id: "hero",
+      name: "hero",
+      variants: [
+        {
+          breakpoint: "base",
+          rules: [{ property: "color", value: "red", important: false }],
+        },
+      ],
+      pseudoVariants: [],
+      compoundVariants: [],
+      usageCount: 0,
+      createdAt: now,
+      updatedAt: now,
+    };
 
     const localAdapter = createStorageAdapterMock({
-      getDesignSystem: async () =>
-        ({
-          artifacts: { globalCSSHash: "local-css" },
-          semanticClasses: {
-            hero: { id: "hero", name: "hero", variants: [] } as any,
-          },
-        }) as any,
+      getDesignSystem: async () => localDesignSystem,
     });
 
     const remoteAdapter = createStorageAdapterMock({
-      getDesignSystem: async () =>
-        ({
-          artifacts: { globalCSSHash: "remote-css" },
-          semanticClasses: {
-            hero: {
-              id: "hero",
-              name: "hero",
-              variants: [
-                {
-                  breakpoint: "base",
-                  rules: [{ property: "color", value: "red" }],
-                },
-              ],
-            } as any,
-          },
-        }) as any,
+      getDesignSystem: async () => remoteDesignSystem,
     });
 
     const result = await planner.plan({

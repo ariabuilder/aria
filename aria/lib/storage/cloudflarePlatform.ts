@@ -18,12 +18,12 @@ type D1PreparedStatementLike = {
   run(): Promise<D1Result>;
 };
 
-type D1DatabaseLike = {
+export type D1DatabaseLike = {
   prepare(sql: string): D1PreparedStatementLike;
   batch(statements: D1PreparedStatementLike[]): Promise<Array<D1Result>>;
 };
 
-type KVNamespaceLike = {
+export type KVNamespaceLike = {
   get(key: string): Promise<string | null>;
   get<T = string | null>(
     key: string,
@@ -57,7 +57,7 @@ type R2ObjectBodyLike = {
   httpMetadata?: { contentType?: string; cacheControl?: string };
 };
 
-type R2BucketLike = {
+export type R2BucketLike = {
   put(
     key: string,
     value: BodyInit | ArrayBuffer | ArrayBufferView | ReadableStream,
@@ -88,10 +88,10 @@ function thumbnailExtensionForContentType(
   return contentType === "image/png" ? "png" : "webp";
 }
 
-type AriaEnv = {
-  aria_db?: D1Database;
-  aria_cache?: KVNamespaceLike;
-  aria_r2?: R2BucketLike;
+export type CloudflareStorageEnv = {
+  aria_db?: unknown;
+  aria_cache?: unknown;
+  aria_r2?: unknown;
   R2_PUBLIC_URL?: string;
   localUploadDir?: string;
   mirrorMediaLocally?: boolean;
@@ -256,6 +256,43 @@ function buildMediaHttpMetadata(contentType?: string): {
     : { cacheControl: MEDIA_OBJECT_CACHE_CONTROL };
 }
 
+function hasCallableProperty(
+  value: object,
+  property: string,
+): boolean {
+  return typeof (value as Record<string, unknown>)[property] === "function";
+}
+
+function isD1DatabaseLike(value: unknown): value is D1DatabaseLike {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    hasCallableProperty(value, "prepare") &&
+    hasCallableProperty(value, "batch")
+  );
+}
+
+function isKVNamespaceLike(value: unknown): value is KVNamespaceLike {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    hasCallableProperty(value, "get") &&
+    hasCallableProperty(value, "put") &&
+    hasCallableProperty(value, "delete")
+  );
+}
+
+function isR2BucketLike(value: unknown): value is R2BucketLike {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    hasCallableProperty(value, "get") &&
+    hasCallableProperty(value, "put") &&
+    hasCallableProperty(value, "delete") &&
+    hasCallableProperty(value, "list")
+  );
+}
+
 export class CloudflareStoragePlatform implements StorageAdapter {
   db?: D1DatabaseLike;
   kv?: KVNamespaceLike;
@@ -266,10 +303,10 @@ export class CloudflareStoragePlatform implements StorageAdapter {
   private localUploadDir: string;
   private mirrorMediaLocallyOverride?: boolean;
 
-  constructor(env?: AriaEnv) {
-    this.db = env?.aria_db as D1DatabaseLike | undefined;
-    this.kv = env?.aria_cache;
-    this.r2 = env?.aria_r2;
+  constructor(env?: CloudflareStorageEnv) {
+    this.db = isD1DatabaseLike(env?.aria_db) ? env.aria_db : undefined;
+    this.kv = isKVNamespaceLike(env?.aria_cache) ? env.aria_cache : undefined;
+    this.r2 = isR2BucketLike(env?.aria_r2) ? env.aria_r2 : undefined;
     this.r2BaseUrl =
       typeof env?.R2_PUBLIC_URL === "string" ? env.R2_PUBLIC_URL : "";
     try {
@@ -380,7 +417,7 @@ export class CloudflareStoragePlatform implements StorageAdapter {
           id: string,
           version: string,
         ) => this.getStoredVersionRow(tableName, id, version),
-        resolveStoredVersionContentHash: (input: any) =>
+        resolveStoredVersionContentHash: (input) =>
           this.resolveStoredVersionContentHash(input),
         syncPageUsage: (id: string, dsl: PageDSL) =>
           this.syncPageUsage(id, dsl),
@@ -425,7 +462,7 @@ export class CloudflareStoragePlatform implements StorageAdapter {
           id: string,
           version: string,
         ) => this.getStoredVersionRow(tableName, id, version),
-        resolveStoredVersionContentHash: (input: any) =>
+        resolveStoredVersionContentHash: (input) =>
           this.resolveStoredVersionContentHash(input),
         syncMediaUsageBestEffort: (
           kind: StoredMediaUsageKind,

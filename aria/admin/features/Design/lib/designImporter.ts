@@ -167,19 +167,19 @@ function addPrefixedImportIssue(
   });
 }
 
+const ImporterBreakpointVariantSchema = z.object({
+  breakpoint: z.string().trim().min(1),
+  rules: z.array(CSSRuleValueSchema).default([]),
+});
+
 const ImporterClassSchema = CustomClassSchema.extend({
-  variants: z.array(z.any()).default([]),
-  pseudoVariants: z.array(z.any()).default([]),
+  variants: z.array(ImporterBreakpointVariantSchema).default([]),
+  pseudoVariants: CustomClassSchema.shape.pseudoVariants,
   usageCount: z.int().min(0).optional(),
   createdAt: z.iso.datetime().optional(),
   updatedAt: z.iso.datetime().optional(),
 }).superRefine((cls, ctx) => {
-  const variants = z.array(
-    z.object({
-      breakpoint: z.string().trim().min(1),
-      rules: z.array(CSSRuleValueSchema).default([]),
-    }),
-  );
+  const variants = z.array(ImporterBreakpointVariantSchema);
   const pseudoVariants = CustomClassSchema.shape.pseudoVariants;
 
   const parsedVariants = variants.safeParse(cls.variants);

@@ -5,6 +5,11 @@ import {
   createTestSessionUser,
   resetActionsSharedAuthMocks,
 } from "../mocks/actions-shared";
+import { getActionHandler } from "../helpers/actionHandler";
+
+type CreateApplyResponseInput = Parameters<
+  (typeof import("../../lib/content-sync/service/executor"))["createContentSyncApplyResponseData"]
+>[0];
 
 const mockPlannerPlan = vi.fn();
 const mockExecutorApply = vi.fn();
@@ -41,7 +46,7 @@ vi.mock("../../lib/content-sync/service/executor", () => ({
   ContentSyncExecutor: class {
     apply = mockExecutorApply;
   },
-  createContentSyncApplyResponseData: (input: any) => ({
+  createContentSyncApplyResponseData: (input: CreateApplyResponseInput) => ({
     job: input.job,
     items: input.items,
     summary: input.summary,
@@ -233,7 +238,7 @@ describe("contentSync actions", () => {
       },
     });
 
-    const result = await (contentSync.apply as any).handler(
+    const result = await getActionHandler(contentSync.apply)(
       {
         jobId: "plan-1",
         idempotencyKey: "8b4a3fd7-77fd-42b2-bf2d-d30ca822ae8c",
@@ -244,7 +249,7 @@ describe("contentSync actions", () => {
               aria_db: {},
             },
         },
-      } as any,
+      } as never,
     );
 
     expect(actionsSharedMocks.resolveAuthorizedMutation).toHaveBeenCalledWith(
@@ -355,7 +360,7 @@ describe("contentSync actions", () => {
       lastMutationKind: "push",
     });
 
-    const result = await (contentSync.apply as any).handler(
+    const result = await getActionHandler(contentSync.apply)(
       {
         jobId: "plan-2",
         idempotencyKey: "494a1ea1-ddf7-40c5-aaaf-e7ddcce8f341",
@@ -366,9 +371,13 @@ describe("contentSync actions", () => {
               aria_db: {},
             },
         },
-      } as any,
+      } as never,
     );
 
+    expect(result.success).toBe(true);
+    if (!result.success) {
+      throw new Error(result.error.message);
+    }
     expect(mockCreateApplyJob).not.toHaveBeenCalled();
     expect(mockExecutorApply).not.toHaveBeenCalled();
     expect(result.data.job.id).toBe("apply-2");
@@ -484,7 +493,7 @@ describe("contentSync actions", () => {
       },
     });
 
-    await (contentSync.apply as any).handler(
+    await getActionHandler(contentSync.apply)(
       {
         jobId: "plan-3",
         idempotencyKey: "22222222-3333-4444-8555-666666666666",
@@ -496,7 +505,7 @@ describe("contentSync actions", () => {
               aria_db: {},
             },
         },
-      } as any,
+      } as never,
     );
 
     expect(mockExecutorApply).toHaveBeenCalledWith(
@@ -565,7 +574,7 @@ describe("contentSync actions", () => {
     mockExecutorApply.mockRejectedValue(new Error("boom"));
 
     await expect(
-      (contentSync.apply as any).handler(
+      getActionHandler(contentSync.apply)(
         {
           jobId: "plan-1",
           idempotencyKey: "8b4a3fd7-77fd-42b2-bf2d-d30ca822ae8c",
@@ -576,7 +585,7 @@ describe("contentSync actions", () => {
                 aria_db: {},
               },
           },
-        } as any,
+        } as never,
       ),
     ).rejects.toMatchObject({
       code: "INTERNAL_SERVER_ERROR",
@@ -705,7 +714,7 @@ describe("contentSync actions", () => {
       },
     });
 
-    const result = await (contentSync.plan as any).handler(
+    const result = await getActionHandler(contentSync.plan)(
       { direction: "push", conflictPolicy: "newest-wins" },
       {
         locals: {
@@ -713,7 +722,7 @@ describe("contentSync actions", () => {
               aria_db: {},
             },
         },
-      } as any,
+      } as never,
     );
 
     expect(mockPlannerPlan).toHaveBeenCalledWith(
@@ -807,13 +816,13 @@ describe("contentSync actions", () => {
     const { contentSync } = await import("../../actions/content-sync");
 
     await expect(
-      (contentSync.plan as any).handler(
+      getActionHandler(contentSync.plan)(
         { direction: "push", conflictPolicy: "newest-wins" },
         {
           locals: {
             cfBindings: {},
           },
-        } as any,
+        } as never,
       ),
     ).rejects.toMatchObject({
       code: "BAD_REQUEST",
@@ -851,13 +860,13 @@ describe("contentSync actions", () => {
       evaluatedAt: "2026-03-16T12:05:00.000Z",
     });
 
-    const result = await (contentSync.status as any).handler(undefined, {
+    const result = await getActionHandler(contentSync.status)(undefined, {
       locals: {
         cfBindings: {
           aria_db: {},
         },
       },
-    } as any);
+    } as never);
 
     expect(actionsSharedMocks.requireOperation).toHaveBeenCalledWith(
       expect.anything(),
@@ -927,11 +936,11 @@ describe("contentSync actions", () => {
       },
     ]);
 
-    const result = await (contentSync.status as any).handler({}, {
+    const result = await getActionHandler(contentSync.status)(undefined, {
       locals: {
         cfBindings: {},
       },
-    } as any);
+    } as never);
 
     expect(mockDeriveContentSyncStatus).not.toHaveBeenCalled();
     expect(mockReconcileStaleApplyJobs).toHaveBeenCalledTimes(1);
@@ -1005,9 +1014,9 @@ describe("contentSync actions", () => {
       },
     ]);
 
-    const result = await (contentSync.history as any).handler(
+    const result = await getActionHandler(contentSync.history)(
       { mode: "apply", limit: 5 },
-      { locals: { cfBindings: {} } } as any,
+      { locals: { cfBindings: {} } } as never,
     );
 
     expect(mockGetHistoryJobsWithItems).toHaveBeenCalledWith({

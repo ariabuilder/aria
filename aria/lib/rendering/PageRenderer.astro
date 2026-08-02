@@ -43,13 +43,13 @@ function getClassName(node: BuilderNode): string | undefined {
  */
 function getInlineStyles(
   node: BuilderNode,
-): { [key: string]: any } | undefined {
+): Record<string, string> | undefined {
   if (mode === "production") return undefined; // Use classes in production
 
   // Convert StyleMap to inline styles for editor
   if (!node.styles) return undefined;
 
-  const inlineStyles: { [key: string]: any } = {};
+  const inlineStyles: Record<string, string> = {};
 
   const getResponsiveValue = (
     value: unknown,
@@ -223,7 +223,7 @@ function getInlineStyles(
 /**
  * Get CSS style string from object
  */
-function stylesToString(styles: { [key: string]: any }): string {
+function stylesToString(styles: Record<string, string>): string {
   return Object.entries(styles)
     .map(([key, value]) => `${key}: ${value}`)
     .join("; ");

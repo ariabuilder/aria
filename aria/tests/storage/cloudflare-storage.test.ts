@@ -189,7 +189,7 @@ describe("CloudflareStorageAdapter", () => {
 
   it("uses canonical aria_page tables for page CRUD", async () => {
     const adapter = new CloudflareStorageAdapter({
-      aria_db: createD1Mock(client) as any,
+      aria_db: createD1Mock(client),
     });
 
     const version = await adapter.savePageDSL(samplePage.id, samplePage);
@@ -205,7 +205,7 @@ describe("CloudflareStorageAdapter", () => {
 
   it("stores canonical surface sources and source hashes for every DSL kind", async () => {
     const adapter = new CloudflareStorageAdapter({
-      aria_db: createD1Mock(client) as any,
+      aria_db: createD1Mock(client),
     });
     const page = {
       ...samplePage,
@@ -286,7 +286,7 @@ describe("CloudflareStorageAdapter", () => {
 
   it("rejects invalid recursive page input before creating D1 rows", async () => {
     const adapter = new CloudflareStorageAdapter({
-      aria_db: createD1Mock(client) as any,
+      aria_db: createD1Mock(client),
     });
     const cyclicNode: Record<string, unknown> = {
       id: "cycle",
@@ -322,7 +322,7 @@ describe("CloudflareStorageAdapter", () => {
 
   it("allows exactly one concurrent guarded page save", async () => {
     const adapter = new CloudflareStorageAdapter({
-      aria_db: createD1Mock(client) as any,
+      aria_db: createD1Mock(client),
     });
     await adapter.savePageDSL(samplePage.id, samplePage, {
       preserveVersion: true,
@@ -368,7 +368,7 @@ describe("CloudflareStorageAdapter", () => {
 
   it("commits a guarded page and layout draft in one D1 batch", async () => {
     const adapter = new CloudflareStorageAdapter({
-      aria_db: createD1Mock(client) as any,
+      aria_db: createD1Mock(client),
     });
     await adapter.saveLayoutDSL(sampleLayout.id, sampleLayout, {
       preserveVersion: true,
@@ -422,7 +422,7 @@ describe("CloudflareStorageAdapter", () => {
 
   it("never lets a guarded save and publish overwrite each other's pointers", async () => {
     const adapter = new CloudflareStorageAdapter({
-      aria_db: createD1Mock(client) as any,
+      aria_db: createD1Mock(client),
     });
     await adapter.savePageDSL(samplePage.id, samplePage, {
       preserveVersion: true,
@@ -474,7 +474,7 @@ describe("CloudflareStorageAdapter", () => {
 
   it("automatically prunes page history to the default retention limit", async () => {
     const adapter = new CloudflareStorageAdapter({
-      aria_db: createD1Mock(client) as any,
+      aria_db: createD1Mock(client),
     });
     const savedVersions: string[] = [];
 
@@ -501,7 +501,7 @@ describe("CloudflareStorageAdapter", () => {
 
   it("keeps draft and published page revisions separate", async () => {
     const adapter = new CloudflareStorageAdapter({
-      aria_db: createD1Mock(client) as any,
+      aria_db: createD1Mock(client),
     });
 
     await adapter.savePageDSL(samplePage.id, samplePage, {
@@ -556,7 +556,7 @@ describe("CloudflareStorageAdapter", () => {
 
   it("surfaces scheduled status and scheduledFor in page inventory", async () => {
     const adapter = new CloudflareStorageAdapter({
-      aria_db: createD1Mock(client) as any,
+      aria_db: createD1Mock(client),
     });
 
     await adapter.savePageDSL(samplePage.id, samplePage, {
@@ -576,7 +576,7 @@ describe("CloudflareStorageAdapter", () => {
 
   it("clears scheduling metadata when unpublishing a scheduled page", async () => {
     const adapter = new CloudflareStorageAdapter({
-      aria_db: createD1Mock(client) as any,
+      aria_db: createD1Mock(client),
     });
 
     await adapter.savePageDSL(samplePage.id, samplePage, {
@@ -595,7 +595,7 @@ describe("CloudflareStorageAdapter", () => {
 
   it("cancels a scheduled page when a newer draft is saved", async () => {
     const adapter = new CloudflareStorageAdapter({
-      aria_db: createD1Mock(client) as any,
+      aria_db: createD1Mock(client),
     });
     await adapter.savePageDSL(samplePage.id, samplePage);
     await adapter.schedulePageDSL(
@@ -698,7 +698,7 @@ describe("CloudflareStorageAdapter", () => {
     ]);
 
     const adapter = new CloudflareStorageAdapter({
-      aria_db: createD1Mock(client) as any,
+      aria_db: createD1Mock(client),
     });
 
     await expect(
@@ -792,7 +792,7 @@ describe("CloudflareStorageAdapter", () => {
     ]);
 
     const adapter = new CloudflareStorageAdapter({
-      aria_db: createD1Mock(client) as any,
+      aria_db: createD1Mock(client),
     });
     await expect(
       adapter.savePagePolicy({
@@ -811,7 +811,7 @@ describe("CloudflareStorageAdapter", () => {
 
   it("reads and writes typed page policy and access sessions", async () => {
     const adapter = new CloudflareStorageAdapter({
-      aria_db: createD1Mock(client) as any,
+      aria_db: createD1Mock(client),
     });
 
     await adapter.savePageDSL(samplePage.id, samplePage);
@@ -912,7 +912,7 @@ describe("CloudflareStorageAdapter", () => {
 
   it("keeps D1 page roles synchronized with CMS assignments", async () => {
     const adapter = new CloudflareStorageAdapter({
-      aria_db: createD1Mock(client) as any,
+      aria_db: createD1Mock(client),
     });
     const listPage: PageDSL = {
       ...samplePage,
@@ -970,8 +970,8 @@ describe("CloudflareStorageAdapter", () => {
 
   it("invalidates draft and published page thumbnails when page revisions change", async () => {
     const adapter = new CloudflareStorageAdapter({
-      aria_db: createD1Mock(client) as any,
-      aria_r2: new MemoryR2() as any,
+      aria_db: createD1Mock(client),
+      aria_r2: new MemoryR2(),
       R2_PUBLIC_URL: "https://assets.example.com",
     });
 
@@ -1017,8 +1017,8 @@ describe("CloudflareStorageAdapter", () => {
 
   it("preserves page thumbnail content type metadata in R2", async () => {
     const adapter = new CloudflareStorageAdapter({
-      aria_db: createD1Mock(client) as any,
-      aria_r2: new MemoryR2() as any,
+      aria_db: createD1Mock(client),
+      aria_r2: new MemoryR2(),
       R2_PUBLIC_URL: "https://assets.example.com",
     });
 
@@ -1035,8 +1035,8 @@ describe("CloudflareStorageAdapter", () => {
 
   it("serves thumbnails from worker-relative URLs when R2_PUBLIC_URL is unset", async () => {
     const adapter = new CloudflareStorageAdapter({
-      aria_db: createD1Mock(client) as any,
-      aria_r2: new MemoryR2() as any,
+      aria_db: createD1Mock(client),
+      aria_r2: new MemoryR2(),
     });
 
     const savedPageUrl = await adapter.savePageThumbnail(
@@ -1065,8 +1065,8 @@ describe("CloudflareStorageAdapter", () => {
   it("lists stored page thumbnail ids across paginated R2 results", async () => {
     const r2 = new MemoryR2();
     const adapter = new CloudflareStorageAdapter({
-      aria_db: createD1Mock(client) as any,
-      aria_r2: r2 as any,
+      aria_db: createD1Mock(client),
+      aria_r2: r2,
       R2_PUBLIC_URL: "https://assets.example.com",
     });
 
@@ -1081,7 +1081,7 @@ describe("CloudflareStorageAdapter", () => {
 
   it("compares legacy D1 rows by normalized semantic source hash", async () => {
     const adapter = new CloudflareStorageAdapter({
-      aria_db: createD1Mock(client) as any,
+      aria_db: createD1Mock(client),
     });
     const firstVersion = await adapter.savePageDSL(samplePage.id, samplePage);
     const stored = await client.execute({
@@ -1111,7 +1111,7 @@ describe("CloudflareStorageAdapter", () => {
 
   it("prunes intermediate page history while keeping latest and pinned revisions", async () => {
     const adapter = new CloudflareStorageAdapter({
-      aria_db: createD1Mock(client) as any,
+      aria_db: createD1Mock(client),
     });
 
     const firstVersion = await adapter.savePageDSL(samplePage.id, samplePage);
@@ -1151,7 +1151,7 @@ describe("CloudflareStorageAdapter", () => {
 
   it("stores layouts and components in canonical tables", async () => {
     const adapter = new CloudflareStorageAdapter({
-      aria_db: createD1Mock(client) as any,
+      aria_db: createD1Mock(client),
     });
 
     await adapter.saveLayoutDSL(sampleLayout.id, sampleLayout);
@@ -1185,8 +1185,8 @@ describe("CloudflareStorageAdapter", () => {
   it("stores builder state in D1 and mirrors snapshots to KV cache", async () => {
     const kv = new MemoryKv();
     const adapter = new CloudflareStorageAdapter({
-      aria_db: createD1Mock(client) as any,
-      aria_cache: kv as any,
+      aria_db: createD1Mock(client),
+      aria_cache: kv,
     });
 
     await adapter.saveOrder("pages", ["home", "pricing"]);
@@ -1205,7 +1205,7 @@ describe("CloudflareStorageAdapter", () => {
 
   it("persists canonical design-system style artifacts as segmented aria_styles rows", async () => {
     const adapter = new CloudflareStorageAdapter({
-      aria_db: createD1Mock(client) as any,
+      aria_db: createD1Mock(client),
     });
 
     await adapter.saveDesignSystem(
@@ -1245,7 +1245,7 @@ describe("CloudflareStorageAdapter", () => {
 
   it("reads only requested design-system segments", async () => {
     const adapter = new CloudflareStorageAdapter({
-      aria_db: createD1Mock(client) as any,
+      aria_db: createD1Mock(client),
     });
 
     const source = normalizeStylesDataToUniversalDesignSystem(sampleStyles);
@@ -1275,7 +1275,7 @@ describe("CloudflareStorageAdapter", () => {
 
   it("tracks content revision state in D1", async () => {
     const adapter = new CloudflareStorageAdapter({
-      aria_db: createD1Mock(client) as any,
+      aria_db: createD1Mock(client),
     });
 
     const first = await adapter.touchContentRevision({
@@ -1306,7 +1306,7 @@ describe("CloudflareStorageAdapter", () => {
 
   it("lists indexed media usage by logical path", async () => {
     const adapter = new CloudflareStorageAdapter({
-      aria_db: createD1Mock(client) as any,
+      aria_db: createD1Mock(client),
     });
 
     await adapter.getOrder("pages");
@@ -1435,7 +1435,7 @@ describe("CloudflareStorageAdapter", () => {
 
   it("skips settings audit v2 migration when expanded schema already exists", async () => {
     const adapter = new CloudflareStorageAdapter({
-      aria_db: createD1Mock(client) as any,
+      aria_db: createD1Mock(client),
     });
 
     await adapter.getSiteSettings();
@@ -1450,7 +1450,7 @@ describe("CloudflareStorageAdapter", () => {
     expect(firstInitTables).not.toContain("aria_settings_audit_v2");
 
     const secondAdapter = new CloudflareStorageAdapter({
-      aria_db: createD1Mock(client) as any,
+      aria_db: createD1Mock(client),
     });
     await secondAdapter.getSiteSettings();
 
@@ -1484,7 +1484,7 @@ describe("CloudflareStorageAdapter", () => {
     });
 
     const adapter = new CloudflareStorageAdapter({
-      aria_db: createD1Mock(client) as any,
+      aria_db: createD1Mock(client),
     });
 
     await adapter.getSiteSettings();

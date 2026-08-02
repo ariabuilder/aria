@@ -80,14 +80,15 @@ function coerceString(value: unknown): string {
     : "";
 }
 
-function sanitizeStyleSection<T extends Record<string, any>>(
+function sanitizeStyleSection<T extends object>(
   template: T,
   value: unknown,
 ): T {
   const source = isRecord(value) ? value : {};
 
   return Object.fromEntries(
-    Object.entries(template).map(([key, templateValue]) => {
+    Object.entries(template as Record<string, unknown>).map(
+      ([key, templateValue]) => {
       const nextValue = source[key];
 
       if (isRecord(templateValue)) {
@@ -95,7 +96,8 @@ function sanitizeStyleSection<T extends Record<string, any>>(
       }
 
       return [key, coerceString(nextValue)];
-    }),
+      },
+    ),
   ) as T;
 }
 

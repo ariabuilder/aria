@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { getActionHandler } from "../../helpers/actionHandler";
 
 const {
   getStorageAdapterAsyncMock,
@@ -108,7 +109,7 @@ describe("MCP token activation", () => {
   });
 
   it("enables MCP before issuing the first token", async () => {
-    await (agent.createMcpToken as any).handler(
+    await getActionHandler(agent.createMcpToken)(
       { type: "personal", name: "Personal", scopes: ["mcp:read"] },
       { locals: {} },
     );

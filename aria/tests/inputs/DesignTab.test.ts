@@ -1,9 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { mount } from "@vue/test-utils";
 import { defineComponent, h, ref } from "vue";
+import type { BuilderNodeFixture } from "../helpers/builderNodeFixture";
 
-const selectedNodeRef = ref<any>(null);
-const selectionTreeRootNodesRef = ref<any[]>([]);
+const selectedNodeRef = ref<BuilderNodeFixture | null>(null);
+const selectionTreeRootNodesRef = ref<BuilderNodeFixture[]>([]);
 
 const selectedNodeIdRef = ref<string | null>(null);
 
@@ -28,7 +29,7 @@ vi.mock("../../admin/features/Core", () => ({
   }),
   useSelectionTreeState: () => ({
     selectionTreeRootNodes: selectionTreeRootNodesRef,
-    setSelectionTreeRootNodes: (next: any[]) => {
+    setSelectionTreeRootNodes: (next: BuilderNodeFixture[]) => {
       selectionTreeRootNodesRef.value = next;
     },
   }),

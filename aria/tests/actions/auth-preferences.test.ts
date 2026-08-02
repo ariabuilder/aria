@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { getActionHandler } from "../helpers/actionHandler";
 
 const getUserByIdMock = vi.fn();
 const updateUserMock = vi.fn();
@@ -70,7 +71,7 @@ describe("auth preferences actions", () => {
       },
     });
 
-    const result = await (updatePreferences as any).handler(
+    const result = await getActionHandler(updatePreferences)(
       {
         appearance: {
           themeId: "astro",
@@ -103,10 +104,10 @@ describe("auth preferences actions", () => {
     });
 
     await expect(
-      (updatePreferences as any).handler(
+      getActionHandler(updatePreferences)(
         {
           appearance: {
-            themeId: "invalid",
+            themeId: "invalid" as unknown as "cloudflare",
             colorScheme: "light",
             fontFamily: "Outfit",
             uiZoom: 1,
@@ -136,7 +137,7 @@ describe("auth preferences actions", () => {
       },
     });
 
-    const result = await (getMe as any).handler({}, { locals: {} });
+    const result = await getActionHandler(getMe)(undefined, { locals: {} });
     expect(result.user.preferences?.appearance?.themeId).toBe("astro");
   });
 });

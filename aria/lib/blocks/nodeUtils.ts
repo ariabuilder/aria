@@ -16,6 +16,9 @@ import { BuilderNodeSchema } from "../schemas/nodes";
 import { NodeMotionSchema } from "../motion/schemas/nodeMotion.schema";
 import { generateNodeId as createNodeId } from "../ids/nodeId";
 import { log } from "../utils/logger";
+import { getComponentReferenceId } from "./componentReference";
+
+export { getComponentReferenceId } from "./componentReference";
 
 export function generateNodeId(): string {
   return createNodeId();
@@ -45,25 +48,6 @@ function createCircularReferencePlaceholder(
       },
     ],
   };
-}
-
-export function getComponentReferenceId(node: BuilderNode): string | null {
-  const referenceMasterId = node.reference?.masterId;
-  if (typeof referenceMasterId === "string" && referenceMasterId.length > 0) {
-    return referenceMasterId;
-  }
-
-  const referenceId = node.reference?.id;
-  if (typeof referenceId === "string" && referenceId.length > 0) {
-    return referenceId;
-  }
-
-  const propComponentId = node.props?.componentId;
-  if (typeof propComponentId === "string" && propComponentId.length > 0) {
-    return propComponentId;
-  }
-
-  return null;
 }
 
 /**

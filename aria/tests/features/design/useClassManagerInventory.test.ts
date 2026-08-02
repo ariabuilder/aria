@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ref } from "vue";
 import { createSimplePage } from "../../fixtures/testDataGenerator";
+import type { ComponentDSL, LayoutDSL } from "../../../lib/types/nodes";
 
 const fetchBuilderDataMock = vi.fn();
 const loadClassesMock = vi.fn();
@@ -15,8 +16,8 @@ const refreshCssMock = vi.fn();
 const clearActiveClassMock = vi.fn();
 
 const pagesRef = ref([{ id: "home", slug: "home", title: "Home" }]);
-const layoutsRef = ref<any[]>([]);
-const componentsRef = ref<any[]>([]);
+const layoutsRef = ref<LayoutDSL[]>([]);
+const componentsRef = ref<ComponentDSL[]>([]);
 const customClassesRef = ref<Record<string, never>>({});
 const currentBreakpointRef = ref("base");
 

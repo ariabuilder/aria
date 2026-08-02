@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ActionError as ClientActionError } from "../../../node_modules/astro/dist/actions/runtime/client.js";
 
 import { decodeRenderActionErrorMessage } from "../../lib/rendering/actionErrorMessage";
+import { getActionHandler } from "../helpers/actionHandler";
 
 const {
   assertPageLayoutChangeAllowedMock,
@@ -106,12 +107,13 @@ describe("save action nonce handling", () => {
   it("does not spend a nonce for an ordinary non-empty page save", async () => {
     const { save } = await import("../../actions/save");
 
-    const result = await (save.page as any).handler(
+    const result = await getActionHandler(save.page)(
       {
         id: "home",
         blocks: [{ id: "hero", type: "section", props: {}, children: [] }],
         layout: "default",
         nonce: "nonce-current",
+        expectedVersion: "v-current",
       },
       { locals: {} } as never,
     );
@@ -131,12 +133,13 @@ describe("save action nonce handling", () => {
     });
 
     await expect(
-      (save.page as any).handler(
+      getActionHandler(save.page)(
         {
           id: "home",
           blocks: [{ id: "hero", type: "section", props: {}, children: [] }],
           layout: "default",
           nonce: "nonce-current",
+          expectedVersion: "v-current",
         },
         { locals: {} } as never,
       ),
@@ -161,8 +164,14 @@ describe("save action nonce handling", () => {
     });
 
     await expect(
-      (save.page as any).handler(
-        { id: "home", blocks: [], layout: "default", nonce: "nonce-current" },
+      getActionHandler(save.page)(
+        {
+          id: "home",
+          blocks: [],
+          layout: "default",
+          nonce: "nonce-current",
+          expectedVersion: "v-current",
+        },
         { locals: {} } as never,
       ),
     ).resolves.toEqual({ version: "v-next" });
@@ -184,7 +193,7 @@ describe("save action nonce handling", () => {
     const { save } = await import("../../actions/save");
 
     await expect(
-      (save.page as any).handler(
+      getActionHandler(save.page)(
         {
           id: "home",
           blocks: [{ id: "hero", type: "section", props: {}, children: [] }],
@@ -217,12 +226,13 @@ describe("save action nonce handling", () => {
 
     let thrown: unknown;
     try {
-      await (save.page as any).handler(
+      await getActionHandler(save.page)(
         {
           id: "home",
           blocks: [cyclicNode],
           layout: "default",
           nonce: "nonce-current",
+          expectedVersion: "v-current",
         },
         { locals: {} } as never,
       );
@@ -269,7 +279,7 @@ describe("save action nonce handling", () => {
     for (let index = 0; index < 65; index += 1) settings = [settings];
 
     await expect(
-      (save.page as any).handler(
+      getActionHandler(save.page)(
         {
           id: "home",
           blocks: [],
@@ -294,7 +304,7 @@ describe("save action nonce handling", () => {
   it("forwards the current Composer version to the storage save boundary", async () => {
     const { save } = await import("../../actions/save");
 
-    await (save.page as any).handler(
+    await getActionHandler(save.page)(
       {
         id: "home",
         blocks: [{ id: "hero", type: "section", props: {}, children: [] }],
@@ -325,7 +335,7 @@ describe("save action nonce handling", () => {
     );
 
     await expect(
-      (save.page as any).handler(
+      getActionHandler(save.page)(
         {
           id: "home",
           blocks: [{ id: "hero", type: "section", props: {}, children: [] }],
@@ -343,12 +353,13 @@ describe("save action nonce handling", () => {
     saveResourceMock.mockRejectedValue(new Error("storage failed"));
 
     await expect(
-      (save.page as any).handler(
+      getActionHandler(save.page)(
         {
           id: "home",
           blocks: [{ id: "hero", type: "section", props: {}, children: [] }],
           layout: "default",
           nonce: "nonce-current",
+          expectedVersion: "v-current",
         },
         { locals: {} } as never,
       ),

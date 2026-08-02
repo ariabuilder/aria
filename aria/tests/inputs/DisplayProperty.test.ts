@@ -9,9 +9,15 @@ import {
   designComposableMocks,
 } from "./helpers/inspectorPropertyTestState";
 
-const selectedNodeRef = ref<Record<string, unknown> | null>(null);
+type DisplayTestNode = Record<string, unknown> & {
+  id: string;
+  styles?: Record<string, unknown>;
+  children?: DisplayTestNode[];
+};
+
+const selectedNodeRef = ref<DisplayTestNode | null>(null);
 const selectedNodeIdRef = ref<string | null>(null);
-const selectionTreeRootNodesRef = ref([]);
+const selectionTreeRootNodesRef = ref<DisplayTestNode[]>([]);
 const breakpointNameRef = ref("base");
 const isLoadingRef = ref(false);
 const errorRef = ref<string | null>(null);
@@ -42,7 +48,10 @@ const getComputedStyleValueMock = vi.fn(
     breakpoint = "base",
     targetNodeId?: string,
   ) => {
-    const findNodeById = (nodes: Array<any>, nodeId: string): any | null => {
+    const findNodeById = (
+      nodes: DisplayTestNode[],
+      nodeId: string,
+    ): DisplayTestNode | null => {
       for (const node of nodes) {
         if (node.id === nodeId) {
           return node;

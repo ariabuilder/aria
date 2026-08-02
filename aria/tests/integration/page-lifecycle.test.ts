@@ -629,13 +629,16 @@ describe("Page Lifecycle - Integration Tests", () => {
     });
 
     it("should reject invalid page content on save", async () => {
-      const invalidPage = {
+      const invalidPage: unknown = {
         nodes: { "not-a-uuid": { id: "invalid" } },
         rootNodeId: "not-a-uuid",
         metadata: { title: "Invalid" },
-      } as any;
+      };
 
-      const result = await storage.save("invalid", invalidPage);
+      const result = await storage.save(
+        "invalid",
+        invalidPage as Parameters<typeof storage.save>[1],
+      );
 
       expect(result.success).toBe(false);
       expect(result.error).toBeDefined();
