@@ -71,6 +71,7 @@ function mountLayerItem(options: {
   hasChildren?: boolean;
   canAcceptChildren?: boolean;
   selected?: boolean;
+  expanding?: boolean;
   dropIndicatorClass?: "" | "drop-before" | "drop-after" | "drop-inside";
 }) {
   return mount(LayerItem, {
@@ -78,6 +79,7 @@ function mountLayerItem(options: {
       node: createNode("node-1", "Container"),
       selected: options.selected ?? false,
       expanded: options.expanded ?? false,
+      expanding: options.expanding ?? false,
       hasChildren: options.hasChildren ?? true,
       canAcceptChildren: options.canAcceptChildren ?? true,
       depth: 0,
@@ -161,6 +163,23 @@ describe("LayerItem", () => {
     await row.trigger("dragover", { clientY: 120, dataTransfer });
     vi.advanceTimersByTime(650);
     expect(wrapper.emitted("toggle-expand")).toHaveLength(1);
+  });
+
+  it("keeps expansion visibly busy and exposes its state accessibly", () => {
+    const wrapper = mountLayerItem({
+      expanded: false,
+      expanding: true,
+      hasChildren: true,
+    });
+    const button = wrapper.get("button[aria-expanded]");
+
+    expect(button.attributes("aria-busy")).toBe("true");
+    expect(button.attributes("aria-label")).toContain("Expanding");
+    expect(
+      button
+        .findAll("div")
+        .some((node) => node.classes().includes("i-hugeicons:loading-01")),
+    ).toBe(true);
   });
 
   it("cancels pending auto-expand when the pointer moves to an edge zone", async () => {

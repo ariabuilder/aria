@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { mount } from "@vue/test-utils";
-import { defineComponent, h, ref } from "vue";
+import { defineComponent, h, nextTick, ref } from "vue";
 
 const mockAgentRuntime = vi.hoisted(() => ({
   isWorking: { value: false },
@@ -165,17 +165,14 @@ vi.mock("@/features/Studio/core/components/ExpandableSearchInput.vue", () => ({
   }),
 }));
 
-vi.mock(
-  "@/features/Composer/components/ComposerCanvasOptionsMenu.vue",
-  () => ({
-    default: defineComponent({
-      name: "ComposerCanvasOptionsMenu",
-      setup() {
-        return () => h("div", { "data-testid": "canvas-options-menu" });
-      },
-    }),
+vi.mock("@/features/Composer/components/ComposerCanvasOptionsMenu.vue", () => ({
+  default: defineComponent({
+    name: "ComposerCanvasOptionsMenu",
+    setup() {
+      return () => h("div", { "data-testid": "canvas-options-menu" });
+    },
   }),
-);
+}));
 
 vi.mock("@/components/ui/popover", () => ({
   Popover: defineComponent({
@@ -223,24 +220,24 @@ vi.mock("@/components/ui/command", () => ({
   }),
 }));
 
-vi.mock("@/features/Composer/composables/useComposerSavePublishUiState", () => ({
-  useComposerSavePublishUiState: () => ({
-    isPublished: { value: false },
-    livePageHref: { value: null },
-  }),
-}));
-
 vi.mock(
-  "@/features/Composer/components/ComponentSettingsPanel.vue",
+  "@/features/Composer/composables/useComposerSavePublishUiState",
   () => ({
-    default: defineComponent({
-      name: "ComponentSettingsPanel",
-      setup() {
-        return () => h("div");
-      },
+    useComposerSavePublishUiState: () => ({
+      isPublished: { value: false },
+      livePageHref: { value: null },
     }),
   }),
 );
+
+vi.mock("@/features/Composer/components/ComponentSettingsPanel.vue", () => ({
+  default: defineComponent({
+    name: "ComponentSettingsPanel",
+    setup() {
+      return () => h("div");
+    },
+  }),
+}));
 
 vi.mock("@/features/Composer/components/ComposerQuickSwitch.vue", () => ({
   default: defineComponent({
@@ -315,6 +312,30 @@ describe("ComposerSidebar layout", () => {
     expect(wrapper.find(".border-t.border-dashed.border-border").exists()).toBe(
       false,
     );
+  });
+
+  it("keeps the layer toolbar visibly busy during global expansion", async () => {
+    const { default: ComposerSidebar } =
+      await import("@/features/Composer/components/ComposerSidebar.vue");
+
+    const wrapper = mount(ComposerSidebar, {
+      ...mountOptions,
+      props: pageEditingProps,
+    });
+    const layerPanel = wrapper.getComponent({ name: "LayerPanel" });
+
+    layerPanel.vm.$emit("update:layersBusy", true);
+    layerPanel.vm.$emit("update:layersOperation", "expanding");
+    await nextTick();
+
+    const button = wrapper.get('button[aria-label="Expanding all layers"]');
+    expect(button.attributes("aria-busy")).toBe("true");
+    expect(button.attributes()).toHaveProperty("disabled");
+    expect(
+      button
+        .findAll("div")
+        .some((node) => node.classes().includes("i-hugeicons:loading-01")),
+    ).toBe(true);
   });
 
   it("replaces the Components workspace with AI Engineer", async () => {

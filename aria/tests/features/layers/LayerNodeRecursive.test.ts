@@ -126,6 +126,27 @@ function mountRecursive(options: {
 }
 
 describe("LayerNodeRecursive", () => {
+  it("recreates only the child draggable when child order changes", async () => {
+    const firstChild = createNode("child-1", "Text");
+    const secondChild = createNode("child-2", "Text");
+    const wrapper = mountRecursive({});
+
+    await wrapper.setProps({
+      node: createNode("parent", "Container", [firstChild, secondChild]),
+    });
+    const initialKey = wrapper.findComponent(draggableStub).vm.$.vnode.key;
+
+    await wrapper.setProps({
+      node: createNode("parent", "Container", [secondChild, firstChild]),
+    });
+
+    await vi.waitFor(() => {
+      expect(wrapper.findComponent(draggableStub).vm.$.vnode.key).not.toBe(
+        initialKey,
+      );
+    });
+  });
+
   it("does not render an empty child list for expanded containers with no children", () => {
     const wrapper = mountRecursive({ childCount: 0 });
 
@@ -341,7 +362,7 @@ describe("LayerNodeRecursive", () => {
         },
       });
 
-      expect(wrapper.findAll("[data-layer-item]")).toHaveLength(81);
+      expect(wrapper.findAll("[data-layer-item]")).toHaveLength(25);
 
       while (frameCallbacks.length > 0) {
         frameCallbacks.shift()?.();
@@ -480,7 +501,7 @@ describe("LayerNodeRecursive", () => {
 
       await wrapper.setProps({ renderCacheKey: "slot:two" });
 
-      expect(wrapper.findAll("[data-layer-item]")).toHaveLength(81);
+      expect(wrapper.findAll("[data-layer-item]")).toHaveLength(25);
       expect(frameCallbacks.length).toBeGreaterThan(0);
     } finally {
       requestFrame.mockRestore();

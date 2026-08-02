@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from "vue";
+import { computed, onBeforeUnmount, ref, watch } from "vue";
 import draggable from "vuedraggable";
 import { LayerNodeRecursive } from "./LayerNodeRecursive";
 import type { BuilderNode } from "../../../../lib/types/nodes";
@@ -17,6 +17,25 @@ import { didDragLeaveElement } from "../utils/dropTargeting";
 import { studioIcons } from "@/lib/icons";
 
 const SLOT_TAIL_ZONE_HEIGHT_PX = 18;
+const INITIAL_SLOT_RENDER_BUDGET = 24;
+const SLOT_RENDER_BATCH_SIZE = 32;
+
+const requestRenderFrame = (callback: () => void): number => {
+  if (typeof requestAnimationFrame === "function") {
+    return requestAnimationFrame(callback);
+  }
+
+  return globalThis.setTimeout(callback, 16) as unknown as number;
+};
+
+const cancelRenderFrame = (frameId: number): void => {
+  if (typeof cancelAnimationFrame === "function") {
+    cancelAnimationFrame(frameId);
+    return;
+  }
+
+  clearTimeout(frameId);
+};
 
 const props = withDefaults(
   defineProps<{
@@ -24,6 +43,7 @@ const props = withDefaults(
     slotLabel: string;
     nodes: BuilderNode[];
     isExpanded: boolean;
+    isExpanding?: boolean;
     selectedNodeId?: string;
     selectedNodeIds?: string[];
     selectedNodePath?: readonly string[];
@@ -57,6 +77,7 @@ const props = withDefaults(
     iconStyle: undefined,
     forceMinHeight: false,
     isDragging: false,
+    isExpanding: false,
     isActiveDragList: false,
     activeDragListId: null,
     dropTargetId: null,
@@ -127,17 +148,121 @@ const showTailSlotDropIndicator = computed(
 );
 
 const slotDragOptions = computed(() => createSlotDragConfig());
+const draggableOrderRevision = ref(0);
+const nodeOrderSignature = computed(() =>
+  props.nodes.map((node) => node.id).join("|"),
+);
+const draggableOrderKey = computed(
+  () =>
+    `draggable-${props.slotName}-${props.draggableKey}-${draggableOrderRevision.value}`,
+);
 const hasMountedSlotBody = ref(false);
+const renderedNodeLimit = ref(INITIAL_SLOT_RENDER_BUDGET);
+let renderBudgetFrameId: number | null = null;
+let draggableOrderFrameId: number | null = null;
+
+const cancelRenderBudgetFrame = (): void => {
+  if (renderBudgetFrameId !== null) {
+    cancelRenderFrame(renderBudgetFrameId);
+    renderBudgetFrameId = null;
+  }
+};
+
+const scheduleRenderBudget = (): void => {
+  cancelRenderBudgetFrame();
+
+  if (!props.isExpanded || props.isDragging) {
+    return;
+  }
+
+  if (renderedNodeLimit.value >= props.nodes.length) {
+    return;
+  }
+
+  const applyNextBatch = (): void => {
+    renderBudgetFrameId = null;
+    if (!props.isExpanded) {
+      return;
+    }
+
+    renderedNodeLimit.value = Math.min(
+      renderedNodeLimit.value + SLOT_RENDER_BATCH_SIZE,
+      props.nodes.length,
+    );
+
+    if (renderedNodeLimit.value < props.nodes.length) {
+      renderBudgetFrameId = requestRenderFrame(applyNextBatch);
+    }
+  };
+
+  renderBudgetFrameId = requestRenderFrame(applyNextBatch);
+};
+
+const renderedNodes = computed(() =>
+  props.isDragging || props.nodes.length <= renderedNodeLimit.value
+    ? props.nodes
+    : props.nodes.slice(0, renderedNodeLimit.value),
+);
 
 watch(
   () => props.isExpanded,
   (isExpanded) => {
     if (isExpanded) {
       hasMountedSlotBody.value = true;
+      scheduleRenderBudget();
+    } else {
+      cancelRenderBudgetFrame();
     }
   },
   { immediate: true },
 );
+
+watch(
+  () => [props.renderCacheKey, props.nodes.length],
+  () => {
+    cancelRenderBudgetFrame();
+    renderedNodeLimit.value =
+      props.nodes.length <= INITIAL_SLOT_RENDER_BUDGET
+        ? props.nodes.length
+        : INITIAL_SLOT_RENDER_BUDGET;
+    scheduleRenderBudget();
+  },
+);
+
+watch(
+  () => props.isDragging,
+  (isDragging) => {
+    if (isDragging) {
+      cancelRenderBudgetFrame();
+      renderedNodeLimit.value = props.nodes.length;
+      return;
+    }
+
+    scheduleRenderBudget();
+  },
+);
+
+watch(nodeOrderSignature, (nextSignature, previousSignature) => {
+  if (nextSignature === previousSignature) {
+    return;
+  }
+
+  if (draggableOrderFrameId !== null) {
+    cancelRenderFrame(draggableOrderFrameId);
+  }
+
+  draggableOrderFrameId = requestRenderFrame(() => {
+    draggableOrderFrameId = null;
+    draggableOrderRevision.value += 1;
+  });
+});
+
+onBeforeUnmount(() => {
+  cancelRenderBudgetFrame();
+  if (draggableOrderFrameId !== null) {
+    cancelRenderFrame(draggableOrderFrameId);
+  }
+});
 
 const ensureSlotExpandedForDrag = (): void => {
   if (props.isDragging && !props.isExpanded) {
@@ -278,127 +403,150 @@ const handleSlotHeaderClick = (event: MouseEvent): void => {
       @click="handleSlotHeaderClick"
       @dragover="handleSlotHeaderDragOver"
     >
-    <button
-      type="button"
-      class="flex items-center justify-center mr-2 w-5 h-5 rounded hover:bg-muted/60"
-      :aria-expanded="props.isExpanded"
-      @click="handleChevronClick"
-    >
-      <div
-        :class="[
-          studioIcons.chevronRight,
-          'transition-all text-muted-foreground/80 w-2.5 h-2.5',
-          props.isExpanded ? 'rotate-90' : '',
-        ]"
-      />
-    </button>
-    <span
-      class="flex-1 text-left font-serif text-2xs font-medium uppercase tracking-[0.14em] transition-colors duration-100"
-      :class="
-        props.isActiveSlot
-          ? 'text-primary'
-          : 'text-muted-foreground/80 group-hover:text-foreground'
-      "
-    >
-      {{ props.slotLabel }}
-    </span>
-    <span
-      v-if="props.showEmptyHint && props.nodes.length === 0"
-      class="text-4xs text-muted-foreground/50 tracking-widest font-mono ml-2 shrink-0"
-    >
-      {{ props.emptyHintText }}
-    </span>
-  </div>
-
-  <div
-    v-if="hasMountedSlotBody"
-    v-show="props.isExpanded"
-    :key="`slot-${props.slotName}`"
-  >
-    <div
-      data-layer-slot-drop-zone
-      :class="[
-        'layer-slot-drop-zone',
-        props.forceMinHeight || props.nodes.length > 0 ? 'min-h-3' : 'min-h-9',
-        showEmptySlotDropIndicator ? 'layer-slot-drop-zone--inside' : '',
-      ]"
-      @dragover="handleEmptySlotDragOver"
-      @dragleave="handleEmptySlotDragLeave"
-      @drop="handleEmptySlotDrop"
-    >
-      <draggable
-        :key="`draggable-${props.slotName}-${props.draggableKey}`"
-        v-bind="slotDragOptions"
-        :model-value="props.nodes"
-        data-layer-slot-list
-        :class="[
-          'layer-slot-list border-t border-dashed border-border/70 text-foreground',
-          props.isActiveSlot ? 'bg-primary/4' : 'bg-transparent',
-          props.forceMinHeight || props.nodes.length > 0 ? 'min-h-3' : 'min-h-9',
-          props.isDragging ? 'layer-slot-list--dragging' : '',
-          showTailSlotDropIndicator ? 'layer-slot-list--drop-after' : '',
-        ]"
-        @start="emit('drag-start', $event)"
-        @end="emit('drag-end')"
-        @dragover="handleSlotListDragOver"
-        @dragleave="handleSlotListDragLeave"
-        @drop="handleSlotListDrop"
-        @change="
-          (evt: LayerListChangeEvent) =>
-            emit('slot-change', evt, props.slotName)
+      <button
+        type="button"
+        class="flex items-center justify-center mr-2 w-5 h-5 rounded hover:bg-muted/60"
+        :aria-expanded="props.isExpanded"
+        :aria-busy="props.isExpanding || undefined"
+        :aria-label="
+          props.isExpanding
+            ? `Expanding ${props.slotLabel} layers`
+            : props.isExpanded
+              ? `Collapse ${props.slotLabel} layers`
+              : `Expand ${props.slotLabel} layers`
+        "
+        @click="handleChevronClick"
+      >
+        <div
+          v-if="props.isExpanding"
+          :class="[
+            studioIcons.loading,
+            'size-3 text-primary motion-safe:animate-spin motion-reduce:opacity-70',
+          ]"
+          aria-hidden="true"
+          style="will-change: transform"
+        />
+        <div
+          v-else
+          :class="[
+            studioIcons.chevronRight,
+            'text-muted-foreground/80 h-2.5 w-2.5 transition-transform',
+            props.isExpanded ? 'rotate-90' : '',
+          ]"
+          aria-hidden="true"
+        />
+      </button>
+      <span
+        class="flex-1 text-left font-serif text-2xs font-medium uppercase tracking-[0.14em] transition-colors duration-100"
+        :class="
+          props.isActiveSlot
+            ? 'text-primary'
+            : 'text-muted-foreground/80 group-hover:text-foreground'
         "
       >
-        <template #item="{ element: node }">
-          <LayerNodeRecursive
-            :node="node"
-            :depth="0"
-            :render-cache-key="props.renderCacheKey"
-            :selected-node-id="props.selectedNodeId"
-            :selected-node-ids="props.selectedNodeIds"
-            :selected-node-path="props.selectedNodePath"
-            :hovered-node-id="props.hoveredNodeId"
-            :editing-node-id="props.editingNodeId"
-            :node-actions="props.nodeActions"
-            :active-drag-list-id="props.activeDragListId"
-            :is-dragging="props.isDragging"
-            :is-expanded="props.isNodeExpanded"
-            :has-children="props.hasChildren"
-            :can-accept-children="props.canAcceptChildren"
-            :get-collapse-state="props.getCollapseState"
-            :get-drop-indicator-class="props.getDropIndicatorClass"
-            :visible-node-ids="props.visibleNodeIds"
-            @select="emit('select-node', $event)"
-            @hover="emit('hover-node', $event)"
-            @leave="emit('leave-node')"
-            @drag-start="emit('drag-start', $event)"
-            @drag-end="emit('drag-end')"
-            @toggle-expand="
-              (nodeId: string, event: Event) =>
-                emit('toggle-node-expand', nodeId, event)
-            "
-            @update-children="
-              (parentNode: BuilderNode, changeEvent: LayerListChangeEvent) =>
-                emit('update-children', parentNode, changeEvent)
-            "
-            @rename="
-              (nodeValue: BuilderNode, newLabel: string) =>
-                emit('rename-node', nodeValue, newLabel)
-            "
-            @edit-start="emit('edit-start', $event)"
-            @edit-cancel="emit('edit-cancel')"
-            @children-drop-target-change="
-              emit('children-drop-target-change', $event)
-            "
-            @children-drop-target-leave="emit('children-drop-target-leave')"
-            @drop-target-change="emit('drop-target-change', $event)"
-            @drop-target-leave="emit('drop-target-leave')"
-            @drop-node="emit('drop-node', $event)"
-            @edit-component="emit('edit-component', $event)"
-          />
-        </template>
-      </draggable>
+        {{ props.slotLabel }}
+      </span>
+      <span
+        v-if="props.showEmptyHint && props.nodes.length === 0"
+        class="text-4xs text-muted-foreground/50 tracking-widest font-mono ml-2 shrink-0"
+      >
+        {{ props.emptyHintText }}
+      </span>
     </div>
-  </div>
+
+    <div
+      v-if="hasMountedSlotBody"
+      v-show="props.isExpanded"
+      :key="`slot-${props.slotName}`"
+    >
+      <div
+        data-layer-slot-drop-zone
+        :class="[
+          'layer-slot-drop-zone',
+          props.forceMinHeight || props.nodes.length > 0
+            ? 'min-h-3'
+            : 'min-h-9',
+          showEmptySlotDropIndicator ? 'layer-slot-drop-zone--inside' : '',
+        ]"
+        @dragover="handleEmptySlotDragOver"
+        @dragleave="handleEmptySlotDragLeave"
+        @drop="handleEmptySlotDrop"
+      >
+        <draggable
+          :key="draggableOrderKey"
+          v-bind="slotDragOptions"
+          :model-value="renderedNodes"
+          data-layer-slot-list
+          :class="[
+            'layer-slot-list border-t border-dashed border-border/70 text-foreground',
+            props.isActiveSlot ? 'bg-primary/4' : 'bg-transparent',
+            props.forceMinHeight || props.nodes.length > 0
+              ? 'min-h-3'
+              : 'min-h-9',
+            props.isDragging ? 'layer-slot-list--dragging' : '',
+            showTailSlotDropIndicator ? 'layer-slot-list--drop-after' : '',
+          ]"
+          @start="emit('drag-start', $event)"
+          @end="emit('drag-end')"
+          @dragover="handleSlotListDragOver"
+          @dragleave="handleSlotListDragLeave"
+          @drop="handleSlotListDrop"
+          @change="
+            (evt: LayerListChangeEvent) =>
+              emit('slot-change', evt, props.slotName)
+          "
+        >
+          <template #item="{ element: node }">
+            <LayerNodeRecursive
+              :node="node"
+              :depth="0"
+              :render-cache-key="props.renderCacheKey"
+              :selected-node-id="props.selectedNodeId"
+              :selected-node-ids="props.selectedNodeIds"
+              :selected-node-path="props.selectedNodePath"
+              :hovered-node-id="props.hoveredNodeId"
+              :editing-node-id="props.editingNodeId"
+              :node-actions="props.nodeActions"
+              :active-drag-list-id="props.activeDragListId"
+              :is-dragging="props.isDragging"
+              :is-expanded="props.isNodeExpanded"
+              :has-children="props.hasChildren"
+              :can-accept-children="props.canAcceptChildren"
+              :get-collapse-state="props.getCollapseState"
+              :get-drop-indicator-class="props.getDropIndicatorClass"
+              :visible-node-ids="props.visibleNodeIds"
+              @select="emit('select-node', $event)"
+              @hover="emit('hover-node', $event)"
+              @leave="emit('leave-node')"
+              @drag-start="emit('drag-start', $event)"
+              @drag-end="emit('drag-end')"
+              @toggle-expand="
+                (nodeId: string, event: Event) =>
+                  emit('toggle-node-expand', nodeId, event)
+              "
+              @update-children="
+                (parentNode: BuilderNode, changeEvent: LayerListChangeEvent) =>
+                  emit('update-children', parentNode, changeEvent)
+              "
+              @rename="
+                (nodeValue: BuilderNode, newLabel: string) =>
+                  emit('rename-node', nodeValue, newLabel)
+              "
+              @edit-start="emit('edit-start', $event)"
+              @edit-cancel="emit('edit-cancel')"
+              @children-drop-target-change="
+                emit('children-drop-target-change', $event)
+              "
+              @children-drop-target-leave="emit('children-drop-target-leave')"
+              @drop-target-change="emit('drop-target-change', $event)"
+              @drop-target-leave="emit('drop-target-leave')"
+              @drop-node="emit('drop-node', $event)"
+              @edit-component="emit('edit-component', $event)"
+            />
+          </template>
+        </draggable>
+      </div>
+    </div>
   </div>
 </template>
 

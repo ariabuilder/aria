@@ -59,6 +59,7 @@ function mountSlotGroup(options: {
   isDragging?: boolean;
   isActiveDragList?: boolean;
   isExpanded?: boolean;
+  isExpanding?: boolean;
 }) {
   return mount(LayerSlotGroup, {
     props: {
@@ -66,6 +67,7 @@ function mountSlotGroup(options: {
       slotLabel: "Hero",
       nodes: options.nodes ?? [],
       isExpanded: options.isExpanded ?? true,
+      isExpanding: options.isExpanding ?? false,
       editingNodeId: null,
       draggableKey: 1,
       isDragging: options.isDragging ?? false,
@@ -92,6 +94,38 @@ function mountSlotGroup(options: {
 }
 
 describe("LayerSlotGroup", () => {
+  it("recreates only the slot draggable when root order changes", async () => {
+    const firstNode = {
+      id: "node-1",
+      type: "Text",
+      props: {},
+      styles: {},
+      children: [],
+    };
+    const secondNode = {
+      id: "node-2",
+      type: "Text",
+      props: {},
+      styles: {},
+      children: [],
+    };
+    const wrapper = mountSlotGroup({ nodes: [firstNode, secondNode] });
+    const initialKey = wrapper.findComponent(draggableStub).vm.$.vnode.key;
+
+    await wrapper.setProps({ nodes: [secondNode, firstNode] });
+
+    await vi.waitFor(() => {
+      expect(wrapper.findComponent(draggableStub).vm.$.vnode.key).not.toBe(
+        initialKey,
+      );
+    });
+    expect(
+      wrapper
+        .findAll("[data-layer-node]")
+        .map((node) => node.attributes("data-layer-node")),
+    ).toEqual(["node-2", "node-1"]);
+  });
+
   it("keeps slot content mounted after collapse and reveals it on reopen", async () => {
     const wrapper = mountSlotGroup({
       nodes: [
@@ -117,6 +151,58 @@ describe("LayerSlotGroup", () => {
     await wrapper.setProps({ isExpanded: true });
 
     expect(wrapper.find('[data-layer-node="node-1"]').exists()).toBe(true);
+  });
+
+  it("mounts large slot root lists progressively", async () => {
+    const frameCallbacks: Array<() => void> = [];
+    const requestFrame = vi
+      .spyOn(globalThis, "requestAnimationFrame")
+      .mockImplementation((callback: FrameRequestCallback) => {
+        frameCallbacks.push(() => callback(performance.now()));
+        return frameCallbacks.length;
+      });
+    const cancelFrame = vi
+      .spyOn(globalThis, "cancelAnimationFrame")
+      .mockImplementation(() => {});
+
+    try {
+      const nodes = Array.from({ length: 90 }, (_, index) => ({
+        id: `node-${index}`,
+        type: "Text",
+        props: {},
+        styles: {},
+        children: [],
+      }));
+      const wrapper = mountSlotGroup({ nodes });
+
+      expect(wrapper.findAll("[data-layer-node]")).toHaveLength(24);
+
+      while (frameCallbacks.length > 0) {
+        frameCallbacks.shift()?.();
+        await wrapper.vm.$nextTick();
+      }
+
+      expect(wrapper.findAll("[data-layer-node]")).toHaveLength(90);
+    } finally {
+      requestFrame.mockRestore();
+      cancelFrame.mockRestore();
+    }
+  });
+
+  it("shows a busy slot expander while a cold branch is requested", () => {
+    const wrapper = mountSlotGroup({
+      isExpanded: false,
+      isExpanding: true,
+    });
+    const button = wrapper.get("button[aria-expanded]");
+
+    expect(button.attributes("aria-busy")).toBe("true");
+    expect(button.attributes("aria-label")).toContain("Expanding");
+    expect(
+      button
+        .findAll("div")
+        .some((node) => node.classes().includes("i-hugeicons:loading-01")),
+    ).toBe(true);
   });
 
   it("updates mounted slot content across empty and non-empty transitions", async () => {

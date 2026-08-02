@@ -161,13 +161,10 @@ const agentPanel = useAgentPanel();
 const agentRuntime = useAgentRuntimeStatus();
 const agentChatRef = ref<InstanceType<typeof AgentChatView> | null>(null);
 const agentWorkingInBackground = computed(
-  () =>
-    agentRuntime.isWorking.value && editingActiveTab.value !== "agent",
+  () => agentRuntime.isWorking.value && editingActiveTab.value !== "agent",
 );
 const agentCompletedSectionsInBackground = computed(() =>
-  agentWorkingInBackground.value
-    ? agentRuntime.completedSectionCount.value
-    : 0,
+  agentWorkingInBackground.value ? agentRuntime.completedSectionCount.value : 0,
 );
 
 const { isPublished, livePageHref } = useComposerSavePublishUiState({
@@ -177,7 +174,21 @@ const { isPublished, livePageHref } = useComposerSavePublishUiState({
 });
 
 const allLayersExpanded = ref(true);
+const layersBusy = ref(false);
+const layersOperation = ref<"expanding" | "collapsing" | null>(null);
 const layerPanelRef = ref<InstanceType<typeof LayerPanel>>();
+
+const layersToggleLabel = computed(() => {
+  if (layersOperation.value === "expanding") {
+    return t("composer.sidebar.expandingAll");
+  }
+  if (layersOperation.value === "collapsing") {
+    return t("composer.sidebar.collapsingAll");
+  }
+  return allLayersExpanded.value
+    ? t("composer.sidebar.collapseAll")
+    : t("composer.sidebar.expandAll");
+});
 
 const isEditingMode = computed(() => {
   return !!(props.currentItemSlug && props.currentItemType);
@@ -349,9 +360,9 @@ defineExpose({
                 />
               </button>
             </TooltipTrigger>
-            <TooltipContent side="bottom" class="text-xs"
-              >{{ t("composer.sidebar.layers") }}</TooltipContent
-            >
+            <TooltipContent side="bottom" class="text-xs">{{
+              t("composer.sidebar.layers")
+            }}</TooltipContent>
           </Tooltip>
         </TooltipProvider>
         <TooltipProvider :delay-duration="0">
@@ -380,9 +391,9 @@ defineExpose({
                 />
               </button>
             </TooltipTrigger>
-            <TooltipContent side="bottom" class="text-xs"
-              >{{ t("composer.sidebar.addElements") }}</TooltipContent
-            >
+            <TooltipContent side="bottom" class="text-xs">{{
+              t("composer.sidebar.addElements")
+            }}</TooltipContent>
           </Tooltip>
         </TooltipProvider>
         <TooltipProvider :delay-duration="0">
@@ -418,9 +429,7 @@ defineExpose({
                   aria-hidden="true"
                   :class="[
                     'pointer-events-none absolute inset-x-0 bottom-0 h-0.5 z-20 origin-left bg-primary transition-transform duration-150 ease-out',
-                    editingActiveTab === 'agent'
-                      ? 'scale-x-100'
-                      : 'scale-x-0',
+                    editingActiveTab === 'agent' ? 'scale-x-100' : 'scale-x-0',
                   ]"
                 />
               </button>
@@ -433,7 +442,9 @@ defineExpose({
       </div>
 
       <!-- Toolbar -->
-      <PanelHeader :class="editingActiveTab === 'layers' ? 'relative' : undefined">
+      <PanelHeader
+        :class="editingActiveTab === 'layers' ? 'relative' : undefined"
+      >
         <span
           v-if="!(editingActiveTab === 'layers' && layersSearchOpen)"
           class="text-xs font-serif text-muted-foreground select-none truncate"
@@ -478,26 +489,27 @@ defineExpose({
                 "
                 @update:open="layersSearchOpen = $event"
               />
-              <HeaderActionTooltip
-                :label="
-                  allLayersExpanded
-                    ? t('composer.sidebar.collapseAll')
-                    : t('composer.sidebar.expandAll')
-                "
-              >
+              <HeaderActionTooltip :label="layersToggleLabel">
                 <Button
                   @click="layerPanelRef?.toggleAll()"
+                  :disabled="layersBusy"
                   variant="headerAction"
                   size="icon-header"
                   class="relative z-20"
-                  :aria-label="
-                    allLayersExpanded
-                      ? t('composer.sidebar.collapseAll')
-                      : t('composer.sidebar.expandAll')
-                  "
+                  :aria-label="layersToggleLabel"
+                  :aria-busy="layersBusy || undefined"
                 >
                   <div
-                    v-if="allLayersExpanded"
+                    v-if="layersBusy"
+                    :class="[
+                      studioIcons.loading,
+                      'size-4 text-primary motion-safe:animate-spin motion-reduce:opacity-70',
+                    ]"
+                    aria-hidden="true"
+                    style="will-change: transform"
+                  />
+                  <div
+                    v-else-if="allLayersExpanded"
                     :class="[studioIcons.chevronDown, 'w-4 h-4']"
                   />
                   <div v-else :class="[studioIcons.chevronUp, 'w-4 h-4']" />
@@ -546,9 +558,13 @@ defineExpose({
             :search-query="layersSearchQuery"
             @update:blocks="emit('update:activeBlocks', $event)"
             @update:all-layers-expanded="allLayersExpanded = $event"
+            @update:layers-busy="layersBusy = $event"
+            @update:layers-operation="layersOperation = $event"
             @update-layout="emit('update-layout', $event)"
             @open-picker="(payload: string) => emit('open-picker', payload)"
-            @edit-component="(componentId: string) => emit('edit-component', componentId)"
+            @edit-component="
+              (componentId: string) => emit('edit-component', componentId)
+            "
           />
         </div>
       </Transition>

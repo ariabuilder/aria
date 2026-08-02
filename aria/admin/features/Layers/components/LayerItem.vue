@@ -34,15 +34,36 @@
         <!-- Expander (hidden for component instances since they can't expand until detached) -->
         <button
           v-if="hasChildren && !isComponentInstance"
+          type="button"
           class="flex size-5 shrink-0 items-center justify-center rounded-sm transition-colors hover:bg-primary/8"
+          :aria-expanded="expanded"
+          :aria-busy="expanding || undefined"
+          :aria-label="
+            expanding
+              ? `Expanding ${getNodeLabel(node)} layers`
+              : expanded
+                ? `Collapse ${getNodeLabel(node)} layers`
+                : `Expand ${getNodeLabel(node)} layers`
+          "
           @click.stop="(evt) => $emit('toggle-expand', evt)"
         >
           <div
+            v-if="expanding"
+            :class="[
+              studioIcons.loading,
+              'size-3 text-primary motion-safe:animate-spin motion-reduce:opacity-70',
+            ]"
+            aria-hidden="true"
+            style="will-change: transform"
+          />
+          <div
+            v-else
             :class="[
               studioIcons.chevronRight,
-              'transition-transform text-muted-foreground w-3 h-3',
+              'h-3 w-3 text-muted-foreground transition-transform',
               expanded ? 'rotate-90' : '',
             ]"
+            aria-hidden="true"
           />
         </button>
         <div v-else class="w-5 shrink-0"></div>
@@ -235,7 +256,14 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, nextTick, onBeforeUnmount, onMounted, watch } from "vue";
+import {
+  computed,
+  ref,
+  nextTick,
+  onBeforeUnmount,
+  onMounted,
+  watch,
+} from "vue";
 import { z } from "zod";
 import { normalizeContainerNodeType } from "../../../../lib/blocks/containerTypes";
 import { NodeDataSourceSchema } from "../../../../lib/schemas/nodes";
@@ -286,6 +314,7 @@ const props = defineProps<{
   node: BuilderNode;
   selected: boolean;
   expanded: boolean;
+  expanding?: boolean;
   hasChildren: boolean;
   canAcceptChildren?: boolean;
   depth: number;

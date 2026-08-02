@@ -35,6 +35,7 @@ interface RecordLayerReorderInput {
   description: string;
   itemType?: "page" | "layout" | "component";
   itemSlug?: string;
+  alreadyApplied?: boolean;
   applyBlocks: (blocks: BuilderNode[]) => void | Promise<void>;
   previousLayoutSnapshot?: string;
   nextLayoutSnapshot?: string;
@@ -84,8 +85,9 @@ export function useLayerReorderHistory(
       };
     }
 
-    const previousBlocks = cloneDeep(parsedBlocks.data.previousBlocks);
-    const nextBlocks = cloneDeep(parsedBlocks.data.nextBlocks);
+    const previousBlocks = parsedBlocks.data.previousBlocks;
+    const nextBlocks = parsedBlocks.data.nextBlocks;
+    let skipInitialRedo = input.alreadyApplied === true;
 
     const result = await execute({
       type: parsedMetadata.data.type as OperationType,
@@ -97,6 +99,11 @@ export function useLayerReorderHistory(
         }
       },
       redo: async () => {
+        if (skipInitialRedo) {
+          skipInitialRedo = false;
+          return;
+        }
+
         await input.applyBlocks(cloneDeep(nextBlocks));
         if (input.applyLayoutSnapshot && input.nextLayoutSnapshot) {
           await input.applyLayoutSnapshot(input.nextLayoutSnapshot);

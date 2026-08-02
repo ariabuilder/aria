@@ -34,8 +34,8 @@ import type {
 const DRAG_CONFIG = createChildrenDragConfig();
 
 const CHILD_LIST_TAIL_ZONE_HEIGHT_PX = 18;
-const INITIAL_CHILD_RENDER_BUDGET = 80;
-const CHILD_RENDER_BATCH_SIZE = 120;
+const INITIAL_CHILD_RENDER_BUDGET = 24;
+const CHILD_RENDER_BATCH_SIZE = 32;
 
 const requestRenderFrame = (callback: () => void): number => {
   if (typeof requestAnimationFrame === "function") {
@@ -124,6 +124,11 @@ export const LayerNodeRecursive = defineComponent({
       required: true,
     },
 
+    isExpanding: {
+      type: Function as PropType<(nodeId: string) => boolean>,
+      default: () => false,
+    },
+
     /** Predicate function to check if a node has children */
     hasChildren: {
       type: Function as PropType<(node: BuilderNode) => boolean>,
@@ -207,7 +212,9 @@ export const LayerNodeRecursive = defineComponent({
   setup(props, { emit }) {
     const mountedChildBranchIds = new Set<string>();
     const renderedChildLimit = ref(INITIAL_CHILD_RENDER_BUDGET);
+    const childDraggableRevision = ref(0);
     let renderBudgetFrameId: number | null = null;
+    let childDraggableFrameId: number | null = null;
 
     const cancelRenderBudgetFrame = (): void => {
       if (renderBudgetFrameId !== null) {
@@ -260,6 +267,9 @@ export const LayerNodeRecursive = defineComponent({
     const getChildSignature = (): string =>
       (props.node.children ?? []).map((child) => child.id).join("|");
 
+    const getChildDraggableKey = (node: BuilderNode): string =>
+      `children-${node.id}-${childDraggableRevision.value}`;
+
     const resetRenderBudget = (): void => {
       cancelRenderBudgetFrame();
       const childCount = props.node.children?.length ?? 0;
@@ -281,6 +291,13 @@ export const LayerNodeRecursive = defineComponent({
         }
 
         resetRenderBudget();
+        if (childDraggableFrameId !== null) {
+          cancelRenderFrame(childDraggableFrameId);
+        }
+        childDraggableFrameId = requestRenderFrame(() => {
+          childDraggableFrameId = null;
+          childDraggableRevision.value += 1;
+        });
       },
     );
 
@@ -306,7 +323,12 @@ export const LayerNodeRecursive = defineComponent({
       { immediate: true },
     );
 
-    onBeforeUnmount(cancelRenderBudgetFrame);
+    onBeforeUnmount(() => {
+      cancelRenderBudgetFrame();
+      if (childDraggableFrameId !== null) {
+        cancelRenderFrame(childDraggableFrameId);
+      }
+    });
 
     /**
      * Renders a single node and its children recursively.
@@ -332,10 +354,9 @@ export const LayerNodeRecursive = defineComponent({
       const children: BuilderNode[] = canHostChildren
         ? node.children || []
         : [];
-      const renderedChildren =
-        props.isDragging
-          ? children
-          : children.length > renderedChildLimit.value
+      const renderedChildren = props.isDragging
+        ? children
+        : children.length > renderedChildLimit.value
           ? children.slice(0, renderedChildLimit.value)
           : children;
 
@@ -387,6 +408,7 @@ export const LayerNodeRecursive = defineComponent({
             selected: isSelected,
             hovered: props.hoveredNodeId === node.id,
             expanded: isNodeExpanded,
+            expanding: props.isExpanding(node.id),
             hasChildren: props.hasChildren(node),
             canAcceptChildren: props.canAcceptChildren(node),
             editingNodeId: props.editingNodeId,
@@ -433,6 +455,7 @@ export const LayerNodeRecursive = defineComponent({
                   h(
                     draggable,
                     {
+                      key: getChildDraggableKey(node),
                       ...DRAG_CONFIG,
                       modelValue: renderedChildren,
                       class: [
@@ -534,6 +557,7 @@ export const LayerNodeRecursive = defineComponent({
                           activeDragListId: props.activeDragListId,
                           isDragging: props.isDragging,
                           isExpanded: props.isExpanded,
+                          isExpanding: props.isExpanding,
                           hasChildren: props.hasChildren,
                           canAcceptChildren: props.canAcceptChildren,
                           getCollapseState: props.getCollapseState,
