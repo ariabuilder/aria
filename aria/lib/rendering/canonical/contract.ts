@@ -6,6 +6,7 @@ import type {
 } from "../../types/nodes";
 import type { CanonicalJsonValue } from "./stableJson";
 import type { CanonicalSha256 } from "./hash";
+import type { CanonicalClassToken } from "./classTokens";
 
 export type RenderSurfaceKind = "page" | "layout" | "component";
 
@@ -213,6 +214,105 @@ export interface ResolvedRenderSurface<
   styleArtifact: RenderStyleArtifactManifest;
   diagnostics: readonly RenderDiagnostic[];
 }
+
+export interface RenderDocumentRegionV1 {
+  id: string;
+  role: RenderRegionRole;
+  html: string;
+}
+
+export interface CanonicalDocumentMetadata {
+  lang: string;
+  dir: "ltr" | "rtl" | null;
+  title: string;
+  description: string;
+  bodyClass: string;
+}
+
+export interface CanonicalHeadNode {
+  type: "raw";
+  value: string;
+}
+
+export interface CanonicalAttribute {
+  name: string;
+  value: string | null;
+}
+
+export interface CanonicalNodeCapabilities {
+  interactive: boolean;
+  managedImage: boolean;
+  motion: boolean;
+  navigation: boolean;
+}
+
+export type CanonicalRenderChild =
+  | CanonicalRenderNode
+  | { type: "text"; value: string }
+  | { type: "trusted-svg"; value: string };
+
+export interface CanonicalRenderNode {
+  runtimeId: string;
+  sourceNodeId: string;
+  type: "element";
+  namespace: "html" | "svg";
+  tagName: string;
+  attributes: readonly CanonicalAttribute[];
+  classTokens: readonly CanonicalClassToken[];
+  children: readonly CanonicalRenderChild[];
+  voidElement: boolean;
+  capabilities: CanonicalNodeCapabilities;
+}
+
+export interface CanonicalStylesheet {
+  css: string;
+  hash: CanonicalSha256;
+}
+
+export interface RenderRevision {
+  sourceHash: CanonicalSha256;
+  renderInputHash: CanonicalSha256;
+}
+
+export interface RenderRuntimeManifestV1 {
+  motion: boolean;
+  navigation: boolean;
+  legacyIconify: boolean;
+}
+
+export interface RenderCspManifestV1 {
+  headerValue: string;
+}
+
+/**
+ * Portable, immutable identity for one fully resolved HTML document.
+ *
+ * The document hash is the SHA-256 of the stable JSON serialization of every
+ * field except `documentHash`. Runtime mode is recorded as execution context,
+ * never as persisted source identity. Regions retain the canonical
+ * header/page/footer order supplied by the resolved surface.
+ */
+export interface RenderDocumentV1 {
+  contractVersion: 1;
+  kind: RenderSurfaceKind;
+  renderInputHash: CanonicalSha256;
+  documentHash: CanonicalSha256;
+  mode: RenderMode;
+  document: CanonicalDocumentMetadata;
+  head: readonly CanonicalHeadNode[];
+  roots: readonly CanonicalRenderNode[];
+  styles: CanonicalStylesheet;
+  html: string;
+  regions: readonly RenderDocumentRegionV1[];
+  runtime: RenderRuntimeManifestV1;
+  csp: RenderCspManifestV1;
+  resources: RenderResourceManifest;
+  dependencies: RenderDependencyManifest;
+  revision: RenderRevision;
+  diagnostics: readonly RenderDiagnostic[];
+}
+
+export type UnhashedRenderDocumentV1 = Omit<RenderDocumentV1, "documentHash">;
 
 export { normalizeEditableSurface } from "./normalizeEditableSurface";
 export { resolveRenderSurface } from "./resolveRenderSurface";

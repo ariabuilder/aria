@@ -1,22 +1,6 @@
-import {
-  nodesToHtmlDocumentAsync,
-  nodesToHtmlFragmentAsync,
-  resolvePublishedHtmlRenderStyleMode,
-  type NodeToHtmlDocumentOptions,
-} from "../blocks/nodesToHtml";
-import {
-  combineBuilderNodeSets,
-  nodesRequireIconifyRuntime,
-} from "../icons/customElement";
-import {
-  nodeTreeRequiresMotionRuntime,
-  renderMotionScriptTag,
-} from "../motion/runtime";
-import {
-  nodeTreeRequiresNavRuntime,
-  renderNavScriptTag,
-  renderNavStylesheetTag,
-} from "../nav";
+import { combineBuilderNodeSets } from "../icons/customElement";
+import { renderMotionScriptTag } from "../motion/runtime";
+import { renderNavScriptTag, renderNavStylesheetTag } from "../nav";
 import { prepareNavigationForRender } from "../cms/navActive";
 import { compileAnalyticsScripts } from "../analytics/compileAnalyticsScripts";
 import { analyzeCustomCode } from "../security/analyzeCustomCode";
@@ -45,7 +29,7 @@ import {
   getCustomFontsLibraryFromUniversalDesignSystem,
   resolveBreakpointDefinitionsFromDesignSystem,
 } from "../styles/universalDesignSystem";
-import { type BuilderNode, type LayoutDSL, type PageDSL } from "../types/nodes";
+import { type LayoutDSL, type PageDSL } from "../types/nodes";
 import { buildResolvedThemeCssVariables } from "../styles/resolvedUserTheme";
 import { buildGlobalStylesCss } from "../styles/globalStylesCss";
 import {
@@ -71,6 +55,13 @@ import {
   type RenderMode,
   type RenderRegionInput,
 } from "./canonical";
+import {
+  compileRenderDocument,
+  collectRuntimeManifest,
+  serializeRenderDocumentHtml,
+  type CanonicalSha256,
+  type NodeToHtmlDocumentOptions,
+} from "./canonical/document";
 import { createStorageRenderDependencyProvider } from "./storageRenderDependencyProvider";
 
 type RenderLogger = (
@@ -109,87 +100,12 @@ type RenderPageDslToHtmlOptions = {
 type RenderPageDslToHtmlResult = {
   html: string;
   cspHeaderValue: string;
+  documentHash: CanonicalSha256;
 };
 
 const noopLogger: RenderLogger = () => undefined;
 
 export type { RenderCmsDataOptions };
-
-function injectIntoBody(
-  html: string,
-  injection: { header?: string; footer?: string },
-): string {
-  const header = injection.header ?? "";
-  const footer = injection.footer ?? "";
-
-  if (!header && !footer) return html;
-
-  const bodyOpenMatch = html.match(/<body[^>]*>/i);
-  const bodyCloseMatch = html.match(/<\/body>/i);
-
-  if (!bodyOpenMatch || !bodyCloseMatch) {
-    return `${header}${html}${footer}`;
-  }
-
-  const bodyOpenIndex = html.search(/<body[^>]*>/i);
-  const bodyOpenEnd = bodyOpenIndex + bodyOpenMatch[0].length;
-  const bodyCloseIndex = html.search(/<\/body>/i);
-
-  return (
-    html.slice(0, bodyOpenEnd) +
-    (header ? `\n${header}` : "") +
-    html.slice(bodyOpenEnd, bodyCloseIndex) +
-    (footer ? `\n${footer}\n` : "") +
-    html.slice(bodyCloseIndex)
-  );
-}
-
-async function renderLayoutRegionFragments(options: {
-  headerNodes: BuilderNode[];
-  footerNodes: BuilderNode[];
-  getComponentDSL: StorageAdapter["getComponentDSL"];
-  breakpoints?: NodeToHtmlDocumentOptions["breakpoints"];
-  globalCSSEnabled?: boolean;
-  inlineGeneratedDocumentCss?: boolean;
-  locals?: RuntimeLocals;
-  iconResources?: IconRenderResources;
-}): Promise<{
-  header?: string;
-  footer?: string;
-}> {
-  const fragmentStyleMode = resolvePublishedHtmlRenderStyleMode({
-    globalCSSEnabled: options.globalCSSEnabled,
-    inlineGeneratedDocumentCss: options.inlineGeneratedDocumentCss,
-  });
-  // Keep one deterministic SVG instance sequence for the whole document.
-  const header = options.headerNodes.length
-    ? await nodesToHtmlFragmentAsync(
-        options.headerNodes,
-        options.getComponentDSL,
-        0,
-        options.breakpoints,
-        fragmentStyleMode,
-        options.iconResources,
-        options.locals,
-      )
-    : "";
-  const footer = options.footerNodes.length
-    ? await nodesToHtmlFragmentAsync(
-        options.footerNodes,
-        options.getComponentDSL,
-        0,
-        options.breakpoints,
-        fragmentStyleMode,
-        options.iconResources,
-        options.locals,
-      )
-    : "";
-
-  return {
-    header: header || undefined,
-    footer: footer || undefined,
-  };
-}
 
 function toCanonicalManifestValue(value: unknown) {
   const serialized = JSON.stringify(value);
@@ -300,11 +216,6 @@ export async function renderPageDslToHtml(
   );
 
   const publicationDependencies = options.page._publicationDependencies;
-  const getComponentDSL: StorageAdapter["getComponentDSL"] = (id, version) =>
-    options.adapter.getComponentDSL(
-      id,
-      version ?? publicationDependencies?.components[id],
-    );
   let iconResources: IconRenderResources | undefined;
   const normalized = await normalizeEditableSurface(
     { kind: "page", source: options.page },
@@ -399,22 +310,8 @@ export async function renderPageDslToHtml(
       },
     },
   });
-  const headerNodes: BuilderNode[] = [
-    ...(resolvedSurface.regions.find((region) => region.role === "header")
-      ?.roots ?? []),
-  ];
-  const footerNodes: BuilderNode[] = [
-    ...(resolvedSurface.regions.find((region) => region.role === "footer")
-      ?.roots ?? []),
-  ];
-  const bodyRegion = resolvedSurface.regions.find(
-    (region) => region.role === "layout" || region.role === "page",
-  );
-  const pageNodes: BuilderNode[] = [...(bodyRegion?.roots ?? [])];
   const iconSourceNodes = combineBuilderNodeSets(
-    pageNodes,
-    headerNodes,
-    footerNodes,
+    ...resolvedSurface.regions.map((region) => [...region.roots]),
   );
   const rendererBaseFragment = await buildRendererBaseStyleFragment(
     collectRendererStyleRequirements(iconSourceNodes),
@@ -440,28 +337,13 @@ export async function renderPageDslToHtml(
     });
   }
 
-  const assignedRegions = await renderLayoutRegionFragments({
-    headerNodes,
-    footerNodes,
-    getComponentDSL,
-    breakpoints: canonicalBreakpoints,
-    globalCSSEnabled,
-    inlineGeneratedDocumentCss,
-    locals: options.locals,
-    iconResources,
-  });
-
   const iconRuntimeNodes = iconSourceNodes;
-
-  const needsMotionRuntime = nodeTreeRequiresMotionRuntime(
-    ...resolvedSurface.regions.map((region) => region.roots),
-  );
-  const needsNavRuntime = nodeTreeRequiresNavRuntime(
-    ...resolvedSurface.regions.map((region) => region.roots),
-  );
-  const motionScriptTag = needsMotionRuntime ? renderMotionScriptTag() : "";
-  const navStylesheetTag = needsNavRuntime ? renderNavStylesheetTag() : "";
-  const navScriptTag = needsNavRuntime ? renderNavScriptTag() : "";
+  const runtimeManifest = collectRuntimeManifest(iconRuntimeNodes);
+  const motionScriptTag = runtimeManifest.motion ? renderMotionScriptTag() : "";
+  const navStylesheetTag = runtimeManifest.navigation
+    ? renderNavStylesheetTag()
+    : "";
+  const navScriptTag = runtimeManifest.navigation ? renderNavScriptTag() : "";
 
   const cspPlan = planEffectiveCsp({
     analytics: compiledAnalytics.csp,
@@ -470,7 +352,7 @@ export async function renderPageDslToHtml(
     renderPipeline: analyzeRenderPipelineRequirements({
       framework,
       customFrameworkURL: siteSettings?.customFrameworkURL,
-      requiresIconifyRuntime: nodesRequireIconifyRuntime(iconRuntimeNodes),
+      requiresIconifyRuntime: runtimeManifest.legacyIconify,
       includesStructuredDataJsonLd: true,
       globalCSSEnabled,
       customFonts,
@@ -557,7 +439,6 @@ export async function renderPageDslToHtml(
     darkMode: darkMode === "disabled" ? undefined : darkMode,
     iconRuntimeNodes,
     iconResources,
-    iconLocals: options.locals,
     siteSettings: {
       framework,
       unocssConfig: siteSettings?.unocssConfig,
@@ -572,15 +453,16 @@ export async function renderPageDslToHtml(
     renderInputHash: resolvedSurface.renderInputHash,
   });
 
-  return {
-    html: injectIntoBody(
-      await nodesToHtmlDocumentAsync(
-        pageNodes,
-        getComponentDSL,
-        documentOptions,
-      ),
-      assignedRegions,
-    ),
+  const renderDocument = await compileRenderDocument({
+    surface: resolvedSurface,
+    document: documentOptions,
     cspHeaderValue,
+    iconResources,
+  });
+
+  return {
+    html: serializeRenderDocumentHtml(renderDocument),
+    cspHeaderValue,
+    documentHash: renderDocument.documentHash,
   };
 }
