@@ -3,7 +3,7 @@
  * pages, layouts, and components. Extracted from App.
  */
 
-import { ref, type Ref } from "vue";
+import { ref, watch, type Ref } from "vue";
 import { actions } from "astro:actions";
 import { toast } from "vue-sonner";
 import { z } from "zod";
@@ -17,6 +17,10 @@ import { useBuilderData } from "@/composables/useBuilderData";
 import { markPageThumbnailStale } from "@/features/Studio/pages/composables/pageThumbnailInvalidation";
 import { markComponentThumbnailStale } from "@/features/Studio/components/composables/componentThumbnailInvalidation";
 import { commitSavedComponentToClientCaches } from "./componentCacheCoherence";
+import {
+  acquireEditorMutationLock,
+  settleEditorCommitBarrier,
+} from "./editorCommitCoordinator";
 import { invalidateComposeCache } from "../../../composables/composeClientCache";
 import { unwrapItemLoadingComposeResult } from "../../../composables/itemLoadingActionResults";
 import {
@@ -47,6 +51,10 @@ const PublishActionDataSchema = z
     timestamp: z.string().optional(),
     published: z.boolean().optional(),
     version: z.string().trim().min(1),
+    draftVersion: z.string().trim().min(1),
+    publishedVersion: z.string().trim().min(1),
+    delivery: z.enum(["ready", "pending"]).default("ready"),
+    deliveryJobId: z.string().trim().min(1).optional(),
   })
   .strict();
 
@@ -73,6 +81,30 @@ const PublishActionResultSchema = z.discriminatedUnion("success", [
 
 type PublishActionData = z.infer<typeof PublishActionDataSchema>;
 
+const DeliveryStatusResultSchema = z
+  .object({
+    success: z.literal(true),
+    data: z
+      .object({
+        jobId: z.string().trim().min(1),
+        delivery: z.enum(["ready", "pending"]),
+      })
+      .strict(),
+  })
+  .strict();
+
+const StyleRegenerationResultSchema = z.discriminatedUnion("success", [
+  z.looseObject({
+    success: z.literal(true),
+  }),
+  z.looseObject({
+    success: z.literal(false),
+    error: z.looseObject({
+      message: z.string().trim().min(1),
+    }),
+  }),
+]);
+
 export interface SavePublishDeps {
   pageBlocks: Ref<BuilderNode[]>;
   currentPage: Ref<PageDSL | null>;
@@ -97,7 +129,7 @@ export interface SavePublishDeps {
 }
 
 export interface SavePublishReturn {
-  handleSave: () => Promise<void>;
+  handleSave: () => Promise<SaveOutcome>;
   handlePublish: (options?: { showSuccessToast?: boolean }) => Promise<boolean>;
   handleSaveAndPublish: (options?: {
     showSuccessToast?: boolean;
@@ -110,6 +142,19 @@ export interface SavePublishReturn {
   /** Load the authoritative server draft without overwriting local recovery. */
   resolveSaveConflict: () => Promise<boolean>;
 }
+
+export type SaveOutcome =
+  | {
+      status: "saved" | "unchanged";
+      version: string | null;
+      documentFingerprint: string;
+    }
+  | {
+      status: "failed";
+      version: null;
+      documentFingerprint: string;
+      error: Error;
+    };
 
 export function useSavePublish(deps: SavePublishDeps): SavePublishReturn {
   const {
@@ -128,6 +173,7 @@ export function useSavePublish(deps: SavePublishDeps): SavePublishReturn {
 
   const currentVersion = ref<string | null>(null);
   const saveConflict = ref(false);
+  let lastSavedDocumentFingerprint: string | null = null;
   const { refreshPagesNow } = useBuilderData();
 
   function parsePublishActionData(payload: unknown): PublishActionData {
@@ -150,6 +196,37 @@ export function useSavePublish(deps: SavePublishDeps): SavePublishReturn {
     }
 
     return parsed.data.data;
+  }
+
+  async function pollPublishDelivery(
+    jobId: string,
+  ): Promise<"ready" | "pending"> {
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      const result = await actions.publishing.deliveryStatus({ jobId });
+      if (result.error) return "pending";
+      const parsed = DeliveryStatusResultSchema.safeParse(result.data);
+      if (parsed.success && parsed.data.data.delivery === "ready") {
+        return "ready";
+      }
+    }
+    return "pending";
+  }
+
+  async function regeneratePublishedStyles(): Promise<void> {
+    const result = await actions.styles.regenerateGlobalCSS();
+    if (result.error) {
+      throw actionErrorToError(
+        result.error as { message?: string; code?: string },
+      );
+    }
+
+    const parsed = StyleRegenerationResultSchema.safeParse(result.data);
+    if (!parsed.success) {
+      throw new Error("Invalid stylesheet regeneration response");
+    }
+    if (!parsed.data.success) {
+      throw new Error(parsed.data.error.message);
+    }
   }
 
   function markLayoutSlotsSaved(): void {
@@ -359,11 +436,20 @@ export function useSavePublish(deps: SavePublishDeps): SavePublishReturn {
     return true;
   }
 
-  let saveChain: Promise<void> = Promise.resolve();
+  let saveChain: Promise<SaveOutcome> = Promise.resolve({
+    status: "unchanged",
+    version: null,
+    documentFingerprint: "",
+  });
 
-  function enqueueSave(task: () => Promise<void>): Promise<void> {
+  function enqueueSave(task: () => Promise<SaveOutcome>): Promise<SaveOutcome> {
     const run = saveChain.then(task);
-    saveChain = run.catch(() => {});
+    saveChain = run.catch((error: unknown) => ({
+      status: "failed",
+      version: null,
+      documentFingerprint: "",
+      error: error instanceof Error ? error : new Error(String(error)),
+    }));
     return run;
   }
 
@@ -402,6 +488,64 @@ export function useSavePublish(deps: SavePublishDeps): SavePublishReturn {
   const createSnapshot = (blocks: BuilderNode[]): string => {
     return JSON.stringify(sanitizeNodes(blocks));
   };
+
+  function authoredDocument(
+    source: PageDSL | LayoutDSL | ComponentDSL | null,
+  ): Record<string, unknown> | null {
+    if (!source) {
+      return null;
+    }
+
+    const authored = { ...source } as Record<string, unknown>;
+    delete authored.version;
+    delete authored.createdAt;
+    delete authored.updatedAt;
+    delete authored.publishedAt;
+    delete authored.isModifiedSincePublish;
+    delete authored.usage;
+    delete authored.status;
+    authored.nodes = sanitizeNodes(pageBlocks.value);
+    return authored;
+  }
+
+  function createDocumentFingerprint(): string {
+    const itemType = currentItemType.value;
+    const document =
+      itemType === "page"
+        ? authoredDocument(currentPage.value)
+        : itemType === "layout"
+          ? authoredDocument(currentLayout.value)
+          : authoredDocument(currentComponent.value);
+
+    return JSON.stringify({
+      itemType,
+      document,
+      linkedLayoutSlots:
+        itemType === "page" ? snapshotLayoutSlots(currentLayout.value) : null,
+    });
+  }
+
+  watch(
+    [
+      () => currentItemType.value,
+      () => currentPage.value?.id,
+      () => currentPage.value?.version,
+      () => currentLayout.value?.id,
+      () => currentLayout.value?.version,
+      () => currentComponent.value?.id,
+      () => currentComponent.value?.version,
+      () => lastSavedSnapshot.value,
+      () => layoutSlotsSnapshot.value,
+      () => loadingState.value.isLoading,
+      () => hasUnsavedChanges.value,
+    ],
+    () => {
+      if (!loadingState.value.isLoading && !hasUnsavedChanges.value) {
+        lastSavedDocumentFingerprint = createDocumentFingerprint();
+      }
+    },
+    { flush: "sync", immediate: true },
+  );
 
   /**
    * Load the authoritative server draft after a conflict. The conflicting
@@ -621,19 +765,67 @@ export function useSavePublish(deps: SavePublishDeps): SavePublishReturn {
     throw new Error("Failed to save component");
   }
 
-  const performSave = async (): Promise<void> => {
+  const performSave = async (): Promise<SaveOutcome> => {
+    let documentFingerprint = createDocumentFingerprint();
+
+    try {
+      await settleEditorCommitBarrier();
+      documentFingerprint = createDocumentFingerprint();
+      const sourceDirty =
+        createSnapshot(pageBlocks.value) !== lastSavedSnapshot.value ||
+        snapshotLayoutSlots(currentLayout.value) !== layoutSlotsSnapshot.value;
+      const documentDirty =
+        lastSavedDocumentFingerprint !== null &&
+        documentFingerprint !== lastSavedDocumentFingerprint;
+      hasUnsavedChanges.value = sourceDirty || documentDirty;
+    } catch (error) {
+      const commitError =
+        error instanceof Error
+          ? error
+          : new Error("Could not commit the active editor change");
+      log("error", "Editor commit failed before save", {
+        error: commitError.message,
+      });
+      toast.error(commitError.message);
+      return {
+        status: "failed",
+        version: null,
+        documentFingerprint,
+        error: commitError,
+      };
+    }
+
     if (!hasUnsavedChanges.value) {
       log("debug", "[useSavePublish] No changes detected - skipping save");
-      return;
+      const activeDocument =
+        currentItemType.value === "page"
+          ? currentPage.value
+          : currentItemType.value === "layout"
+            ? currentLayout.value
+            : currentComponent.value;
+      return {
+        status: "unchanged",
+        version: activeDocument?.version ?? null,
+        documentFingerprint,
+      };
     }
 
     if (currentItemType.value === "page" && !currentPage.value) {
+      const error = new Error("No current page to save");
       log("error", "[useSavePublish] No current page to save");
-      return;
+      toast.error(error.message);
+      return {
+        status: "failed",
+        version: null,
+        documentFingerprint,
+        error,
+      };
     }
 
     log("debug", "[useSavePublish] Changes detected - saving");
     loadingState.value.isSaving = true;
+
+    let savedVersion: string | null = null;
 
     try {
       const itemType = currentItemType.value;
@@ -704,6 +896,7 @@ export function useSavePublish(deps: SavePublishDeps): SavePublishReturn {
               }
             : undefined,
         );
+        savedVersion = saveData.version;
         if (layoutDirty && !saveData.layoutVersion) {
           throw new Error("Invalid atomic page save response");
         }
@@ -773,6 +966,7 @@ export function useSavePublish(deps: SavePublishDeps): SavePublishReturn {
         if (typeof layoutVersion !== "string" || layoutVersion.length === 0) {
           throw new Error("Invalid layout save response");
         }
+        savedVersion = layoutVersion;
 
         if (
           currentItemType.value === "layout" &&
@@ -803,6 +997,7 @@ export function useSavePublish(deps: SavePublishDeps): SavePublishReturn {
           componentToSave,
           sanitizedBlocks,
         );
+        savedVersion = saveData.version;
 
         const savedComponent: ComponentDSL = {
           ...componentToSave,
@@ -840,6 +1035,18 @@ export function useSavePublish(deps: SavePublishDeps): SavePublishReturn {
           );
         }
       }
+
+      if (!savedVersion) {
+        throw new Error("Save completed without a document revision");
+      }
+
+      lastSavedDocumentFingerprint = documentFingerprint;
+
+      return {
+        status: "saved",
+        version: savedVersion,
+        documentFingerprint,
+      };
     } catch (err) {
       if (
         isVersionConflictError({
@@ -861,6 +1068,13 @@ export function useSavePublish(deps: SavePublishDeps): SavePublishReturn {
           ? " Reload the page in Composer if this persists after a dev:edge restart."
           : "";
       toast.error(`${errorMsg}${hint}`);
+      const error = err instanceof Error ? err : new Error(errorMsg);
+      return {
+        status: "failed",
+        version: null,
+        documentFingerprint,
+        error,
+      };
     } finally {
       loadingState.value.isSaving = false;
       syncDirtyState(true);
@@ -870,8 +1084,8 @@ export function useSavePublish(deps: SavePublishDeps): SavePublishReturn {
   /**
    * Handle save operation with proper state management
    */
-  const handleSave = async (): Promise<void> => {
-    await enqueueSave(performSave);
+  const handleSave = async (): Promise<SaveOutcome> => {
+    return enqueueSave(performSave);
   };
 
   /**
@@ -881,6 +1095,7 @@ export function useSavePublish(deps: SavePublishDeps): SavePublishReturn {
     options: {
       skipSave?: boolean;
       showSuccessToast?: boolean;
+      saveOutcome?: SaveOutcome;
     } = {},
   ): Promise<boolean> => {
     if (currentItemType.value !== "page") {
@@ -892,6 +1107,7 @@ export function useSavePublish(deps: SavePublishDeps): SavePublishReturn {
       return false;
     }
     loadingState.value.isPublishing = true;
+    let releaseMutationLock: (() => void) | null = null;
 
     try {
       if (!currentPage.value) {
@@ -901,11 +1117,17 @@ export function useSavePublish(deps: SavePublishDeps): SavePublishReturn {
       // Direct publishing must never bypass the normal draft save path, which
       // also persists edited layout slots and updates local recovery. The
       // combined save-and-publish action has already completed that work.
+      let saveOutcome = options.saveOutcome;
       if (!options.skipSave) {
-        await handleSave();
-        if (hasUnsavedChanges.value || saveConflict.value) {
+        await settleEditorCommitBarrier();
+        releaseMutationLock = acquireEditorMutationLock();
+        saveOutcome = await handleSave();
+        if (saveOutcome.status === "failed" || saveConflict.value) {
           return false;
         }
+      }
+      if (!saveOutcome || saveOutcome.status === "failed") {
+        throw new Error("Publish requires a completed draft save");
       }
       if (hasUnsavedChanges.value) {
         throw new Error("Save the current draft before publishing");
@@ -913,8 +1135,20 @@ export function useSavePublish(deps: SavePublishDeps): SavePublishReturn {
 
       const publishingPageId = currentPage.value.id;
       const publishingPageSlug = currentPage.value.slug;
-      const requestedVersion = expectedVersionFor(currentPage.value);
-      const requestedBlocksSnapshot = createSnapshot(pageBlocks.value);
+      const requestedVersion = saveOutcome.version;
+      if (!requestedVersion) {
+        throw new Error("The saved draft has no publishable revision");
+      }
+      if (createDocumentFingerprint() !== saveOutcome.documentFingerprint) {
+        throw new Error(
+          "The document changed while publishing. No revision was promoted.",
+        );
+      }
+      const requestedDocumentFingerprint = saveOutcome.documentFingerprint;
+
+      // The save stores the canonical node tree. Refresh derived utility CSS
+      // from that authoritative tree before making its revision public.
+      await regeneratePublishedStyles();
 
       // Use the publish action to advance the page's published revision.
       const result = await actions.publishing.publish({
@@ -939,9 +1173,13 @@ export function useSavePublish(deps: SavePublishDeps): SavePublishReturn {
 
       if (result.data) {
         const publishedData = parsePublishActionData(result.data);
-        if (publishedData.version !== requestedVersion) {
+        if (
+          publishedData.version !== requestedVersion ||
+          publishedData.draftVersion !== requestedVersion ||
+          publishedData.publishedVersion !== requestedVersion
+        ) {
           throw new Error(
-            "Published revision did not match the requested saved draft",
+            "The published revision does not match the saved draft revision.",
           );
         }
         log("info", "[useSavePublish] Page published", {
@@ -949,11 +1187,17 @@ export function useSavePublish(deps: SavePublishDeps): SavePublishReturn {
           htmlSize: `${(publishedData.htmlSize / 1024).toFixed(2)}KB`,
           withCompiledCSS: publishedData.globalCSSEnabled,
         });
+        if (
+          publishedData.delivery === "pending" &&
+          publishedData.deliveryJobId
+        ) {
+          await pollPublishDelivery(publishedData.deliveryJobId);
+        }
 
         if (currentPage.value?.id === publishingPageId) {
           const draftAdvancedWhilePublishing =
             currentPage.value.version !== requestedVersion ||
-            createSnapshot(pageBlocks.value) !== requestedBlocksSnapshot ||
+            createDocumentFingerprint() !== requestedDocumentFingerprint ||
             hasUnsavedChanges.value;
 
           currentPage.value.status = "published";
@@ -971,7 +1215,7 @@ export function useSavePublish(deps: SavePublishDeps): SavePublishReturn {
         markPageThumbnailStale(publishingPageId);
         await refreshPagesNow();
         if (options.showSuccessToast ?? true) {
-          toast.success("Page published");
+          toast.success("Page Published");
         }
         return true;
       }
@@ -995,6 +1239,7 @@ export function useSavePublish(deps: SavePublishDeps): SavePublishReturn {
       toast.error(errorMsg);
       return false;
     } finally {
+      releaseMutationLock?.();
       loadingState.value.isPublishing = false;
     }
   };
@@ -1008,20 +1253,21 @@ export function useSavePublish(deps: SavePublishDeps): SavePublishReturn {
   }): Promise<void> => {
     const showSuccessToast = options?.showSuccessToast ?? true;
 
-    await handleSave();
-    if (hasUnsavedChanges.value || saveConflict.value) {
-      return;
-    }
     let completed = true;
     if (currentItemType.value === "page") {
       completed = await handlePublish({
-        skipSave: true,
         showSuccessToast: false,
       });
+    } else {
+      const saveOutcome = await handleSave();
+      completed =
+        saveOutcome.status !== "failed" &&
+        !hasUnsavedChanges.value &&
+        !saveConflict.value;
     }
     if (showSuccessToast && completed) {
       toast.success(
-        currentItemType.value === "page" ? "Page published" : "Draft saved",
+        currentItemType.value === "page" ? "Page Published" : "Draft saved",
       );
     }
   };

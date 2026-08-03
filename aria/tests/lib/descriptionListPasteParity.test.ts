@@ -5,9 +5,9 @@
 import { describe, expect, it } from "vitest";
 
 import { importHtmlToNodes } from "../../lib/blocks/htmlToNodes";
+import { convertListSemanticMode } from "../../lib/blocks/listNodes";
 import { nodesToAstro } from "../../lib/blocks/nodesToAstro";
 import { nodesToHtmlFragment } from "../../lib/blocks/nodesToHtml";
-import { resolveStageBlockRootTag } from "../../admin/features/Stage/utils/stageBlockRootTag";
 import type { BuilderNode } from "../../lib/types/nodes";
 import { RENDERING_DESCRIPTION_LIST_UTILITY_PASTE } from "../fixtures/renderingDescriptionListUtilityPaste";
 
@@ -24,7 +24,7 @@ function findNode(
 }
 
 describe("description-list paste semantic parity", () => {
-  it("preserves dl/dt/dd provenance through importer, Stage, HTML, and Astro", async () => {
+  it("preserves dl/dt/dd provenance through importer, HTML, and Astro", async () => {
     const imported = await importHtmlToNodes(
       RENDERING_DESCRIPTION_LIST_UTILITY_PASTE,
     );
@@ -57,10 +57,6 @@ describe("description-list paste semantic parity", () => {
       "lg:max-w-none",
       "lg:grid-cols-4",
     ]);
-    expect(resolveStageBlockRootTag(descriptionList!)).toBe("dl");
-    expect(resolveStageBlockRootTag(term!)).toBe("dt");
-    expect(resolveStageBlockRootTag(description!)).toBe("dd");
-
     const html = nodesToHtmlFragment(imported.nodes);
     document.body.innerHTML = html;
     const renderedList = document.body.querySelector("dl");
@@ -84,18 +80,109 @@ describe("description-list paste semantic parity", () => {
     expect(astro).not.toContain("ordered=");
   });
 
-  it("retains ordered-list semantics separately from description lists", async () => {
+  it("keeps the pasted description groups stable across repeated type switches", async () => {
     const imported = await importHtmlToNodes(
-      `<ol><li>First</li><li>Second</li></ol>`,
+      RENDERING_DESCRIPTION_LIST_UTILITY_PASTE,
     );
-    const list = imported.nodes[0];
+    const descriptionList = findNode(
+      imported.nodes,
+      (node) => node.type === "List" && node.props.element === "dl",
+    );
+    expect(descriptionList).not.toBeNull();
+
+    let converted = descriptionList!;
+    for (const mode of [
+      "ordered",
+      "description",
+      "unordered",
+      "description",
+    ] as const) {
+      converted = convertListSemanticMode(converted, mode);
+      expect(converted.children).toHaveLength(4);
+    }
+
+    const ordered = convertListSemanticMode(converted, "ordered");
+    const emptyContainers = ordered.children.flatMap((item) =>
+      item.children.filter(
+        (child) =>
+          child.type.toLowerCase() === "container" &&
+          child.children.length === 0,
+      ),
+    );
+    expect(emptyContainers).toEqual([]);
+    document.body.innerHTML = nodesToHtmlFragment([ordered]);
+    const renderedOrderedList = document.body.querySelector("ol");
+    expect(renderedOrderedList?.children).toHaveLength(4);
+    expect(renderedOrderedList?.querySelectorAll(":scope > li")).toHaveLength(
+      4,
+    );
+    expect(renderedOrderedList?.querySelector("li li")).toBeNull();
+    expect(renderedOrderedList?.textContent).toContain("Customer satisfaction");
+    expect(renderedOrderedList?.textContent).toContain("98%");
+
+    const restored = convertListSemanticMode(ordered, "description");
+    document.body.innerHTML = nodesToHtmlFragment([restored]);
+    const renderedDescriptionList = document.body.querySelector("dl");
+    expect(renderedDescriptionList?.children).toHaveLength(4);
+    expect(
+      renderedDescriptionList?.querySelectorAll(":scope > div > dt"),
+    ).toHaveLength(4);
+    expect(
+      renderedDescriptionList?.querySelectorAll(":scope > div > dd"),
+    ).toHaveLength(4);
+    expect(renderedDescriptionList?.querySelector("ul, ol, li")).toBeNull();
+  });
+
+  it("repairs empty temporary description containers on the next type change", async () => {
+    const imported = await importHtmlToNodes(
+      RENDERING_DESCRIPTION_LIST_UTILITY_PASTE,
+    );
+    const descriptionList = findNode(
+      imported.nodes,
+      (node) => node.type === "List" && node.props.element === "dl",
+    );
+    expect(descriptionList).not.toBeNull();
+
+    const previouslyConverted = convertListSemanticMode(
+      descriptionList!,
+      "ordered",
+    );
+    for (const item of previouslyConverted.children) {
+      for (const part of item.children) {
+        if (part.type.toLowerCase() === "text") {
+          part.type = "container";
+        }
+      }
+    }
+
+    const repaired = convertListSemanticMode(previouslyConverted, "unordered");
+    expect(
+      repaired.children.flatMap((item) =>
+        item.children.map((part) => part.type.toLowerCase()),
+      ),
+    ).not.toContain("container");
+
+    document.body.innerHTML = nodesToHtmlFragment([repaired]);
+    const renderedList = document.body.querySelector("ul");
+    expect(renderedList?.textContent).toContain("Customer satisfaction");
+    expect(renderedList?.textContent).toContain("98%");
+    expect(renderedList?.querySelector("li > div:empty")).toBeNull();
+  });
+
+  it.each([
+    ["ul", false],
+    ["ol", true],
+  ] as const)("retains ordinary %s/li semantics", async (tagName, ordered) => {
+    const imported = await importHtmlToNodes(
+      `<${tagName}><li>First</li><li>Second</li></${tagName}>`,
+    );
+    const list = imported.nodes[0]!;
 
     expect(list).toMatchObject({
       type: "List",
-      props: { ordered: true },
+      props: ordered ? { ordered: true } : {},
     });
-    expect(resolveStageBlockRootTag(list!)).toBe("ol");
     document.body.innerHTML = nodesToHtmlFragment(imported.nodes);
-    expect(document.body.querySelector("ol > li")).not.toBeNull();
+    expect(document.body.querySelectorAll(`${tagName} > li`)).toHaveLength(2);
   });
 });

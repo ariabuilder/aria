@@ -22,4 +22,19 @@ declare module "cloudflare:workers" {
     protected readonly env: Env;
     constructor(ctx: DurableObjectState, env: Env);
   }
+
+  export interface CachePurgeOptions {
+    tags?: string[];
+    pathPrefixes?: string[];
+    purgeEverything?: boolean;
+  }
+
+  export interface CachePurgeResult {
+    success: boolean;
+    errors: Array<{ code: number; message: string }>;
+  }
+
+  export const cache: {
+    purge(options: CachePurgeOptions): Promise<CachePurgeResult>;
+  };
 }

@@ -11,6 +11,8 @@ const {
   saveComponentMock,
   updateItemMock,
   publishMock,
+  regenerateGlobalCSSMock,
+  deliveryStatusMock,
   getItemMock,
   refreshPagesMock,
   refreshPagesNowMock,
@@ -24,6 +26,8 @@ const {
   saveComponentMock: vi.fn(),
   updateItemMock: vi.fn(),
   publishMock: vi.fn(),
+  regenerateGlobalCSSMock: vi.fn(),
+  deliveryStatusMock: vi.fn(),
   getItemMock: vi.fn(),
   refreshPagesMock: vi.fn(),
   refreshPagesNowMock: vi.fn(),
@@ -42,6 +46,10 @@ vi.mock("astro:actions", () => ({
     getItem: getItemMock,
     publishing: {
       publish: publishMock,
+      deliveryStatus: deliveryStatusMock,
+    },
+    styles: {
+      regenerateGlobalCSS: regenerateGlobalCSSMock,
     },
   },
 }));
@@ -176,6 +184,9 @@ describe("useSavePublish", () => {
     const { __resetItemLoadingGenerationsForTests } =
       await import("../../admin/composables/useItemLoading");
     __resetItemLoadingGenerationsForTests();
+    const { resetEditorCommitCoordinatorForTests } =
+      await import("../../admin/features/Core/composables/editorCommitCoordinator");
+    resetEditorCommitCoordinatorForTests();
     const { useAppRouter } =
       await import("@/features/Core/composables/useAppRouter");
     useAppRouter().startEditing({ itemType: "page", itemSlug: "home" });
@@ -216,7 +227,27 @@ describe("useSavePublish", () => {
           timestamp: "2026-03-31T22:00:00.000Z",
           published: true,
           version: "v2",
+          draftVersion: "v2",
+          publishedVersion: "v2",
         },
+      },
+      error: null,
+    });
+    regenerateGlobalCSSMock.mockResolvedValue({
+      data: {
+        success: true,
+        data: {
+          globalCSSHash: "css-v2",
+          cssSize: 4096,
+          classCount: 24,
+        },
+      },
+      error: null,
+    });
+    deliveryStatusMock.mockResolvedValue({
+      data: {
+        success: true,
+        data: { jobId: "delivery-job", delivery: "pending" },
       },
       error: null,
     });
@@ -340,6 +371,10 @@ describe("useSavePublish", () => {
       expectedVersion: "v2",
       skipCSSRegeneration: true,
     });
+    expect(regenerateGlobalCSSMock).toHaveBeenCalledTimes(1);
+    expect(
+      regenerateGlobalCSSMock.mock.invocationCallOrder[0],
+    ).toBeLessThan(publishMock.mock.invocationCallOrder[0]!);
     expect(getItemMock).not.toHaveBeenCalled();
     expect(deps.currentPage.value?.status).toBe("published");
     expect(currentVersion.value).toBe("v2");
@@ -348,7 +383,7 @@ describe("useSavePublish", () => {
     expect(loadResult?.pageData.title).toBe("Published Home");
     expect(refreshPagesNowMock).toHaveBeenCalledTimes(2);
     expect(toastSuccessMock).toHaveBeenCalledTimes(1);
-    expect(toastSuccessMock).toHaveBeenCalledWith("Page published");
+    expect(toastSuccessMock).toHaveBeenCalledWith("Page Published");
   });
 
   it("shows a success toast for explicit save-and-publish actions", async () => {
@@ -362,8 +397,36 @@ describe("useSavePublish", () => {
 
     expect(savePageMock).toHaveBeenCalledTimes(1);
     expect(publishMock).toHaveBeenCalledTimes(1);
-    expect(toastSuccessMock).toHaveBeenCalledWith("Page published");
+    expect(toastSuccessMock).toHaveBeenCalledWith("Page Published");
     expect(toastSuccessMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps durable live delivery automatic and out of the success copy", async () => {
+    publishMock.mockResolvedValueOnce({
+      data: {
+        success: true,
+        data: {
+          slug: "home",
+          htmlSize: 0,
+          globalCSSEnabled: true,
+          version: "v2",
+          draftVersion: "v2",
+          publishedVersion: "v2",
+          delivery: "pending",
+          deliveryJobId: "public-route:publish:page-home:v2",
+        },
+      },
+      error: null,
+    });
+    const { useSavePublish } =
+      await import("../../admin/features/Core/composables/useSavePublish");
+    const deps = createSaveDeps();
+    const { handleSaveAndPublish } = useSavePublish(deps);
+
+    await handleSaveAndPublish();
+
+    expect(toastSuccessMock).toHaveBeenCalledWith("Page Published");
+    expect(toastErrorMock).not.toHaveBeenCalled();
   });
 
   it("reports a malformed publish response instead of failing silently", async () => {
@@ -383,6 +446,35 @@ describe("useSavePublish", () => {
     expect(toastSuccessMock).not.toHaveBeenCalled();
     expect(toastErrorMock).toHaveBeenCalledTimes(1);
     expect(toastErrorMock).toHaveBeenCalledWith("Invalid publish response");
+  });
+
+  it("fails closed before revision promotion when utility CSS regeneration fails", async () => {
+    const { useSavePublish } =
+      await import("../../admin/features/Core/composables/useSavePublish");
+
+    regenerateGlobalCSSMock.mockResolvedValueOnce({
+      data: {
+        success: false,
+        error: {
+          code: "CSS_REGENERATION_FAILED",
+          message: "Utility CSS compilation failed",
+        },
+      },
+      error: null,
+    });
+
+    const deps = createSaveDeps();
+    const { handlePublish } = useSavePublish(deps);
+
+    await expect(handlePublish()).resolves.toBe(false);
+
+    expect(savePageMock).toHaveBeenCalledTimes(1);
+    expect(regenerateGlobalCSSMock).toHaveBeenCalledTimes(1);
+    expect(publishMock).not.toHaveBeenCalled();
+    expect(deps.currentPage.value?.status).toBe("draft");
+    expect(toastErrorMock).toHaveBeenCalledWith(
+      "Utility CSS compilation failed",
+    );
   });
 
   it("saves once before publishing and uses the replacement nonce", async () => {
@@ -658,15 +750,70 @@ describe("useSavePublish", () => {
 
     const first = handleSave();
     const second = handleSave();
-    await Promise.resolve();
-
-    expect(callOrder).toEqual(["start"]);
+    await vi.waitFor(() => expect(callOrder).toEqual(["start"]));
 
     releaseFirstSave?.();
     await Promise.all([first, second]);
 
     expect(callOrder).toEqual(["start", "end"]);
     expect(savePageMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("commits pending Inspector work before deciding whether a save is needed", async () => {
+    const { useSavePublish } =
+      await import("../../admin/features/Core/composables/useSavePublish");
+    const { trackEditorCommit } =
+      await import("../../admin/features/Core/composables/editorCommitCoordinator");
+
+    const deps = createSaveDeps();
+    const savePublish = useSavePublish(deps);
+    deps.lastSavedSnapshot.value = savePublish.createSnapshot(
+      deps.pageBlocks.value,
+    );
+    deps.hasUnsavedChanges.value = false;
+
+    trackEditorCommit(
+      Promise.resolve().then(() => {
+        deps.pageBlocks.value.push(createNode({ id: "committed-on-publish" }));
+        return true;
+      }),
+      "Background",
+    );
+
+    await savePublish.handlePublish();
+
+    expect(savePageMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        blocks: expect.arrayContaining([
+          expect.objectContaining({ id: "committed-on-publish" }),
+        ]),
+      }),
+    );
+    expect(publishMock).toHaveBeenCalledWith(
+      expect.objectContaining({ expectedVersion: "v2" }),
+    );
+  });
+
+  it("saves authored metadata even when the reactive dirty flag is stale", async () => {
+    const { useSavePublish } =
+      await import("../../admin/features/Core/composables/useSavePublish");
+
+    const deps = createSaveDeps();
+    const savePublish = useSavePublish(deps);
+    deps.lastSavedSnapshot.value = savePublish.createSnapshot(
+      deps.pageBlocks.value,
+    );
+    deps.hasUnsavedChanges.value = false;
+
+    deps.currentPage.value!.title = "Direct snapshot wins";
+    expect(deps.hasUnsavedChanges.value).toBe(false);
+
+    const outcome = await savePublish.handleSave();
+
+    expect(outcome.status).toBe("saved");
+    expect(savePageMock).toHaveBeenCalledWith(
+      expect.objectContaining({ title: "Direct snapshot wins" }),
+    );
   });
 
   it("keeps edits made during an in-flight save dirty without auto-saving twice", async () => {
@@ -1064,6 +1211,8 @@ describe("useSavePublish", () => {
           timestamp: "2026-03-31T22:00:00.000Z",
           published: true,
           version: "v2",
+          draftVersion: "v2",
+          publishedVersion: "v2",
         },
       },
       error: null,
@@ -1105,6 +1254,8 @@ describe("useSavePublish", () => {
           globalCSSEnabled: true,
           published: true,
           version: "v2",
+          draftVersion: "v2",
+          publishedVersion: "v2",
         },
       },
       error: null,

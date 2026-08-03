@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { cache as workersCache } from "cloudflare:workers";
 import { getCloudflareEnv, type RuntimeLocals } from "../cloudflare/env";
 import { log as baseLog } from "../utils/logger";
 import type { PageDSL } from "../types/nodes";
@@ -73,11 +74,10 @@ type PublicPageIdentity = Pick<PageDSL, "id" | "slug"> & {
   pathnameKey?: string;
 };
 
-type CloudflareCachePurgeRequest = { tags: string[] } | { files: string[] };
-
-type CloudflareCachePurgeResponse = {
-  success: boolean;
-  errors?: Array<{ message?: string; code?: number }>;
+type CloudflareCachePurgeRequest = {
+  tags?: string[];
+  pathPrefixes?: string[];
+  purgeEverything?: boolean;
 };
 
 const PUBLIC_PAGE_CACHE_TAG = "aria-public-pages" as const;
@@ -232,49 +232,15 @@ export async function purgePublicCacheTags(
 }
 
 async function purgeCloudflareCache(
-  context: CacheContext,
+  _context: CacheContext,
   payload: CloudflareCachePurgeRequest,
 ): Promise<boolean> {
-  const env = getCloudflareEnv(context.locals);
-  const apiToken =
-    typeof env.CLOUDFLARE_API_TOKEN === "string"
-      ? env.CLOUDFLARE_API_TOKEN
-      : typeof env.CF_API_TOKEN === "string"
-        ? env.CF_API_TOKEN
-        : undefined;
-  const zoneId =
-    typeof env.CLOUDFLARE_ZONE_ID === "string"
-      ? env.CLOUDFLARE_ZONE_ID
-      : typeof env.CF_ZONE_ID === "string"
-        ? env.CF_ZONE_ID
-        : undefined;
-
-  if (!apiToken || !zoneId) {
-    return false;
-  }
-
-  const response = await fetch(
-    `https://api.cloudflare.com/client/v4/zones/${zoneId}/purge_cache`,
-    {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiToken}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(payload),
-    },
-  );
-
-  if (!response.ok) {
-    throw new Error(`Cloudflare purge request failed with ${response.status}`);
-  }
-
-  const result = (await response.json()) as CloudflareCachePurgeResponse;
+  const result = await workersCache.purge(payload);
   if (!result.success) {
     const detail = result.errors
-      ?.map((error) => error.message ?? String(error.code))
+      .map((error) => error.message || String(error.code))
       .join(", ");
-    throw new Error(detail || "Cloudflare cache purge failed");
+    throw new Error(detail || "Workers cache purge failed");
   }
 
   return true;

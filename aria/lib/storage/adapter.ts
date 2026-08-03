@@ -73,16 +73,17 @@ import type {
   EntryListParams,
   EntryListResult,
 } from "../cms/constants";
-import type {
-  CacheInvalidationJob,
-  LayoutLocaleMeta,
-  LayoutLocaleRecord,
-  LayoutLocaleVersion,
-  LocalizedRoute,
-  PageLocaleMeta,
-  PageLocaleRecord,
-  PageLocaleVersion,
-  RouteLease,
+import {
+  CacheInvalidationJobSchema,
+  type CacheInvalidationJob,
+  type LayoutLocaleMeta,
+  type LayoutLocaleRecord,
+  type LayoutLocaleVersion,
+  type LocalizedRoute,
+  type PageLocaleMeta,
+  type PageLocaleRecord,
+  type PageLocaleVersion,
+  type RouteLease,
 } from "../localization/siteTranslationSchemas";
 import type { ApiEntryMutationCommit } from "../api/mutationContext";
 import type {
@@ -581,10 +582,16 @@ export const PublishPageOptionsSchema = z
     activityMetadata: z.string().optional(),
     compilerMetadata: z.custom<AriaCompilerMetadata>().optional(),
     dependencies: PagePublicationDependenciesSchema.optional(),
+    invalidationJob: CacheInvalidationJobSchema.optional(),
   })
   .strict();
 
 export type PublishPageOptions = z.infer<typeof PublishPageOptionsSchema>;
+
+export const UnpublishPageOptionsSchema = z
+  .object({ invalidationJob: CacheInvalidationJobSchema.optional() })
+  .strict();
+export type UnpublishPageOptions = z.infer<typeof UnpublishPageOptionsSchema>;
 
 export type LinkedLayoutDraftSave = {
   id: string;
@@ -841,7 +848,7 @@ export interface StorageAdapter {
     authorship?: AuthorshipSaveContext,
     options?: SchedulePageOptions,
   ): Promise<string | null>;
-  unpublishPageDSL(id: string): Promise<void>;
+  unpublishPageDSL(id: string, options?: UnpublishPageOptions): Promise<void>;
   archivePageDSL(id: string): Promise<void>;
   unarchivePageDSL(id: string): Promise<void>;
   listPagesDSL(opts?: {
@@ -1000,12 +1007,15 @@ export interface StorageAdapter {
   enqueueCacheInvalidationJob(
     job: CacheInvalidationJob,
   ): Promise<CacheInvalidationJob>;
+  getCacheInvalidationJob(id: string): Promise<CacheInvalidationJob | null>;
   claimDueCacheInvalidationJobs(input: {
     now: string;
     leaseToken: string;
     leaseExpiresAt: string;
     updatedAt: string;
     limit: number;
+    jobId?: string;
+    force?: boolean;
   }): Promise<CacheInvalidationJob[]>;
   completeCacheInvalidationJob(input: {
     id: string;

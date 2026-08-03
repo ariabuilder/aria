@@ -10,7 +10,7 @@ import {
   type EmailMessageBatch,
 } from "./email-delivery";
 import { reconcileScheduledPublish } from "./scheduled-publish";
-import { reconcileLocalizationInvalidations } from "./localization-invalidation";
+import { reconcileCacheInvalidations } from "./localization-invalidation";
 import { reconcileWorkflowRetention } from "./workflow-retention";
 import {
   handleThumbnailQueue,
@@ -60,10 +60,13 @@ export default {
       { name: "email", run: () => reconcileEmailDeliveries(env) },
       { name: "publishing", run: () => reconcileScheduledPublish(env) },
       {
-        name: "localization",
-        run: () => reconcileLocalizationInvalidations(env),
+        name: "cache-invalidation",
+        run: () => reconcileCacheInvalidations(env),
       },
-      { name: "workflow-retention", run: () => reconcileWorkflowRetention(env) },
+      {
+        name: "workflow-retention",
+        run: () => reconcileWorkflowRetention(env),
+      },
       { name: "integrations", run: () => reconcileIntegrationDeliveries(env) },
       { name: "oauth-maintenance", run: () => reconcileOAuthMaintenance(env) },
     ]);

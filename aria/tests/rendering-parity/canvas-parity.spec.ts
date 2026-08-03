@@ -93,6 +93,49 @@ async function openSurface(
   return frame;
 }
 
+async function expectMountedListSemantics(frame: Frame): Promise<void> {
+  const semantics = await frame
+    .locator('[data-parity-id="description-list"]')
+    .evaluate((descriptionList) => ({
+      tagName: descriptionList.tagName.toLowerCase(),
+      groupCount: descriptionList.children.length,
+      groups: Array.from(descriptionList.children).map((group) => ({
+        tagName: group.tagName.toLowerCase(),
+        childTags: Array.from(group.children).map((child) =>
+          child.tagName.toLowerCase(),
+        ),
+      })),
+      invalidDescendantCount:
+        descriptionList.querySelectorAll("ul, ol, li").length,
+      serializedControlAttributeCount:
+        (descriptionList.matches("[element], [ordered]") ? 1 : 0) +
+        descriptionList.querySelectorAll("[element], [ordered]").length,
+    }));
+
+  expect(semantics).toEqual({
+    tagName: "dl",
+    groupCount: 4,
+    groups: Array.from({ length: 4 }, () => ({
+      tagName: "div",
+      childTags: ["dt", "dd"],
+    })),
+    invalidDescendantCount: 0,
+    serializedControlAttributeCount: 0,
+  });
+  await expect(
+    frame.locator('[data-parity-id="unordered-list"]'),
+  ).toHaveJSProperty("tagName", "UL");
+  await expect(
+    frame.locator('[data-parity-id="unordered-list"] > li'),
+  ).toHaveCount(1);
+  await expect(
+    frame.locator('[data-parity-id="ordered-list"]'),
+  ).toHaveJSProperty("tagName", "OL");
+  await expect(
+    frame.locator('[data-parity-id="ordered-list"] > li'),
+  ).toHaveCount(1);
+}
+
 async function captureSurface(
   frame: Frame,
   runtime: BrowserParityRuntime,
@@ -396,6 +439,7 @@ for (const viewport of VIEWPORTS) {
     });
 
     const stageFrame = await openSurface(page, runtime, "stage");
+    await expectMountedListSemantics(stageFrame);
     await installCanonicalHostCss(stageFrame, canonicalHostCss);
     const stageManagedImageRect = await readManagedUtilityImageRect(stageFrame);
     expectManagedUtilityImageRect(publicManagedImageRect);

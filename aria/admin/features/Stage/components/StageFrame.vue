@@ -1862,11 +1862,10 @@ const renderBlockContent = (block: BuilderNode): Element | string | null => {
         return null;
       }
 
-      const list = document.createElement(
-        getNativeTagForRenderableNode(block, blockProps) === "ol" ? "ol" : "ul",
-      );
+      const tagName = getNativeTagForRenderableNode(block, blockProps) ?? "ul";
+      const list = document.createElement(tagName);
 
-      if (blockProps.items && Array.isArray(blockProps.items)) {
+      if (tagName !== "dl" && Array.isArray(blockProps.items)) {
         blockProps.items.forEach((item) => {
           const li = document.createElement("li");
           li.textContent = toDomString(item, "");
@@ -1881,7 +1880,8 @@ const renderBlockContent = (block: BuilderNode): Element | string | null => {
         return null;
       }
 
-      const li = document.createElement("li");
+      const tagName = getNativeTagForRenderableNode(block, blockProps) ?? "li";
+      const listItem = document.createElement(tagName);
       const itemContent = toContentDomString(
         blockProps.content ?? blockProps.text ?? blockProps.label,
         "",
@@ -1891,13 +1891,13 @@ const renderBlockContent = (block: BuilderNode): Element | string | null => {
       if (itemContent.length > 0) {
         if (linkAnchor) {
           linkAnchor.innerHTML = itemContent;
-          li.appendChild(linkAnchor);
+          listItem.appendChild(linkAnchor);
         } else {
-          li.innerHTML = itemContent;
+          listItem.innerHTML = itemContent;
         }
       }
 
-      return li;
+      return listItem;
     }
     case "code": {
       const rawCode = toDomString(

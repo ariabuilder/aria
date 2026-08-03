@@ -4,6 +4,7 @@ import type {
   PageInventoryItem,
   PageSaveOptions,
   PublishPageOptions,
+  UnpublishPageOptions,
   StorageAdapter,
   StoredPageAccessMode,
   StoredPageSystemRole,
@@ -11,6 +12,7 @@ import type {
 import {
   PublishPageOptionsSchema,
   SchedulePageOptionsSchema,
+  UnpublishPageOptionsSchema,
   type SchedulePageOptions,
 } from "../../adapter";
 import {
@@ -43,6 +45,7 @@ import {
   resolveStoredSemanticSourceHash,
 } from "./surfaceNormalization";
 import type { SharedVersionStorageContext } from "./contextTypes";
+import { cacheInvalidationInsertWhenPageState } from "../../siteLocalizationStorage";
 
 export type PageLifecycleStorageDomain = Pick<
   StorageAdapter,
@@ -843,10 +846,13 @@ export function createPageLifecycleStorageDomain(
           ...(scheduleLeaseToken ? [scheduleLeaseToken, sourceVersion] : []),
         ],
       };
-      const publishChanges = parsedOptions.dependencies
-        ? await context.runBatchWithChanges([
-            {
-              sql: `UPDATE aria_page_versions
+      const publishStatements: Array<{
+        sql: string;
+        args?: readonly unknown[];
+      }> = [];
+      if (parsedOptions.dependencies) {
+        publishStatements.push({
+          sql: `UPDATE aria_page_versions
                     SET dependency_versions_json = ?
                     WHERE id = ? AND version = ?
                       AND EXISTS (
@@ -860,26 +866,38 @@ export function createPageLifecycleStorageDomain(
                               : ""
                           }
                       )`,
-              args: [
-                JSON.stringify(parsedOptions.dependencies),
-                resolved.id,
-                sourceVersion,
-                resolved.id,
-                sourceVersion,
-                ...(scheduleLeaseToken
-                  ? [scheduleLeaseToken, sourceVersion]
-                  : []),
-              ],
-            },
-            publishMetaStatement,
-          ])
-        : [
-            await context.runWithChanges(
-              publishMetaStatement.sql,
-              publishMetaStatement.args,
-            ),
-          ];
-      const publishResult = publishChanges[publishChanges.length - 1];
+          args: [
+            JSON.stringify(parsedOptions.dependencies),
+            resolved.id,
+            sourceVersion,
+            resolved.id,
+            sourceVersion,
+            ...(scheduleLeaseToken ? [scheduleLeaseToken, sourceVersion] : []),
+          ],
+        });
+      }
+      const publishStatementIndex = publishStatements.length;
+      publishStatements.push(publishMetaStatement);
+      if (parsedOptions.invalidationJob) {
+        publishStatements.push(
+          cacheInvalidationInsertWhenPageState(parsedOptions.invalidationJob, {
+            pageId: resolved.id,
+            status: "published",
+            publishedVersion: sourceVersion,
+            updatedAt: now,
+          }),
+        );
+      }
+      const publishChanges =
+        publishStatements.length === 1
+          ? [
+              await context.runWithChanges(
+                publishMetaStatement.sql,
+                publishMetaStatement.args,
+              ),
+            ]
+          : await context.runBatchWithChanges(publishStatements);
+      const publishResult = publishChanges[publishStatementIndex];
 
       if (
         publishResult?.changes !== 1 ||
@@ -969,15 +987,20 @@ export function createPageLifecycleStorageDomain(
       return sourceVersion;
     },
 
-    async unpublishPageDSL(id: string): Promise<void> {
+    async unpublishPageDSL(
+      id: string,
+      options?: UnpublishPageOptions,
+    ): Promise<void> {
+      const parsedOptions = UnpublishPageOptionsSchema.parse(options ?? {});
       const resolved = await context.resolvePageIdentity(id);
       if (!resolved) {
         return;
       }
 
       const draftVersion = resolved.draftVersion ?? resolved.currentVersion;
-      const unpublishResult = await context.runWithChanges(
-        `UPDATE aria_page_meta
+      const now = context.nowIso();
+      const unpublishStatement = {
+        sql: `UPDATE aria_page_meta
          SET status = 'draft',
              published_version = NULL,
              scheduled_for = NULL,
@@ -991,14 +1014,34 @@ export function createPageLifecycleStorageDomain(
            AND COALESCE(draft_version, current_version) = ?
            AND status IS ?
            AND published_version IS ?`,
-        [
-          context.nowIso(),
+        args: [
+          now,
           resolved.id,
           draftVersion,
           resolved.status,
           resolved.publishedVersion,
         ],
-      );
+      };
+      const unpublishChanges = parsedOptions.invalidationJob
+        ? await context.runBatchWithChanges([
+            unpublishStatement,
+            cacheInvalidationInsertWhenPageState(
+              parsedOptions.invalidationJob,
+              {
+                pageId: resolved.id,
+                status: "draft",
+                publishedVersion: null,
+                updatedAt: now,
+              },
+            ),
+          ])
+        : [
+            await context.runWithChanges(
+              unpublishStatement.sql,
+              unpublishStatement.args,
+            ),
+          ];
+      const unpublishResult = unpublishChanges[0];
       if (unpublishResult.changes !== 1) {
         const latest = await context.resolvePageIdentity(resolved.id);
         throw new VersionConflictError(

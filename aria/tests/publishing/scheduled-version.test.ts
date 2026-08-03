@@ -73,11 +73,19 @@ describe("scheduled publication version fencing", () => {
     expect(publishPageDSL).toHaveBeenCalledWith(
       "page-1",
       expect.any(Object),
-      {
+      expect.objectContaining({
         expectedVersion: "scheduled-v1",
         scheduleLeaseToken: "lease-1",
         dependencies: { components: {} },
-      },
+        invalidationJob: expect.objectContaining({
+          scope: "public-route",
+          payload: expect.objectContaining({
+            operation: "scheduled-publish",
+            pageId: "page-1",
+            version: "scheduled-v1",
+          }),
+        }),
+      }),
     );
   });
 

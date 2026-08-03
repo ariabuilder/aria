@@ -56,6 +56,7 @@ import { useCreatePageDialog } from "./composables/useCreatePageDialog";
 import { toast } from "vue-sonner";
 import {
   usePagesListState,
+  parsePagesFilter,
   type PagesFilter,
   type PagesSort,
   type PagesSortKey,
@@ -364,27 +365,19 @@ function handleSort(nextSort: PagesSort) {
 function handleFilter(key: PagesFilter) {
   activeFilter.value = key;
   currentPage.value = 1;
-  const query = key === "all" ? {} : { filter: key };
   router.navigateTo(`/pages${key === "all" ? "" : `?filter=${key}`}`);
 }
 
 watch(
   () => route.query.filter,
-  (val) => {
-    if (
-      val &&
-      val !== activeFilter.value &&
-      ["all", "published", "draft", "archived", "modified"].includes(
-        val as string,
-      )
-    ) {
-      activeFilter.value = val as PagesFilter;
-      currentPage.value = 1;
-    } else if (!val && activeFilter.value !== "all") {
-      activeFilter.value = "all";
-      currentPage.value = 1;
-    }
+  (value) => {
+    const nextFilter = parsePagesFilter(value);
+    if (nextFilter === activeFilter.value) return;
+
+    activeFilter.value = nextFilter;
+    currentPage.value = 1;
   },
+  { immediate: true },
 );
 
 watch(showTrafficMetrics, (enabled) => {

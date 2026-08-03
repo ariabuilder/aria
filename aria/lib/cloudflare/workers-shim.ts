@@ -34,6 +34,18 @@ export abstract class DurableObject<Env = Record<string, unknown>> {
   }
 }
 
+export interface CachePurgeResult {
+  success: boolean;
+  errors: Array<{ code: number; message: string }>;
+}
+
+/** Node has no Workers edge cache; a purge is therefore already satisfied. */
+export const cache = {
+  async purge(): Promise<CachePurgeResult> {
+    return { success: true, errors: [] };
+  },
+};
+
 const publicRoot = path.resolve(process.cwd(), "public");
 
 function contentType(pathname: string): string {

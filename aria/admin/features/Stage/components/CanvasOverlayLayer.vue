@@ -803,8 +803,7 @@ const insertionStyle = computed(() => {
   if (!overlays.insertion.visible || !overlays.insertion.position) {
     return { display: "none" };
   }
-  const { left, top, width } = overlays.insertion.position;
-  const isVertical = overlays.insertion.orientation === "vertical";
+  const { left, top, width, height } = overlays.insertion.position;
 
   const style: CSSProperties = {
     display: "block",
@@ -812,8 +811,8 @@ const insertionStyle = computed(() => {
     left: "0",
     top: "0",
     translate: `${left}px ${top}px`,
-    width: isVertical ? "3px" : `${width}px`,
-    height: isVertical ? `${overlays.insertion.position.height}px` : "3px",
+    width: `${width}px`,
+    height: `${height}px`,
     zIndex: OVERLAY_Z_INDEX.insertion,
   };
   return style;
@@ -825,15 +824,14 @@ const addElementsInsertionStyle = computed((): CSSProperties => {
     return { display: "none" };
   }
 
-  const isVertical = overlays.addElementsDrop.orientation === "vertical";
   return {
     display: "block",
     position: "fixed",
     left: "0",
     top: "0",
     translate: `${position.left}px ${position.top}px`,
-    width: isVertical ? "3px" : `${position.width}px`,
-    height: isVertical ? `${position.height}px` : "3px",
+    width: `${position.width}px`,
+    height: `${position.height}px`,
     zIndex: OVERLAY_Z_INDEX.insertion,
   };
 });

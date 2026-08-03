@@ -23,7 +23,15 @@ function mockRect(top: number, height: number, left = 0, width = 400): DOMRect {
   } as DOMRect;
 }
 
-function mockFlexParent(display = "flex", flexDirection = "column"): HTMLElement {
+function mockFlexParent(
+  display = "flex",
+  flexDirection = "column",
+  options: {
+    flexWrap?: string;
+    direction?: string;
+    gridTemplateColumns?: string;
+  } = {},
+): HTMLElement {
   const parent = document.createElement("div");
   parent.style.display = display;
   parent.style.flexDirection = flexDirection;
@@ -32,7 +40,9 @@ function mockFlexParent(display = "flex", flexDirection = "column"): HTMLElement
       getComputedStyle: () => ({
         display,
         flexDirection,
-        gridAutoFlow: "",
+        flexWrap: options.flexWrap ?? "nowrap",
+        direction: options.direction ?? "ltr",
+        gridTemplateColumns: options.gridTemplateColumns ?? "none",
       }),
     },
     configurable: true,
@@ -50,15 +60,15 @@ describe("canvasDropInsertion", () => {
     second.getBoundingClientRect = () => mockRect(200, 40);
     parent.getBoundingClientRect = () => mockRect(80, 200);
 
-    expect(calculateInsertionIndexMidline([first, second], 120, 110, parent)).toBe(
-      0,
-    );
-    expect(calculateInsertionIndexMidline([first, second], 120, 150, parent)).toBe(
-      1,
-    );
-    expect(calculateInsertionIndexMidline([first, second], 120, 250, parent)).toBe(
-      2,
-    );
+    expect(
+      calculateInsertionIndexMidline([first, second], 120, 110, parent),
+    ).toBe(0);
+    expect(
+      calculateInsertionIndexMidline([first, second], 120, 150, parent),
+    ).toBe(1);
+    expect(
+      calculateInsertionIndexMidline([first, second], 120, 250, parent),
+    ).toBe(2);
   });
 
   it("uses horizontal midline for row flex containers", () => {
@@ -70,15 +80,34 @@ describe("canvasDropInsertion", () => {
     second.getBoundingClientRect = () => mockRect(100, 40, 120, 100);
     parent.getBoundingClientRect = () => mockRect(80, 200);
 
-    expect(calculateInsertionIndexMidline([first, second], 40, 120, parent)).toBe(
-      0,
-    );
-    expect(calculateInsertionIndexMidline([first, second], 150, 120, parent)).toBe(
-      1,
-    );
-    expect(calculateInsertionIndexMidline([first, second], 250, 120, parent)).toBe(
-      2,
-    );
+    expect(
+      calculateInsertionIndexMidline([first, second], 40, 120, parent),
+    ).toBe(0);
+    expect(
+      calculateInsertionIndexMidline([first, second], 150, 120, parent),
+    ).toBe(1);
+    expect(
+      calculateInsertionIndexMidline([first, second], 250, 120, parent),
+    ).toBe(2);
+  });
+
+  it("maps reverse row geometry back to the correct DOM insertion index", () => {
+    const parent = mockFlexParent("flex", "row-reverse");
+    const first = document.createElement("div");
+    const second = document.createElement("div");
+
+    first.getBoundingClientRect = () => mockRect(100, 40, 120, 100);
+    second.getBoundingClientRect = () => mockRect(100, 40, 0, 100);
+
+    expect(
+      calculateInsertionIndexMidline([first, second], -10, 120, parent),
+    ).toBe(2);
+    expect(
+      calculateInsertionIndexMidline([first, second], 110, 120, parent),
+    ).toBe(1);
+    expect(
+      calculateInsertionIndexMidline([first, second], 250, 120, parent),
+    ).toBe(0);
   });
 
   it("uses row and column midlines for grid containers", () => {
@@ -123,13 +152,7 @@ describe("canvasDropInsertion", () => {
     section.getBoundingClientRect = () => mockRect(50, 300, 0, 600);
     heading.getBoundingClientRect = () => mockRect(120, 40, 20, 200);
 
-    const result = resolveInsertionTarget(
-      section,
-      100,
-      80,
-      contentRoot,
-      body,
-    );
+    const result = resolveInsertionTarget(section, 100, 80, contentRoot, body);
 
     expect(result.dropParent).toBe(section);
     expect(result.dropParentId).toBe("zone-section");
@@ -154,13 +177,7 @@ describe("canvasDropInsertion", () => {
     heading.getBoundingClientRect = () => mockRect(120, 40, 20, 200);
     section.getBoundingClientRect = () => mockRect(50, 300);
 
-    const result = resolveInsertionTarget(
-      heading,
-      100,
-      130,
-      contentRoot,
-      body,
-    );
+    const result = resolveInsertionTarget(heading, 100, 130, contentRoot, body);
 
     expect(result.dropParent).toBe(section);
   });
@@ -195,7 +212,13 @@ describe("canvasDropInsertion", () => {
     heading.getBoundingClientRect = () => mockRect(280, 40, 100, 220);
 
     const originalElementsFromPoint = document.elementsFromPoint;
-    document.elementsFromPoint = () => [section, card, heading, contentRoot, body];
+    document.elementsFromPoint = () => [
+      section,
+      card,
+      heading,
+      contentRoot,
+      body,
+    ];
 
     try {
       const result = resolveInsertionTarget(
@@ -227,7 +250,11 @@ describe("canvasDropInsertion", () => {
     second.getBoundingClientRect = () => mockRect(200, 40, 20, 360);
     parent.getBoundingClientRect = () => mockRect(80, 200, 0, 400);
 
-    const placeholder = computePlaceholderViewportRect(parent, [first, second], 1);
+    const placeholder = computePlaceholderViewportRect(
+      parent,
+      [first, second],
+      1,
+    );
     expect(placeholder.top).toBe(168.5);
     expect(placeholder.left).toBe(20);
     expect(placeholder.width).toBe(360);
@@ -237,6 +264,65 @@ describe("canvasDropInsertion", () => {
     expect(target.left).toBe(20);
     expect(target.top).toBe(100);
     expect(target.width).toBe(360);
+  });
+
+  it("describes the measured insertion line rather than the parent axis", () => {
+    const row = mockFlexParent("flex", "row");
+    const first = document.createElement("div");
+    const second = document.createElement("div");
+    first.setAttribute("data-aria-id", "first");
+    second.setAttribute("data-aria-id", "second");
+    row.append(first, second);
+    first.getBoundingClientRect = () => mockRect(100, 60, 20, 100);
+    second.getBoundingClientRect = () => mockRect(100, 60, 160, 100);
+    row.getBoundingClientRect = () => mockRect(80, 120, 0, 300);
+
+    const rowLayout = computeAddElementsDropLayout(row, 140, 120);
+    expect(rowLayout.orientation).toBe("vertical");
+    expect(rowLayout.placeholder.width).toBe(3);
+    expect(rowLayout.placeholder.height).toBe(60);
+
+    const column = mockFlexParent("flex", "column");
+    const top = document.createElement("div");
+    const bottom = document.createElement("div");
+    top.setAttribute("data-aria-id", "top");
+    bottom.setAttribute("data-aria-id", "bottom");
+    column.append(top, bottom);
+    top.getBoundingClientRect = () => mockRect(100, 40, 20, 280);
+    bottom.getBoundingClientRect = () => mockRect(180, 40, 20, 280);
+    column.getBoundingClientRect = () => mockRect(80, 180, 0, 320);
+
+    const columnLayout = computeAddElementsDropLayout(column, 80, 160);
+    expect(columnLayout.orientation).toBe("horizontal");
+    expect(columnLayout.placeholder.width).toBe(280);
+    expect(columnLayout.placeholder.height).toBe(3);
+  });
+
+  it("uses vertical boundaries within grid rows and horizontal boundaries between rows", () => {
+    const parent = mockFlexParent("grid", "column", {
+      gridTemplateColumns: "180px 180px",
+    });
+    const children = Array.from({ length: 4 }, (_, index) => {
+      const child = document.createElement("div");
+      child.setAttribute("data-aria-id", `grid-${index}`);
+      parent.appendChild(child);
+      return child;
+    });
+    children[0].getBoundingClientRect = () => mockRect(100, 80, 20, 180);
+    children[1].getBoundingClientRect = () => mockRect(100, 80, 240, 180);
+    children[2].getBoundingClientRect = () => mockRect(220, 80, 20, 180);
+    children[3].getBoundingClientRect = () => mockRect(220, 80, 240, 180);
+    parent.getBoundingClientRect = () => mockRect(80, 340, 0, 440);
+
+    const withinRow = computeAddElementsDropLayout(parent, 220, 120);
+    expect(withinRow.insertionIndex).toBe(1);
+    expect(withinRow.orientation).toBe("vertical");
+    expect(withinRow.placeholder.width).toBe(3);
+
+    const betweenRows = computeAddElementsDropLayout(parent, 0, 200);
+    expect(betweenRows.insertionIndex).toBe(2);
+    expect(betweenRows.orientation).toBe("horizontal");
+    expect(betweenRows.placeholder.width).toBe(400);
   });
 
   it("does not show a target outline while inserting between existing siblings", () => {
