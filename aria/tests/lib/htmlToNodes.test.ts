@@ -262,10 +262,12 @@ describe("importHtmlToNodes", () => {
         <ol><li>Ordered</li></ol>
         <ul style="list-style-type: square"><li>Explicit marker</li></ul>
         <ul class="list-none pl-6 w-full"><li>Explicit sizing</li></ul>
+        <ul class="list-square py-6"><li>Utility marker and padding</li></ul>
       </section>
     `);
 
-    const [unordered, ordered, explicit, padded] = imported.nodes[0]!.children;
+    const [unordered, ordered, explicit, padded, utilityStyled] =
+      imported.nodes[0]!.children;
 
     expect(unordered).toMatchObject({
       type: "List",
@@ -289,6 +291,11 @@ describe("importHtmlToNodes", () => {
     expect(padded?.styles.widthSizing).toBeUndefined();
     expect(padded?.classNames?.base).toEqual(
       expect.arrayContaining(["list-none", "pl-6", "w-full"]),
+    );
+    expect(utilityStyled?.styles.listStyleType).toBeUndefined();
+    expect(utilityStyled?.styles.padding).toBeUndefined();
+    expect(utilityStyled?.classNames?.base).toEqual(
+      expect.arrayContaining(["list-square", "py-6"]),
     );
 
     const [legacyUnordered] = htmlToNodes(`<ul><li>Legacy path</li></ul>`);

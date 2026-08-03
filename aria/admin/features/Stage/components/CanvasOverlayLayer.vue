@@ -6,6 +6,7 @@
 
 import {
   computed,
+  nextTick,
   onBeforeUnmount,
   onMounted,
   ref,
@@ -257,8 +258,24 @@ function getResizeHandleClass(handle: CanvasSelectionResizeHandle): string {
   }
 }
 
+const RESIZE_HANDLE_DIRECTION_KEYS = {
+  "north-west": "composer.canvas.resize.northWest",
+  north: "composer.canvas.resize.north",
+  "north-east": "composer.canvas.resize.northEast",
+  east: "composer.canvas.resize.east",
+  "south-east": "composer.canvas.resize.southEast",
+  south: "composer.canvas.resize.south",
+  "south-west": "composer.canvas.resize.southWest",
+  west: "composer.canvas.resize.west",
+} as const satisfies Record<
+  CanvasSelectionResizeHandle,
+  Parameters<typeof t>[0]
+>;
+
 function getResizeHandleLabel(handle: CanvasSelectionResizeHandle): string {
-  return `Resize ${handle.replace("-", " ")}`;
+  return t("composer.canvas.resizeHandle", {
+    direction: t(RESIZE_HANDLE_DIRECTION_KEYS[handle]),
+  });
 }
 
 function isCornerResizeHandle(handle: CanvasSelectionResizeHandle): boolean {
@@ -403,7 +420,11 @@ async function commitResizeSession(): Promise<void> {
     return;
   }
 
-  resizeAnnouncement.value = `Resized to ${formatCanvasSelectionSize(finalSize)} pixels`;
+  resizeAnnouncement.value = "";
+  await nextTick();
+  resizeAnnouncement.value = t("composer.canvas.resizeComplete", {
+    size: formatCanvasSelectionSize(finalSize),
+  });
   overlays.schedulePositionUpdate("measure");
 }
 
@@ -512,7 +533,7 @@ function handleResizePointerMove(event: PointerEvent): void {
   const movementY = Math.abs(
     event.clientY - (session.startClientY ?? event.clientY),
   );
-  if (movementX < 2 && movementY < 2) {
+  if (!session.hasChanged && movementX < 2 && movementY < 2) {
     return;
   }
   session.hasChanged = true;
@@ -1085,9 +1106,9 @@ const nodeTypeLabel = computed(() => {
         <SelectionToolbarMotionControl />
 
         <div
-            class="mx-1.5 h-2.5 shrink-0 border-l border-solid border-muted-foreground/30"
-            aria-hidden="true"
-          />
+          class="mx-1.5 h-2.5 shrink-0 border-l border-solid border-muted-foreground/30"
+          aria-hidden="true"
+        />
 
         <div class="flex items-center gap-0 pr-1">
           <Button

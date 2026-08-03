@@ -88,13 +88,17 @@ function invalidBuilderNodeInput(
   );
 }
 
-function withGeneratedNodeId(value: unknown): unknown {
+function withGeneratedNodeIds(value: unknown): unknown {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     return value;
   }
   const record = value as Record<string, unknown>;
+  const children = Array.isArray(record.children)
+    ? record.children.map(withGeneratedNodeIds)
+    : record.children;
   return {
     ...record,
+    ...(children === undefined ? {} : { children }),
     id:
       typeof record.id === "string" && record.id.length > 0
         ? record.id
@@ -108,7 +112,7 @@ function parsePreflightedBuilderNode(
   generateMissingId = false,
 ): BuilderNode {
   const parsed = BuilderNodeSchema.safeParse(
-    generateMissingId ? withGeneratedNodeId(value) : value,
+    generateMissingId ? withGeneratedNodeIds(value) : value,
   );
   if (!parsed.success) {
     throw invalidBuilderNodeInput(kind, parsed.error.issues.length);

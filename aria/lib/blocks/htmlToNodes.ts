@@ -567,9 +567,9 @@ function parseInlineStyles(styleStr: string): StyleMap {
 }
 
 const IMPORTED_LIST_STYLE_UTILITY_PATTERN =
-  /^(?:(?:[^:\s]+):)*(?:list-(?:none|disc|decimal))$/;
+  /^(?:(?:[^:\s]+):)*(?:list-(?:none|disc|decimal|circle|square))$/;
 const IMPORTED_PADDING_UTILITY_PATTERN =
-  /^(?:(?:[^:\s]+):)*(?:p|px|pl|pr|ps|pe)-.+$/;
+  /^(?:(?:[^:\s]+):)*(?:p|px|py|pt|pb|pl|pr|ps|pe)-.+$/;
 const IMPORTED_WIDTH_UTILITY_PATTERN =
   /^(?:(?:[^:\s]+):)*(?:(?:w|min-w|max-w|basis)-.+|flex-(?:1|auto|initial|none|\[.+\])|grow(?:-.+)?|self-stretch)$/;
 

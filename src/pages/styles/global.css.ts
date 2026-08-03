@@ -37,6 +37,11 @@ export const GET: APIRoute = async ({ locals, request }) => {
     const etag = `"${globalCSSHash}"`;
     const requestedVersion = url.searchParams.get("v");
     const hasMatchingVersion = requestedVersion === globalCSSHash;
+    const cacheControl = isPreviewRequest
+      ? "no-store, must-revalidate"
+      : hasMatchingVersion
+        ? "public, max-age=31536000, immutable"
+        : "no-cache, must-revalidate";
 
     if (ifNoneMatch === etag) {
       // Browser has current version - return 304 Not Modified
@@ -44,6 +49,7 @@ export const GET: APIRoute = async ({ locals, request }) => {
         status: 304,
         headers: {
           ETag: etag,
+          "Cache-Control": cacheControl,
         },
       });
     }
@@ -53,11 +59,7 @@ export const GET: APIRoute = async ({ locals, request }) => {
       status: 200,
       headers: {
         "Content-Type": "text/css; charset=utf-8",
-        "Cache-Control": isPreviewRequest
-          ? "no-store, must-revalidate"
-          : hasMatchingVersion
-            ? "public, max-age=31536000, immutable"
-            : "no-cache, must-revalidate",
+        "Cache-Control": cacheControl,
         // ETag for cache validation
         ETag: etag,
         // Optional: Add CORS headers if serving to external domains

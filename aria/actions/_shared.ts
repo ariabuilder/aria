@@ -188,7 +188,17 @@ async function commitDraftRevisionAndScheduleDelivery(
     version: string;
   },
 ): Promise<void> {
-  const revision = await touchContentRevision(adapter, mutation, context);
+  let revision: Awaited<ReturnType<typeof touchContentRevision>>;
+  try {
+    revision = await touchContentRevision(adapter, mutation, context);
+  } catch (error) {
+    log("warn", "Resource save content revision failed after commit", {
+      code: "RESOURCE_SAVE_REVISION_FAILED",
+      ...diagnostics,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return;
+  }
   log("info", "Resource save content revision committed", {
     code: "RESOURCE_SAVE_REVISION_COMMITTED",
     ...diagnostics,

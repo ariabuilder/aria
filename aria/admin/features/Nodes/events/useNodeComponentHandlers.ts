@@ -156,18 +156,14 @@ export function useNodeComponentHandlers(
     }
 
     const targetArray = position.parent?.children ?? nextRoots;
-    targetArray.splice(
-      position.index,
-      1,
-      ...cloneDeep([...replacementNodes]),
-    );
+    targetArray.splice(position.index, 1, ...cloneDeep([...replacementNodes]));
     return nextRoots;
   };
 
   const handleDetachComponent = async (nodeId: string): Promise<void> => {
     const editableTree = resolveEditableComponentTree(nodeId);
     if (!editableTree) {
-      toast.error("Not a component instance");
+      toast.error("Component not found");
       return;
     }
 

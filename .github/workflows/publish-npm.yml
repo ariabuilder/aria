@@ -36,6 +36,7 @@ jobs:
 
       - run: npm ci
       - run: npm run check:push-guards
+      - run: npm run check:type-safety
       - run: npm test -- --run
       - env:
           NODE_OPTIONS: --max-old-space-size=8192

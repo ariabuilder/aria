@@ -330,10 +330,14 @@ describe("CloudflareStorageAdapter", () => {
       preserveVersion: true,
       versionHint: "retry-page-v1",
     });
-    const layoutV1 = await adapter.saveLayoutDSL(sampleLayout.id, sampleLayout, {
-      preserveVersion: true,
-      versionHint: "retry-layout-v1",
-    });
+    const layoutV1 = await adapter.saveLayoutDSL(
+      sampleLayout.id,
+      sampleLayout,
+      {
+        preserveVersion: true,
+        versionHint: "retry-layout-v1",
+      },
+    );
     const componentV1 = await adapter.saveComponentDSL(
       sampleComponent.id,
       sampleComponent,
@@ -384,9 +388,9 @@ describe("CloudflareStorageAdapter", () => {
 
     expect(await adapter.getPageVersions(samplePage.id)).toHaveLength(2);
     expect(await adapter.listLayoutVersions(sampleLayout.id)).toHaveLength(2);
-    expect(await adapter.listComponentVersions(sampleComponent.id)).toHaveLength(
-      2,
-    );
+    expect(
+      await adapter.listComponentVersions(sampleComponent.id),
+    ).toHaveLength(2);
   });
 
   it("allows exactly one concurrent guarded page save", async () => {
@@ -467,6 +471,7 @@ describe("CloudflareStorageAdapter", () => {
     );
     const atomicLayoutVersion = (await adapter.getLayoutDSL(sampleLayout.id))
       ?.version;
+    expect(atomicLayoutVersion).toBeDefined();
 
     await expect(
       adapter.savePageDSL(samplePage.id, atomicPage, {

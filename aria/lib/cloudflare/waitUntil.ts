@@ -25,6 +25,10 @@ export function deferWithWaitUntil(
     return false;
   }
 
-  context.waitUntil(task);
-  return true;
+  try {
+    context.waitUntil(task);
+    return true;
+  } catch {
+    return false;
+  }
 }

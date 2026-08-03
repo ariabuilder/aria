@@ -137,12 +137,28 @@ async function prepareLinkedLayoutDraft(
           context.resolveStoredVersionContentHash(currentVersionRow),
       })
     : null;
+
+  const confirmLayoutVersionUnchanged = async (): Promise<string> => {
+    if (!existing) {
+      throw new VersionConflictError(input.expectedVersion, null);
+    }
+    const latest = await context.resolveLayoutVersionState(input.id);
+    if (latest?.currentVersion !== existing.currentVersion) {
+      throw new VersionConflictError(
+        input.expectedVersion,
+        latest?.currentVersion ?? null,
+      );
+    }
+    return latest.currentVersion;
+  };
+
   if (existing?.currentVersion !== input.expectedVersion) {
     if (existing && currentHash === incomingHash) {
+      const stableVersion = await confirmLayoutVersionUnchanged();
       return {
         id: input.id,
         dsl: normalizedDSL,
-        version: existing.currentVersion,
+        version: stableVersion,
         expectedVersion: input.expectedVersion,
         statements: [],
         changed: false,
@@ -155,10 +171,11 @@ async function prepareLinkedLayoutDraft(
   }
 
   if (currentHash === incomingHash) {
+    const stableVersion = await confirmLayoutVersionUnchanged();
     return {
       id: input.id,
       dsl: normalizedDSL,
-      version: existing.currentVersion,
+      version: stableVersion,
       expectedVersion: input.expectedVersion,
       statements: [],
       changed: false,
@@ -409,6 +426,16 @@ export function createPageLifecycleStorageDomain(
           }
           await settlePostCommit([
             () => context.syncPageUsage(id, normalizedDSL),
+            ...(preparedLinkedLayout
+              ? [
+                  () =>
+                    context.syncMediaUsageBestEffort(
+                      "layout",
+                      preparedLinkedLayout.id,
+                      preparedLinkedLayout.dsl,
+                    ),
+                ]
+              : []),
           ]);
           return currentDraftVersion;
         }

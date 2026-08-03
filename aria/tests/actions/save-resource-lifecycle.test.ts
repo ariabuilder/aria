@@ -1,11 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { StorageAdapter } from "../../lib/storage/adapter";
-import type {
-  ComponentDSL,
-  LayoutDSL,
-  PageDSL,
-} from "../../lib/types/nodes";
+import type { ComponentDSL, LayoutDSL, PageDSL } from "../../lib/types/nodes";
 import { buildAuthorshipSaveContext } from "../../lib/authorship/stamping";
 import type { SessionUser } from "../../lib/auth";
 
@@ -133,6 +129,28 @@ describe("shared resource save lifecycle", () => {
     expect(settled).toBe(false);
     resolveDelivery?.();
     await expect(save).resolves.toBe("component-v2");
+  });
+
+  it("does not turn a committed save into a failure when revision tracking fails", async () => {
+    touchContentRevisionMock.mockRejectedValueOnce(
+      new Error("revision backend unavailable"),
+    );
+    const saveComponentDSL = vi.fn().mockResolvedValue("component-v2");
+    const adapter = { saveComponentDSL } as unknown as StorageAdapter;
+
+    await expect(
+      saveResource(
+        adapter,
+        { locals: { user: actor } },
+        "components",
+        component.id,
+        component,
+        buildAuthorshipSaveContext(actor, "save-component"),
+      ),
+    ).resolves.toBe("component-v2");
+
+    expect(saveComponentDSL).toHaveBeenCalledOnce();
+    expect(deliverContentRevisionForActionMock).not.toHaveBeenCalled();
   });
 
   it.each([

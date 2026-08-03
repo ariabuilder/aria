@@ -71,6 +71,36 @@ type DslAssetStorageContext = Pick<
 export function createDslAssetStorageDomain(
   context: DslAssetStorageContext,
 ): DslAssetStorageDomain {
+  async function confirmLayoutVersionUnchanged(
+    id: string,
+    observedVersion: string,
+    expectedVersion: string,
+  ): Promise<string> {
+    const latest = await context.resolveLayoutVersionState(id);
+    if (latest?.currentVersion !== observedVersion) {
+      throw new VersionConflictError(
+        expectedVersion,
+        latest?.currentVersion ?? null,
+      );
+    }
+    return latest.currentVersion;
+  }
+
+  async function confirmComponentVersionUnchanged(
+    id: string,
+    observedVersion: string,
+    expectedVersion: string,
+  ): Promise<string> {
+    const latest = await context.resolveComponentVersionState(id);
+    if (latest?.currentVersion !== observedVersion) {
+      throw new VersionConflictError(
+        expectedVersion,
+        latest?.currentVersion ?? null,
+      );
+    }
+    return latest.currentVersion;
+  }
+
   return {
     async getLayoutDSL(
       id: string,
@@ -164,8 +194,13 @@ export function createDslAssetStorageDomain(
           existing &&
           currentHash === incomingHash
         ) {
+          const stableVersion = await confirmLayoutVersionUnchanged(
+            id,
+            existing.currentVersion,
+            parsedOptions.expectedVersion,
+          );
           await context.syncMediaUsageBestEffort("layout", id, normalizedDSL);
-          return existing.currentVersion;
+          return stableVersion;
         }
         throw new VersionConflictError(
           parsedOptions.expectedVersion,
@@ -174,8 +209,13 @@ export function createDslAssetStorageDomain(
       }
       if (shouldSkipIfContentUnchanged && existing) {
         if (currentHash === incomingHash) {
+          const stableVersion = await confirmLayoutVersionUnchanged(
+            id,
+            existing.currentVersion,
+            parsedOptions.expectedVersion ?? existing.currentVersion,
+          );
           await context.syncMediaUsageBestEffort("layout", id, normalizedDSL);
-          return existing.currentVersion;
+          return stableVersion;
         }
       }
 
@@ -462,12 +502,17 @@ export function createDslAssetStorageDomain(
           existing &&
           currentHash === incomingHash
         ) {
+          const stableVersion = await confirmComponentVersionUnchanged(
+            id,
+            existing.currentVersion,
+            parsedOptions.expectedVersion,
+          );
           await context.syncMediaUsageBestEffort(
             "component",
             id,
             normalizedDSL,
           );
-          return existing.currentVersion;
+          return stableVersion;
         }
         throw new VersionConflictError(
           parsedOptions.expectedVersion,
@@ -476,12 +521,17 @@ export function createDslAssetStorageDomain(
       }
       if (shouldSkipIfContentUnchanged && existing) {
         if (currentHash === incomingHash) {
+          const stableVersion = await confirmComponentVersionUnchanged(
+            id,
+            existing.currentVersion,
+            parsedOptions.expectedVersion ?? existing.currentVersion,
+          );
           await context.syncMediaUsageBestEffort(
             "component",
             id,
             normalizedDSL,
           );
-          return existing.currentVersion;
+          return stableVersion;
         }
       }
 

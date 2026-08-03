@@ -526,10 +526,14 @@ describe("SQLiteStorageAdapter", () => {
       preserveVersion: true,
       versionHint: "retry-page-v1",
     });
-    const layoutV1 = await adapter.saveLayoutDSL(sampleLayout.id, sampleLayout, {
-      preserveVersion: true,
-      versionHint: "retry-layout-v1",
-    });
+    const layoutV1 = await adapter.saveLayoutDSL(
+      sampleLayout.id,
+      sampleLayout,
+      {
+        preserveVersion: true,
+        versionHint: "retry-layout-v1",
+      },
+    );
     const componentV1 = await adapter.saveComponentDSL(
       sampleComponent.id,
       sampleComponent,
@@ -580,9 +584,9 @@ describe("SQLiteStorageAdapter", () => {
 
     expect(await adapter.getPageVersions(samplePage.id)).toHaveLength(2);
     expect(await adapter.listLayoutVersions(sampleLayout.id)).toHaveLength(2);
-    expect(await adapter.listComponentVersions(sampleComponent.id)).toHaveLength(
-      2,
-    );
+    expect(
+      await adapter.listComponentVersions(sampleComponent.id),
+    ).toHaveLength(2);
   });
 
   it("compares legacy stored rows by normalized semantic source hash", async () => {
@@ -684,6 +688,7 @@ describe("SQLiteStorageAdapter", () => {
     );
     const atomicLayoutVersion = (await adapter.getLayoutDSL(sampleLayout.id))
       ?.version;
+    expect(atomicLayoutVersion).toBeDefined();
 
     await expect(
       adapter.savePageDSL(samplePage.id, atomicPage, {
