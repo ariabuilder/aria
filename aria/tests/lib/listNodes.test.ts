@@ -16,7 +16,9 @@ describe("listNodes", () => {
     expect(listNode.type).toBe("list");
     expect(listNode.metadata?.label).toBe("List");
     expect(listNode.styles).toMatchObject({
+      widthSizing: { base: "hug" },
       listStyleType: { base: "none" },
+      padding: { base: "0" },
     });
     expect(listNode.children).toHaveLength(3);
     expect(listNode.children.map((child) => child.type)).toEqual([
@@ -97,6 +99,7 @@ describe("listNodes", () => {
 
     expect(listNode.props.ordered).toBe(true);
     expect(listNode.styles).toMatchObject({
+      widthSizing: { base: "hug" },
       listStyleType: { base: "decimal" },
     });
   });

@@ -21,6 +21,8 @@ import { useStudioI18n } from "@/i18n";
 const props = withDefaults(
   defineProps<{
     showOutlines?: boolean;
+    showSelectionSizing?: boolean;
+    showSelectionToolbar?: boolean;
     wireframeMode?: boolean;
     isPublished?: boolean;
     livePageHref?: string | null;
@@ -28,6 +30,8 @@ const props = withDefaults(
   }>(),
   {
     showOutlines: false,
+    showSelectionSizing: true,
+    showSelectionToolbar: true,
     wireframeMode: false,
     isPublished: false,
     livePageHref: null,
@@ -37,6 +41,8 @@ const props = withDefaults(
 
 const emit = defineEmits<{
   "update:show-outlines": [value: boolean];
+  "update:show-selection-sizing": [value: boolean];
+  "update:show-selection-toolbar": [value: boolean];
   "update:wireframe-mode": [value: boolean];
   "update:show-slot-groups": [value: boolean];
   unpublish: [];
@@ -70,6 +76,14 @@ function toggleShowOutlines(): void {
   if (!next) {
     emit("update:wireframe-mode", false);
   }
+}
+
+function toggleSelectionToolbar(): void {
+  emit("update:show-selection-toolbar", !props.showSelectionToolbar);
+}
+
+function toggleSelectionSizing(): void {
+  emit("update:show-selection-sizing", !props.showSelectionSizing);
 }
 
 function toggleWireframeMode(): void {
@@ -154,6 +168,56 @@ onBeforeUnmount(() => {
                   studioIcons.checkLinear,
                   'size-3.5 shrink-0 text-primary',
                 ]"
+              />
+            </CommandItem>
+
+            <CommandItem
+              value="show-selection-toolbar"
+              class="flex cursor-pointer items-center gap-2"
+              @select="toggleSelectionToolbar"
+            >
+              <span
+                :class="[
+                  studioIcons.buttonLayer,
+                  'size-3.5 shrink-0 text-muted-foreground',
+                ]"
+                aria-hidden="true"
+              />
+              <span class="min-w-0 flex-1 truncate whitespace-nowrap text-xs">
+                {{ t("composer.options.showSelectionToolbar") }}
+              </span>
+              <span
+                v-if="props.showSelectionToolbar"
+                :class="[
+                  studioIcons.checkLinear,
+                  'size-3.5 shrink-0 text-primary',
+                ]"
+                aria-hidden="true"
+              />
+            </CommandItem>
+
+            <CommandItem
+              value="show-selection-sizing"
+              class="flex cursor-pointer items-center gap-2"
+              @select="toggleSelectionSizing"
+            >
+              <span
+                :class="[
+                  studioIcons.actualSize,
+                  'size-3.5 shrink-0 text-muted-foreground',
+                ]"
+                aria-hidden="true"
+              />
+              <span class="min-w-0 flex-1 truncate whitespace-nowrap text-xs">
+                {{ t("composer.options.showSelectionSizing") }}
+              </span>
+              <span
+                v-if="props.showSelectionSizing"
+                :class="[
+                  studioIcons.checkLinear,
+                  'size-3.5 shrink-0 text-primary',
+                ]"
+                aria-hidden="true"
               />
             </CommandItem>
 

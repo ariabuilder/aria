@@ -60,6 +60,8 @@ defineExpose({
           :is-item-transitioning="props.isItemTransitioning"
           :load-error="props.loadError"
           :show-outlines="props.showOutlines"
+          :show-selection-sizing="props.showSelectionSizing"
+          :show-selection-toolbar="props.showSelectionToolbar"
           :wireframe-mode="props.wireframeMode"
           :current-layout="props.currentLayout"
           :stage-key="props.stageKey"

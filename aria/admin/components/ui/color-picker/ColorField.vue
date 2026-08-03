@@ -119,7 +119,7 @@ const displayValue = computed(() => {
           type="button"
           variant="headerAction"
           size="icon"
-          class="relative size-5! shrink-0 overflow-hidden rounded-sm!"
+          class="relative size-5! shrink-0 overflow-hidden rounded-sm! hover:brightness-110"
           :style="{
             background: CHECKERBOARD_STYLE,
             border: '1px solid var(--border)',

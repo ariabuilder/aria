@@ -12,12 +12,15 @@ const mockGetPageDSL = vi.fn();
 const mockGetPublishedPageDSL = vi.fn();
 const mockPublishPageDSL = vi.fn();
 const mockTouchContentRevision = vi.fn();
+const mockGetDesignSystemSegments = vi.fn();
 const mockRegenerateGlobalCSSArtifacts = vi.fn();
+const mockSavePageSnapshot = vi.fn();
 
 vi.mock("../../lib/storage/getStorageAdapter", () => ({
   getStorageAdapterAsync: vi.fn(async () => ({
     getSiteSettings: mockGetSiteSettings,
     getDesignSystem: mockGetDesignSystem,
+    getDesignSystemSegments: mockGetDesignSystemSegments,
     getPageDSL: mockGetPageDSL,
     getPublishedPageDSL: mockGetPublishedPageDSL,
     publishPageDSL: mockPublishPageDSL,
@@ -38,12 +41,19 @@ vi.mock("../../actions/styles", () => ({
   regenerateGlobalCSSArtifacts: mockRegenerateGlobalCSSArtifacts,
 }));
 
+vi.mock("../../lib/rendering/pageSnapshots", () => ({
+  savePageSnapshot: mockSavePageSnapshot,
+}));
+
 describe("publishing revision injection", () => {
   beforeEach(() => {
     resetActionsSharedAuthMocks(actionsSharedMocks);
     vi.clearAllMocks();
 
     mockGetDesignSystem.mockResolvedValue(null);
+    mockGetDesignSystemSegments.mockResolvedValue({
+      artifacts: { globalCSSHash: "hash-123" },
+    });
     mockGetPageDSL.mockResolvedValue({
       id: "home",
       slug: "home",
@@ -68,6 +78,7 @@ describe("publishing revision injection", () => {
       lastCompiled: "2026-03-26T00:00:00.000Z",
       framework: "unocss",
     });
+    mockSavePageSnapshot.mockResolvedValue(undefined);
 
     mockGetSiteSettings.mockResolvedValue({
       customHeadCode: '<meta name="site-custom-head" content="ok">',
@@ -85,7 +96,7 @@ describe("publishing revision injection", () => {
     });
   });
 
-  it("publishes a page revision with custom code and analytics merged", async () => {
+  it("publishes the exact saved revision using stored stylesheet artifacts", async () => {
     const { publishing } = await import("../../actions/publishing");
 
     const result = await getActionHandler(publishing.publish)(
@@ -119,7 +130,7 @@ describe("publishing revision injection", () => {
     expect(mockRegenerateGlobalCSSArtifacts).not.toHaveBeenCalled();
   });
 
-  it("reuses the shared CSS regeneration helper before publish", async () => {
+  it("uses persisted stylesheet artifacts without compiling during publish", async () => {
     const { publishing } = await import("../../actions/publishing");
 
     const result = await getActionHandler(publishing.publish)(
@@ -139,7 +150,7 @@ describe("publishing revision injection", () => {
     );
 
     expect(result.success).toBe(true);
-    expect(mockRegenerateGlobalCSSArtifacts).toHaveBeenCalledTimes(1);
+    expect(mockRegenerateGlobalCSSArtifacts).not.toHaveBeenCalled();
   });
 
   it("returns the committed publish when snapshot refresh fails afterward", async () => {
@@ -166,7 +177,7 @@ describe("publishing revision injection", () => {
     });
   });
 
-  it("compiles the saved draft rather than untrusted client nodes", async () => {
+  it("publishes the saved draft rather than untrusted client nodes", async () => {
     const { publishing } = await import("../../actions/publishing");
     const savedNode = {
       id: "saved-node",
@@ -203,9 +214,79 @@ describe("publishing revision injection", () => {
     );
 
     expect(result.success).toBe(true);
-    expect(mockRegenerateGlobalCSSArtifacts).toHaveBeenCalledWith(
+    expect(mockRegenerateGlobalCSSArtifacts).not.toHaveBeenCalled();
+    expect(mockPublishPageDSL).toHaveBeenCalledWith(
+      "home",
       expect.anything(),
-      expect.objectContaining({ utilityNodes: [savedNode] }),
+      expect.objectContaining({ expectedVersion: "v-saved" }),
+    );
+  });
+
+  it("returns the committed Cloudflare publish before delivery settles", async () => {
+    let resolveRevision!: (value: {
+      scope: string;
+      currentRevisionId: string;
+      revisionSeq: number;
+      updatedAt: string;
+      lastMutationKind: "save-page";
+    }) => void;
+    const pendingRevision = new Promise<{
+      scope: string;
+      currentRevisionId: string;
+      revisionSeq: number;
+      updatedAt: string;
+      lastMutationKind: "save-page";
+    }>((resolve) => {
+      resolveRevision = resolve;
+    });
+    mockTouchContentRevision.mockReturnValueOnce(pendingRevision);
+    const publishedPage = {
+      id: "home",
+      slug: "home",
+      title: "Home",
+      nodes: [],
+      status: "published",
+      version: "v-published",
+    };
+    mockGetPublishedPageDSL.mockResolvedValueOnce(publishedPage);
+    const waitUntil = vi.fn();
+
+    const { publishing } = await import("../../actions/publishing");
+    const result = await getActionHandler(publishing.publish)(
+      {
+        id: "home",
+        expectedVersion: "v-saved",
+        skipCSSRegeneration: true,
+      } as never,
+      { locals: { cfContext: { waitUntil } } } as never,
+    );
+
+    expect(result).toMatchObject({
+      success: true,
+      data: { version: "v-published" },
+    });
+    expect(waitUntil).toHaveBeenCalledTimes(1);
+
+    const deferred = waitUntil.mock.calls[0]?.[0] as Promise<unknown>;
+    let deliverySettled = false;
+    void deferred.then(() => {
+      deliverySettled = true;
+    });
+    await Promise.resolve();
+    expect(deliverySettled).toBe(false);
+
+    resolveRevision({
+      scope: "default",
+      currentRevisionId: "rev-published",
+      revisionSeq: 2,
+      updatedAt: "2026-03-26T00:00:01.000Z",
+      lastMutationKind: "save-page",
+    });
+    await deferred;
+    expect(mockSavePageSnapshot).toHaveBeenCalledWith(
+      { page: publishedPage, stage: "published" },
+      expect.anything(),
+      expect.objectContaining({ locals: expect.anything() }),
     );
   });
 });

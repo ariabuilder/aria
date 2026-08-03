@@ -57,6 +57,8 @@ export interface AppLeftSidebarShellProps {
   open: boolean;
   activeBlocks: BuilderNode[];
   showOutlines: boolean;
+  showSelectionSizing: boolean;
+  showSelectionToolbar: boolean;
   wireframeMode: boolean;
   hasUnsavedChanges: boolean;
   currentItemSlug: string;
@@ -74,6 +76,8 @@ export interface AppLeftSidebarShellListeners {
   "update:open": (value: boolean) => void;
   "update:editing-tab": (value: StageEditingTab) => void;
   "update:show-outlines": (value: boolean) => void;
+  "update:show-selection-sizing": (value: boolean) => void;
+  "update:show-selection-toolbar": (value: boolean) => void;
   "update:wireframe-mode": (value: boolean) => void;
   unpublish: () => void | Promise<void>;
   "select-page": (slug: string) => void;

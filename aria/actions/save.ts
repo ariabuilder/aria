@@ -17,6 +17,7 @@ import {
 import { log as baseLog } from "../lib/utils/logger";
 import { normalizeEditableSurface } from "../lib/rendering/canonical";
 import { savePageSnapshot } from "../lib/rendering/pageSnapshots";
+import { deferWithWaitUntil } from "../lib/cloudflare/waitUntil";
 import { assertPageLayoutChangeAllowed } from "../lib/pages/layoutPolicy.server";
 import { normalizePageLayoutRef } from "../lib/pages/layoutPolicy";
 import { throwSafeRenderContractActionError } from "./_renderContractError";
@@ -157,26 +158,6 @@ function validateSlug(slug: string): boolean {
   return slugRegex.test(slug) && slug.length > 0 && slug.length <= 255;
 }
 
-function assertExpectedVersion(
-  resource: PageDSL | LayoutDSL | ComponentDSL,
-  expectedVersion: string | undefined,
-  authoritativeVersion?: string | null,
-): void {
-  if (!expectedVersion) return;
-
-  const currentVersion = authoritativeVersion ?? resource.version;
-  if (currentVersion !== expectedVersion) {
-    throw createError(
-      ERROR_CODES.VERSION_CONFLICT,
-      "This draft is out of date. Reload it before saving.",
-      {
-        expectedVersion,
-        currentVersion: currentVersion ?? null,
-      },
-    );
-  }
-}
-
 const IdSchema = z.string().min(1).max(255);
 const BuilderNodeArrayInputSchema = z.array(z.unknown());
 
@@ -226,12 +207,6 @@ export const save = {
 
         const adapter = await getAdapter(context);
         const page = await getResource<PageDSL>(adapter, "pages", sanitizedId);
-        const pageVersionPins = await adapter.getPageVersionPins(sanitizedId);
-        assertExpectedVersion(
-          page,
-          input.expectedVersion,
-          pageVersionPins?.draftVersion ?? pageVersionPins?.currentVersion,
-        );
 
         const normalizedBlocks = input.blocks;
         const isDestructiveBlankOverwrite =
@@ -319,23 +294,16 @@ export const save = {
           ? (await adapter.getLayoutDSL(input.layoutDraft.id))?.version
           : undefined;
 
-        const postCommitResults = await Promise.allSettled([
-          savePageSnapshot(
-            {
-              page: updatedPage,
-              stage: "draft",
-            },
-            adapter,
-            { locals: context.locals },
-          ),
-          ...(isDestructiveBlankOverwrite && input.nonce
+        const nonceResults = await Promise.allSettled(
+          isDestructiveBlankOverwrite && input.nonce
             ? [consumeComposeNonceAfterSave(context, sanitizedId, input.nonce)]
-            : []),
-        ]);
-        postCommitResults.forEach((result, index) => {
+            : [],
+        );
+        nonceResults.forEach((result, index) => {
           if (result.status === "rejected") {
             log("warn", "Post-save side effect failed", {
               id: sanitizedId,
+              sideEffect: "consume-compose-nonce",
               index,
               error:
                 result.reason instanceof Error
@@ -344,6 +312,24 @@ export const save = {
             });
           }
         });
+
+        const snapshotRefresh = savePageSnapshot(
+          {
+            page: updatedPage,
+            stage: "draft",
+          },
+          adapter,
+          { locals: context.locals },
+        ).catch((error) => {
+          log("warn", "Post-save side effect failed", {
+            id: sanitizedId,
+            sideEffect: "save-draft-snapshot",
+            error: error instanceof Error ? error.message : String(error),
+          });
+        });
+        if (!deferWithWaitUntil(context.locals, snapshotRefresh)) {
+          await snapshotRefresh;
+        }
 
         const duration = endPerformanceTracking(operation);
         log("info", `Page saved: ${sanitizedId}`, {
@@ -401,7 +387,6 @@ export const save = {
           "components",
           sanitizedId,
         );
-        assertExpectedVersion(component, input.expectedVersion);
 
         const normalizedBlocks = input.blocks;
 
@@ -488,7 +473,6 @@ export const save = {
           "layouts",
           sanitizedId,
         );
-        assertExpectedVersion(layout, input.expectedVersion);
 
         const normalizedBlocks = input.blocks;
 

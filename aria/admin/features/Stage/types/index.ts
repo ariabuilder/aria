@@ -184,6 +184,8 @@ export interface StageAppProps {
   isLoading: boolean;
   loadError: string | null;
   showOutlines: boolean;
+  showSelectionSizing: boolean;
+  showSelectionToolbar: boolean;
   wireframeMode: boolean;
   currentLayout: LayoutDSL | null;
   stageKey: string;

@@ -37,6 +37,8 @@ export interface UseStageShellBindingsDeps {
   pageBlocks: Ref<BuilderNode[]>;
   hasUnsavedChanges: Ref<boolean>;
   showOutlines: Ref<boolean>;
+  showSelectionSizing: Ref<boolean>;
+  showSelectionToolbar: Ref<boolean>;
   wireframeMode: Ref<boolean>;
   currentItemSlug: ComputedRef<string>;
   currentItemType: Ref<EditableItemType>;
@@ -46,6 +48,8 @@ export interface UseStageShellBindingsDeps {
   editingTab: Ref<StageEditingTab>;
   setEditingTab: (value: StageEditingTab) => void;
   setShowOutlines: (value: boolean) => void;
+  setShowSelectionSizing: (value: boolean) => void;
+  setShowSelectionToolbar: (value: boolean) => void;
   setWireframeMode: (value: boolean) => void;
   handleSidebarUnpublish: () => void | Promise<void>;
   handleSidebarComponentSaved: (component: ComponentDSL) => void;
@@ -90,6 +94,8 @@ export function useStageShellBindings(
     pageBlocks,
     hasUnsavedChanges,
     showOutlines,
+    showSelectionSizing,
+    showSelectionToolbar,
     wireframeMode,
     currentItemSlug,
     currentItemType,
@@ -99,6 +105,8 @@ export function useStageShellBindings(
     editingTab,
     setEditingTab,
     setShowOutlines,
+    setShowSelectionSizing,
+    setShowSelectionToolbar,
     setWireframeMode,
     handleSidebarUnpublish,
     handleSidebarComponentSaved,
@@ -137,6 +145,8 @@ export function useStageShellBindings(
     open: leftSidebarOpen.value,
     activeBlocks: pageBlocks.value,
     showOutlines: showOutlines.value,
+    showSelectionSizing: showSelectionSizing.value,
+    showSelectionToolbar: showSelectionToolbar.value,
     wireframeMode: wireframeMode.value,
     currentItemSlug: currentItemSlug.value,
     currentItemType: currentItemType.value,
@@ -153,6 +163,8 @@ export function useStageShellBindings(
     "update:open": setLeftSidebarOpen,
     "update:editing-tab": setEditingTab,
     "update:show-outlines": setShowOutlines,
+    "update:show-selection-sizing": setShowSelectionSizing,
+    "update:show-selection-toolbar": setShowSelectionToolbar,
     "update:wireframe-mode": setWireframeMode,
     unpublish: handleSidebarUnpublish,
     "select-page": handleSidebarSelectPage,

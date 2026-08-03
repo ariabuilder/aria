@@ -189,8 +189,14 @@ describe("save action nonce handling", () => {
     expect(storeNonceMock).not.toHaveBeenCalled();
   });
 
-  it("rejects a stale Composer version before writing or consuming its nonce", async () => {
+  it("forwards a stale Composer version to semantic storage reconciliation", async () => {
     const { save } = await import("../../actions/save");
+    saveResourceMock.mockRejectedValueOnce(
+      Object.assign(
+        new Error("This draft is out of date. Reload it before saving."),
+        { code: "VERSION_CONFLICT" },
+      ),
+    );
 
     await expect(
       getActionHandler(save.page)(
@@ -205,11 +211,19 @@ describe("save action nonce handling", () => {
       ),
     ).rejects.toMatchObject({
       code: "VERSION_CONFLICT",
-      message:
-        "savePage:home failed: This draft is out of date. Reload it before saving.",
     });
 
-    expect(saveResourceMock).not.toHaveBeenCalled();
+    expect(saveResourceMock).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.anything(),
+      "pages",
+      "home",
+      expect.anything(),
+      expect.anything(),
+      expect.objectContaining({
+        versionSaveOptions: { expectedVersion: "v-stale" },
+      }),
+    );
     expect(consumeNonceMock).not.toHaveBeenCalled();
     expect(storeNonceMock).not.toHaveBeenCalled();
   });
@@ -345,6 +359,34 @@ describe("save action nonce handling", () => {
         { locals: {} } as never,
       ),
     ).resolves.toEqual({ version: "v-next" });
+  });
+
+  it("returns the committed Cloudflare save before draft snapshot refresh completes", async () => {
+    const { save } = await import("../../actions/save");
+    let resolveSnapshot: (() => void) | undefined;
+    const snapshotRefresh = new Promise<void>((resolve) => {
+      resolveSnapshot = resolve;
+    });
+    const waitUntil = vi.fn();
+    savePageSnapshotMock.mockReturnValueOnce(snapshotRefresh);
+
+    await expect(
+      getActionHandler(save.page)(
+        {
+          id: "home",
+          blocks: [{ id: "hero", type: "section", props: {}, children: [] }],
+          layout: "default",
+          expectedVersion: "v-current",
+        },
+        { locals: { cfContext: { waitUntil } } } as never,
+      ),
+    ).resolves.toEqual({ version: "v-next" });
+
+    expect(waitUntil).toHaveBeenCalledOnce();
+    expect(waitUntil).toHaveBeenCalledWith(expect.any(Promise));
+
+    resolveSnapshot?.();
+    await expect(waitUntil.mock.calls[0]?.[0]).resolves.toBeUndefined();
   });
 
   it("does not validate or consume a nonce when an ordinary save fails", async () => {

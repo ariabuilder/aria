@@ -4,7 +4,15 @@
  * all visual overlays for the canvas.
  */
 
-import { computed, onMounted, toRef, type CSSProperties } from "vue";
+import {
+  computed,
+  onBeforeUnmount,
+  onMounted,
+  ref,
+  toRef,
+  watch,
+  type CSSProperties,
+} from "vue";
 import { Button } from "@/components/ui/button";
 import { ColorField } from "@/components/ui/color-picker";
 import { useToolbarTextColorContext } from "../composables/useToolbarTextColorContext";
@@ -17,20 +25,44 @@ import {
 import { OVERLAY_Z_INDEX } from "@/lib/zIndex";
 import { getContentHeadingLevel } from "../../Inspector/composables/useContentContract";
 import { useSelectedNodeState } from "../../Core/composables/useSelectedNodeState";
+import { usePropertySave } from "../../Core";
 import { useCanvasSignalBridge } from "../../Core/composables/useCanvasSignalBridge";
 import { useDragDrop } from "../../../composables/useDragDrop";
+import { useInspectorStyleTargetWithGlobalDefaults } from "../../Inspector/composables/useInspectorStyleTargetWithGlobalDefaults";
+import { useInspectorState } from "../../Inspector/composables/useInspectorState";
 import ToolbarHeadingLevelPicker from "./ToolbarHeadingLevelPicker.vue";
 import SelectionToolbarCmsControls from "./SelectionToolbarCmsControls.vue";
 import SelectionToolbarMotionControl from "./SelectionToolbarMotionControl.vue";
 import { useStudioI18n } from "@/i18n";
 import { resolveCanvasAffordanceVisualLayout } from "../utils/canvasAffordanceLayout";
 import { shouldHideSelectionToolbar } from "../utils/selectionToolbarVisibility";
+import {
+  CANVAS_SELECTION_RESIZE_HANDLES,
+  canvasSelectionResizeAxes,
+  canvasSelectionResizeCursor,
+  formatCanvasSelectionSize,
+  getCanvasSelectionScale,
+  measureCanvasSelectionElement,
+  resizeCanvasSelection,
+  type CanvasSelectionResizeHandle,
+  type CanvasSelectionSize,
+} from "../utils/canvasSelectionResize";
 
 // PROPS & EMITS
 
-const props = defineProps<{
-  iframeRef?: HTMLIFrameElement | null;
-}>();
+const props = withDefaults(
+  defineProps<{
+    iframeRef?: HTMLIFrameElement | null;
+    currentItemType?: "page" | "layout" | "component";
+    currentItemSlug?: string;
+    showSelectionSizing?: boolean;
+    showSelectionToolbar?: boolean;
+  }>(),
+  {
+    showSelectionSizing: true,
+    showSelectionToolbar: true,
+  },
+);
 
 const emit = defineEmits<{
   (e: "toolbar-action", action: ToolbarActionName, nodeId: string): void;
@@ -50,7 +82,11 @@ const emit = defineEmits<{
 }>();
 const { t } = useStudioI18n();
 
-const { selectedNode } = useSelectedNodeState();
+const { selectedNode, isMultiSelect } = useSelectedNodeState();
+const propertySave = usePropertySave();
+const { styleTarget: resizeStyleTarget } =
+  useInspectorStyleTargetWithGlobalDefaults({ propertySave });
+const inspectorState = useInspectorState();
 const { signalStyleUpdate } = useCanvasSignalBridge();
 const { isDragging, dragSource } = useDragDrop();
 
@@ -71,6 +107,533 @@ const iframeRefProp = toRef(props, "iframeRef");
 const overlays = useCanvasOverlays({
   iframeRef: computed(() => iframeRefProp.value ?? null),
   debug: import.meta.env.DEV,
+});
+
+const RESIZE_STYLE_PROPERTIES = [
+  "width",
+  "height",
+  "widthSizing",
+  "heightSizing",
+] as const;
+const RESIZE_KEYBOARD_COMMIT_DELAY_MS = 320;
+const SELECTION_SIZE_BADGE_HEIGHT = 20;
+const SELECTION_SIZE_BADGE_GAP = 7;
+
+type ResizePreviewSnapshot = ReturnType<
+  typeof resizeStyleTarget.captureAuthoredStylePreviewSnapshot
+>;
+
+interface ResizeSession {
+  kind: "keyboard" | "pointer";
+  handle: CanvasSelectionResizeHandle;
+  hasChanged: boolean;
+  nodeId: string;
+  startSize: CanvasSelectionSize;
+  currentSize: CanvasSelectionSize;
+  snapshot: ResizePreviewSnapshot;
+  pointerId?: number;
+  startClientX?: number;
+  startClientY?: number;
+  scaleX?: number;
+  scaleY?: number;
+  captureTarget?: HTMLButtonElement;
+}
+
+const resizePreviewSize = ref<CanvasSelectionSize | null>(null);
+const isResizingSelection = ref(false);
+const resizeAnnouncement = ref("");
+let resizeSession: ResizeSession | null = null;
+let resizePreviewFrame: number | null = null;
+let pendingResizePreview: {
+  size: CanvasSelectionSize;
+  handle: CanvasSelectionResizeHandle;
+} | null = null;
+let keyboardCommitTimeout: number | null = null;
+
+const measuredSelectionSize = computed(() => {
+  // Position changes whenever the selected element is remeasured. Reading it
+  // here keeps the badge synchronized with ResizeObserver-driven updates.
+  void overlays.selection.position;
+  return measureCanvasSelectionElement(overlays.selection.element);
+});
+
+const displayedSelectionSize = computed(
+  () => resizePreviewSize.value ?? measuredSelectionSize.value,
+);
+
+const selectionFrameStyle = computed((): CSSProperties => {
+  const position = overlays.selection.position;
+  if (!overlays.selection.visible || !position) {
+    return { display: "none" };
+  }
+
+  return {
+    display: "block",
+    position: "fixed",
+    left: "0",
+    top: "0",
+    translate: `${position.left}px ${position.top}px`,
+    width: `${position.width}px`,
+    height: `${position.height}px`,
+    zIndex: OVERLAY_Z_INDEX.selection,
+  };
+});
+
+const selectionSizeLabel = computed(() =>
+  displayedSelectionSize.value
+    ? formatCanvasSelectionSize(displayedSelectionSize.value)
+    : "",
+);
+
+const showSelectionSizeBadge = computed(
+  () => props.showSelectionSizing && Boolean(selectionSizeLabel.value),
+);
+
+const selectionSizeBadgeStyle = computed((): CSSProperties => {
+  const position = overlays.selection.position;
+  if (!position || !displayedSelectionSize.value) {
+    return { display: "none" };
+  }
+
+  const placeInside =
+    position.top +
+      position.height +
+      SELECTION_SIZE_BADGE_GAP +
+      SELECTION_SIZE_BADGE_HEIGHT >
+    window.innerHeight;
+
+  return placeInside
+    ? {
+        left: "50%",
+        top: `${position.height - SELECTION_SIZE_BADGE_GAP}px`,
+        transform: "translate(-50%, -100%)",
+      }
+    : {
+        left: "50%",
+        top: `${position.height + SELECTION_SIZE_BADGE_GAP}px`,
+        transform: "translateX(-50%)",
+      };
+});
+
+const canResizeSelection = computed(() => {
+  const node = selectedNode.value;
+  return Boolean(
+    overlays.selection.visible &&
+    overlays.selection.nodeId &&
+    overlays.selection.position &&
+    overlays.selection.element &&
+    node &&
+    node.id === overlays.selection.nodeId &&
+    !isMultiSelect.value &&
+    !inspectorState.isLocked.value &&
+    !inspectorState.isReadonly.value &&
+    inspectorState.selectedPseudo.value === "default" &&
+    !node.metadata?.locked &&
+    props.currentItemType &&
+    props.currentItemSlug &&
+    !isDragging.value &&
+    !resizeStyleTarget.isLoading.value,
+  );
+});
+
+function getResizeHandleClass(handle: CanvasSelectionResizeHandle): string {
+  switch (handle) {
+    case "north-west":
+      return "left-0 top-0 -translate-x-1/2 -translate-y-1/2";
+    case "north":
+      return "left-1/2 top-0 -translate-x-1/2 -translate-y-1/2";
+    case "north-east":
+      return "right-0 top-0 translate-x-1/2 -translate-y-1/2";
+    case "east":
+      return "right-0 top-1/2 translate-x-1/2 -translate-y-1/2";
+    case "south-east":
+      return "bottom-0 right-0 translate-x-1/2 translate-y-1/2";
+    case "south":
+      return "bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2";
+    case "south-west":
+      return "bottom-0 left-0 -translate-x-1/2 translate-y-1/2";
+    case "west":
+      return "left-0 top-1/2 -translate-x-1/2 -translate-y-1/2";
+  }
+}
+
+function getResizeHandleLabel(handle: CanvasSelectionResizeHandle): string {
+  return `Resize ${handle.replace("-", " ")}`;
+}
+
+function isCornerResizeHandle(handle: CanvasSelectionResizeHandle): boolean {
+  return handle.includes("-");
+}
+
+function getResizeHandleIndicatorClass(
+  handle: CanvasSelectionResizeHandle,
+): string {
+  if (isCornerResizeHandle(handle)) {
+    return "size-2 border border-solid border-primary bg-white";
+  }
+
+  return handle === "north" || handle === "south"
+    ? "h-0.5 w-3 bg-primary"
+    : "h-3 w-0.5 bg-primary";
+}
+
+function buildResizeStyleUpdates(
+  size: CanvasSelectionSize,
+  handle: CanvasSelectionResizeHandle,
+): Record<string, string> {
+  const axes = canvasSelectionResizeAxes(handle);
+  const updates: Record<string, string> = {};
+
+  if (axes.width) {
+    updates.width = `${Math.max(1, Math.round(size.width))}px`;
+    updates.widthSizing = "exact";
+  }
+  if (axes.height) {
+    updates.height = `${Math.max(1, Math.round(size.height))}px`;
+    updates.heightSizing = "exact";
+  }
+
+  return updates;
+}
+
+function flushResizePreview(): void {
+  if (resizePreviewFrame !== null) {
+    window.cancelAnimationFrame(resizePreviewFrame);
+    resizePreviewFrame = null;
+  }
+  if (!pendingResizePreview) return;
+
+  const { size, handle } = pendingResizePreview;
+  pendingResizePreview = null;
+  propertySave.previewStyleProperties(
+    buildResizeStyleUpdates(size, handle),
+    resizeSession?.nodeId,
+  );
+  overlays.schedulePositionUpdate("measure");
+}
+
+function queueResizePreview(
+  size: CanvasSelectionSize,
+  handle: CanvasSelectionResizeHandle,
+): void {
+  resizePreviewSize.value = size;
+  pendingResizePreview = { size, handle };
+  if (resizePreviewFrame !== null) return;
+
+  resizePreviewFrame = window.requestAnimationFrame(() => {
+    resizePreviewFrame = null;
+    flushResizePreview();
+  });
+}
+
+function clearKeyboardCommitTimeout(): void {
+  if (keyboardCommitTimeout === null) return;
+  window.clearTimeout(keyboardCommitTimeout);
+  keyboardCommitTimeout = null;
+}
+
+function clearResizeInteractionState(): void {
+  const activeSession = resizeSession;
+  resizeSession = null;
+  clearKeyboardCommitTimeout();
+  if (resizePreviewFrame !== null) {
+    window.cancelAnimationFrame(resizePreviewFrame);
+    resizePreviewFrame = null;
+  }
+  pendingResizePreview = null;
+  resizePreviewSize.value = null;
+  isResizingSelection.value = false;
+  document.body.style.cursor = "";
+  document.body.style.userSelect = "";
+  window.removeEventListener("pointermove", handleResizePointerMove);
+  window.removeEventListener("pointerup", handleResizePointerUp);
+  window.removeEventListener("pointercancel", handleResizePointerCancel);
+  window.removeEventListener("keydown", handleResizeWindowKeydown);
+
+  const captureTarget = activeSession?.captureTarget;
+  const pointerId = activeSession?.pointerId;
+  if (captureTarget && pointerId !== undefined) {
+    captureTarget.removeEventListener(
+      "lostpointercapture",
+      handleResizeLostPointerCapture,
+    );
+    if (captureTarget.hasPointerCapture?.(pointerId)) {
+      captureTarget.releasePointerCapture(pointerId);
+    }
+  }
+}
+
+function restoreResizeSnapshot(session: ResizeSession): void {
+  resizeStyleTarget.restoreAuthoredStylePreviewSnapshot(
+    RESIZE_STYLE_PROPERTIES,
+    session.snapshot,
+  );
+  overlays.schedulePositionUpdate("measure");
+}
+
+function cancelResizeSession(): void {
+  const session = resizeSession;
+  if (!session) return;
+  flushResizePreview();
+  restoreResizeSnapshot(session);
+  clearResizeInteractionState();
+}
+
+async function commitResizeSession(): Promise<void> {
+  const session = resizeSession;
+  if (!session) return;
+  if (!session.hasChanged) {
+    clearResizeInteractionState();
+    return;
+  }
+
+  flushResizePreview();
+  const finalSize = session.currentSize;
+  const updates = buildResizeStyleUpdates(finalSize, session.handle);
+  clearResizeInteractionState();
+
+  const saved = await resizeStyleTarget.saveStyleProperties(
+    updates,
+    props.currentItemType,
+    props.currentItemSlug,
+  );
+
+  if (!saved) {
+    restoreResizeSnapshot(session);
+    return;
+  }
+
+  resizeAnnouncement.value = `Resized to ${formatCanvasSelectionSize(finalSize)} pixels`;
+  overlays.schedulePositionUpdate("measure");
+}
+
+function startResizeSession(
+  kind: ResizeSession["kind"],
+  handle: CanvasSelectionResizeHandle,
+): ResizeSession | null {
+  if (!canResizeSelection.value) return null;
+  const nodeId = overlays.selection.nodeId;
+  const startSize = measureCanvasSelectionElement(overlays.selection.element);
+  if (!nodeId || !startSize) return null;
+
+  if (resizeSession) {
+    cancelResizeSession();
+  }
+
+  const session: ResizeSession = {
+    kind,
+    handle,
+    hasChanged: false,
+    nodeId,
+    startSize,
+    currentSize: startSize,
+    snapshot: resizeStyleTarget.captureAuthoredStylePreviewSnapshot(
+      RESIZE_STYLE_PROPERTIES,
+    ),
+  };
+  resizeSession = session;
+  resizePreviewSize.value = startSize;
+  isResizingSelection.value = true;
+  return session;
+}
+
+function handleResizePointerDown(
+  handle: CanvasSelectionResizeHandle,
+  event: PointerEvent,
+): void {
+  if (event.button !== 0) return;
+  const session = startResizeSession("pointer", handle);
+  if (!session) return;
+
+  event.preventDefault();
+  event.stopPropagation();
+  const scale = getCanvasSelectionScale(props.iframeRef);
+  session.pointerId = event.pointerId;
+  session.startClientX = event.clientX;
+  session.startClientY = event.clientY;
+  session.scaleX = scale.x;
+  session.scaleY = scale.y;
+
+  const captureTarget = event.currentTarget;
+  if (captureTarget instanceof HTMLButtonElement) {
+    session.captureTarget = captureTarget;
+    captureTarget.addEventListener(
+      "lostpointercapture",
+      handleResizeLostPointerCapture,
+    );
+    captureTarget.setPointerCapture(event.pointerId);
+  }
+
+  document.body.style.cursor = canvasSelectionResizeCursor(handle);
+  document.body.style.userSelect = "none";
+  window.addEventListener("pointermove", handleResizePointerMove);
+  window.addEventListener("pointerup", handleResizePointerUp);
+  window.addEventListener("pointercancel", handleResizePointerCancel);
+  window.addEventListener("keydown", handleResizeWindowKeydown);
+}
+
+function handleResizeLostPointerCapture(event: PointerEvent): void {
+  const session = resizeSession;
+  if (
+    !session ||
+    session.kind !== "pointer" ||
+    session.pointerId !== event.pointerId
+  ) {
+    return;
+  }
+
+  cancelResizeSession();
+}
+
+function handleResizePointerMove(event: PointerEvent): void {
+  const session = resizeSession;
+  if (
+    !session ||
+    session.kind !== "pointer" ||
+    session.pointerId !== event.pointerId
+  ) {
+    return;
+  }
+
+  event.preventDefault();
+  const nextSize = resizeCanvasSelection({
+    handle: session.handle,
+    startSize: session.startSize,
+    deltaX:
+      (event.clientX - (session.startClientX ?? event.clientX)) /
+      (session.scaleX ?? 1),
+    deltaY:
+      (event.clientY - (session.startClientY ?? event.clientY)) /
+      (session.scaleY ?? 1),
+  });
+  const movementX = Math.abs(
+    event.clientX - (session.startClientX ?? event.clientX),
+  );
+  const movementY = Math.abs(
+    event.clientY - (session.startClientY ?? event.clientY),
+  );
+  if (movementX < 2 && movementY < 2) {
+    return;
+  }
+  session.hasChanged = true;
+  session.currentSize = nextSize;
+  queueResizePreview(nextSize, session.handle);
+}
+
+function handleResizePointerUp(event: PointerEvent): void {
+  if (
+    !resizeSession ||
+    resizeSession.kind !== "pointer" ||
+    resizeSession.pointerId !== event.pointerId
+  ) {
+    return;
+  }
+  event.preventDefault();
+  if (!resizeSession.hasChanged) {
+    clearResizeInteractionState();
+    return;
+  }
+  void commitResizeSession();
+}
+
+function handleResizePointerCancel(event: PointerEvent): void {
+  if (
+    !resizeSession ||
+    resizeSession.kind !== "pointer" ||
+    resizeSession.pointerId !== event.pointerId
+  ) {
+    return;
+  }
+  cancelResizeSession();
+}
+
+function handleResizeWindowKeydown(event: KeyboardEvent): void {
+  if (event.key !== "Escape" || resizeSession?.kind !== "pointer") return;
+  event.preventDefault();
+  cancelResizeSession();
+}
+
+function handleResizeHandleKeydown(
+  handle: CanvasSelectionResizeHandle,
+  event: KeyboardEvent,
+): void {
+  if (event.key === "Escape" && resizeSession?.kind === "keyboard") {
+    event.preventDefault();
+    cancelResizeSession();
+    return;
+  }
+
+  if (
+    !["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(event.key)
+  ) {
+    return;
+  }
+
+  const axes = canvasSelectionResizeAxes(handle);
+  const isHorizontal = event.key === "ArrowLeft" || event.key === "ArrowRight";
+  if ((isHorizontal && !axes.width) || (!isHorizontal && !axes.height)) {
+    return;
+  }
+
+  event.preventDefault();
+  let session = resizeSession;
+  if (!session || session.kind !== "keyboard" || session.handle !== handle) {
+    session = startResizeSession("keyboard", handle);
+  }
+  if (!session) return;
+
+  const step = event.shiftKey ? 10 : 1;
+  const nextSize = {
+    width: Math.max(
+      1,
+      session.currentSize.width +
+        (event.key === "ArrowRight"
+          ? step
+          : event.key === "ArrowLeft"
+            ? -step
+            : 0),
+    ),
+    height: Math.max(
+      1,
+      session.currentSize.height +
+        (event.key === "ArrowDown"
+          ? step
+          : event.key === "ArrowUp"
+            ? -step
+            : 0),
+    ),
+  };
+  session.hasChanged = true;
+  session.currentSize = nextSize;
+  queueResizePreview(nextSize, handle);
+
+  clearKeyboardCommitTimeout();
+  keyboardCommitTimeout = window.setTimeout(() => {
+    keyboardCommitTimeout = null;
+    void commitResizeSession();
+  }, RESIZE_KEYBOARD_COMMIT_DELAY_MS);
+}
+
+function handleResizeHandleBlur(): void {
+  if (resizeSession?.kind !== "keyboard") return;
+  void commitResizeSession();
+}
+
+watch(
+  () => overlays.selection.nodeId,
+  (nodeId, previousNodeId) => {
+    if (previousNodeId && nodeId !== previousNodeId && resizeSession) {
+      cancelResizeSession();
+    }
+  },
+);
+
+onBeforeUnmount(() => {
+  if (resizeSession) {
+    cancelResizeSession();
+  } else {
+    clearResizeInteractionState();
+  }
 });
 
 const isTextNode = computed(() => {
@@ -131,14 +694,21 @@ function handleHeadingLevelChange(level: number): void {
 }
 
 const TOOLBAR_PADDING = 2;
-const TOOLBAR_OFFSET = 4;
+const TOOLBAR_OFFSET = 12;
 const MIN_TOP_SPACE = 60;
+
+const placeToolbarAbove = computed(() => {
+  const position = overlays.selection.position;
+  if (!position) return false;
+  return position.top - TOOLBAR_PADDING - MIN_TOP_SPACE >= 32;
+});
 
 const toolbarStyle = computed((): CSSProperties => {
   if (
     !overlays.selection.visible ||
     !overlays.selection.position ||
-    hideToolbarDuringLibraryDrag.value
+    hideToolbarDuringLibraryDrag.value ||
+    isResizingSelection.value
   ) {
     return { display: "none" };
   }
@@ -150,10 +720,7 @@ const toolbarStyle = computed((): CSSProperties => {
     Math.min(centerX, window.innerWidth - TOOLBAR_PADDING),
   );
 
-  const spaceAbove = top - TOOLBAR_PADDING - MIN_TOP_SPACE;
-  const placeAbove = spaceAbove >= 32;
-
-  if (placeAbove) {
+  if (placeToolbarAbove.value) {
     return {
       display: "flex",
       left: `${clampedCenterX}px`,
@@ -166,7 +733,14 @@ const toolbarStyle = computed((): CSSProperties => {
   return {
     display: "flex",
     left: `${clampedCenterX}px`,
-    top: `${top + height + TOOLBAR_OFFSET}px`,
+    top: `${
+      top +
+      height +
+      TOOLBAR_OFFSET +
+      (showSelectionSizeBadge.value
+        ? SELECTION_SIZE_BADGE_GAP + SELECTION_SIZE_BADGE_HEIGHT
+        : 0)
+    }px`,
     transform: "translate(-50%, 0)",
     zIndex: OVERLAY_Z_INDEX.toolbar,
   };
@@ -389,7 +963,53 @@ const nodeTypeLabel = computed(() => {
     >
       <div
         v-if="overlays.selection.visible"
-        class="selection-toolbar fixed pointer-events-auto flex h-9 max-w-[calc(100vw-16px)] select-none items-center whitespace-nowrap rounded border-solid border-border bg-background px-1 text-xs text-foreground"
+        class="pointer-events-none fixed box-border border border-solid border-primary/85"
+        :style="selectionFrameStyle"
+        data-overlay="selection-frame"
+        :data-node-id="overlays.selection.nodeId"
+      >
+        <template v-if="canResizeSelection">
+          <button
+            v-for="handle in CANVAS_SELECTION_RESIZE_HANDLES"
+            :key="handle"
+            type="button"
+            class="pointer-events-auto absolute flex size-6 touch-none select-none items-center justify-center border-0 bg-transparent p-0 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-primary"
+            :class="getResizeHandleClass(handle)"
+            :style="{ cursor: canvasSelectionResizeCursor(handle) }"
+            :aria-label="getResizeHandleLabel(handle)"
+            :tabindex="handle === 'south-east' ? 0 : -1"
+            :data-resize-handle="handle"
+            @pointerdown="handleResizePointerDown(handle, $event)"
+            @dragstart.prevent
+            @keydown="handleResizeHandleKeydown(handle, $event)"
+            @blur="handleResizeHandleBlur"
+          >
+            <span
+              class="block"
+              :class="getResizeHandleIndicatorClass(handle)"
+              aria-hidden="true"
+            />
+          </button>
+        </template>
+
+        <span
+          v-if="showSelectionSizeBadge"
+          class="pointer-events-none absolute z-1 whitespace-nowrap rounded-sm bg-primary px-1.5 py-0.5 font-mono text-[10px] font-semibold leading-4 tabular-nums text-primary-foreground shadow-sm"
+          :style="selectionSizeBadgeStyle"
+          aria-hidden="true"
+          data-overlay="selection-size"
+        >
+          {{ selectionSizeLabel }}
+        </span>
+      </div>
+
+      <span class="sr-only" role="status" aria-live="polite">
+        {{ resizeAnnouncement }}
+      </span>
+
+      <div
+        v-if="overlays.selection.visible && props.showSelectionToolbar"
+        class="selection-toolbar fixed pointer-events-auto flex h-8.5 max-w-[calc(100vw-16px)] select-none items-center whitespace-nowrap rounded-sm border-solid border-border bg-sidebar px-0 pb-0.3 text-xs text-foreground"
         :style="toolbarStyle"
         data-overlay="toolbar"
         :data-node-id="overlays.selection.nodeId"
@@ -397,9 +1017,9 @@ const nodeTypeLabel = computed(() => {
         <div class="flex min-w-0 items-center gap-1 px-1">
           <Button
             v-if="showSelectParent"
-            variant="sidebar-action"
+            variant="ghost"
             size="icon-sm"
-            class="shrink-0"
+            class="shrink-0 h-6!"
             data-action="select-parent"
             :title="t('composer.toolbar.selectParent')"
             @click.stop.prevent="handleToolbarAction('select-parent')"
@@ -417,11 +1037,11 @@ const nodeTypeLabel = computed(() => {
 
         <template v-if="showNodeTypeControls">
           <div
-            class="mx-1.5 h-3 shrink-0 border-l border-solid border-border/70"
+            class="mx-1.5 h-2.5 shrink-0 border-l border-solid border-muted-foreground/30"
             aria-hidden="true"
           />
 
-          <div class="flex items-center gap-1 px-2" @click.stop>
+          <div class="flex items-center gap-0 px-0" @click.stop>
             <ColorField
               v-if="isTextNode"
               :model-value="toolbarTextColor"
@@ -445,9 +1065,9 @@ const nodeTypeLabel = computed(() => {
             <Button
               v-if="isImageNode"
               type="button"
-              variant="headerAction"
+              variant="ghost"
               size="icon-sm"
-              class="shrink-0"
+              class="shrink-0 h-6! w-6!"
               :title="t('inspector.media.chooseImage')"
               @click.stop.prevent="handleToolbarAction('open-media-picker')"
             >
@@ -465,16 +1085,17 @@ const nodeTypeLabel = computed(() => {
         <SelectionToolbarMotionControl />
 
         <div
-          class="mx-1.5 h-3 shrink-0 border-l border-solid border-border/70"
-          aria-hidden="true"
-        />
+            class="mx-1.5 h-2.5 shrink-0 border-l border-solid border-muted-foreground/30"
+            aria-hidden="true"
+          />
 
-        <div class="flex items-center gap-0.5 px-0.5">
+        <div class="flex items-center gap-0 pr-1">
           <Button
             v-for="btn in toolbarButtons"
             :key="btn.action"
-            variant="sidebar-action"
+            variant="ghost"
             size="icon-sm"
+            class="shrink-0 h-6! w-6!"
             :class="[
               btn.isDanger
                 ? 'hover:border-destructive/50 hover:text-destructive'
@@ -484,7 +1105,7 @@ const nodeTypeLabel = computed(() => {
             :title="btn.title"
             @click.stop.prevent="handleToolbarAction(btn.action)"
           >
-            <span :class="[btn.iconPath, 'size-4']" />
+            <span :class="[btn.iconPath, 'size-3.5 shrink-0']" />
           </Button>
         </div>
       </div>

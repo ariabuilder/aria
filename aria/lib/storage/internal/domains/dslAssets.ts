@@ -135,33 +135,47 @@ export function createDslAssetStorageDomain(
       }
 
       const existing = await context.resolveLayoutVersionState(id);
-      if (
-        parsedOptions.expectedVersion &&
-        existing?.currentVersion !== parsedOptions.expectedVersion
-      ) {
-        throw new VersionConflictError(
-          parsedOptions.expectedVersion,
-          existing?.currentVersion ?? null,
-        );
-      }
       const incomingHash = normalized.sourceHash;
-      if (shouldSkipIfContentUnchanged && existing) {
-        const currentVersionRow = await context.getStoredVersionRow(
+      let currentVersionRow: Awaited<
+        ReturnType<typeof context.getStoredVersionRow>
+      > = null;
+      let currentHash: string | null = null;
+      if (existing) {
+        currentVersionRow = await context.getStoredVersionRow(
           "aria_layout_versions",
           existing.id,
           existing.currentVersion,
         );
         if (currentVersionRow) {
-          const currentHash = await resolveStoredSemanticSourceHash({
+          currentHash = await resolveStoredSemanticSourceHash({
             kind: "layout",
             row: currentVersionRow,
             fallback: () =>
-              context.resolveStoredVersionContentHash(currentVersionRow),
+              context.resolveStoredVersionContentHash(currentVersionRow!),
           });
-          if (currentHash === incomingHash) {
-            await context.syncMediaUsageBestEffort("layout", id, normalizedDSL);
-            return existing.currentVersion;
-          }
+        }
+      }
+      if (
+        parsedOptions.expectedVersion &&
+        existing?.currentVersion !== parsedOptions.expectedVersion
+      ) {
+        if (
+          shouldSkipIfContentUnchanged &&
+          existing &&
+          currentHash === incomingHash
+        ) {
+          await context.syncMediaUsageBestEffort("layout", id, normalizedDSL);
+          return existing.currentVersion;
+        }
+        throw new VersionConflictError(
+          parsedOptions.expectedVersion,
+          existing?.currentVersion ?? null,
+        );
+      }
+      if (shouldSkipIfContentUnchanged && existing) {
+        if (currentHash === incomingHash) {
+          await context.syncMediaUsageBestEffort("layout", id, normalizedDSL);
+          return existing.currentVersion;
         }
       }
 
@@ -419,37 +433,55 @@ export function createDslAssetStorageDomain(
       }
 
       const existing = await context.resolveComponentVersionState(id);
-      if (
-        parsedOptions.expectedVersion &&
-        existing?.currentVersion !== parsedOptions.expectedVersion
-      ) {
-        throw new VersionConflictError(
-          parsedOptions.expectedVersion,
-          existing?.currentVersion ?? null,
-        );
-      }
       const incomingHash = normalized.sourceHash;
-      if (shouldSkipIfContentUnchanged && existing) {
-        const currentVersionRow = await context.getStoredVersionRow(
+      let currentVersionRow: Awaited<
+        ReturnType<typeof context.getStoredVersionRow>
+      > = null;
+      let currentHash: string | null = null;
+      if (existing) {
+        currentVersionRow = await context.getStoredVersionRow(
           "aria_component_versions",
           existing.id,
           existing.currentVersion,
         );
         if (currentVersionRow) {
-          const currentHash = await resolveStoredSemanticSourceHash({
+          currentHash = await resolveStoredSemanticSourceHash({
             kind: "component",
             row: currentVersionRow,
             fallback: () =>
-              context.resolveStoredVersionContentHash(currentVersionRow),
+              context.resolveStoredVersionContentHash(currentVersionRow!),
           });
-          if (currentHash === incomingHash) {
-            await context.syncMediaUsageBestEffort(
-              "component",
-              id,
-              normalizedDSL,
-            );
-            return existing.currentVersion;
-          }
+        }
+      }
+      if (
+        parsedOptions.expectedVersion &&
+        existing?.currentVersion !== parsedOptions.expectedVersion
+      ) {
+        if (
+          shouldSkipIfContentUnchanged &&
+          existing &&
+          currentHash === incomingHash
+        ) {
+          await context.syncMediaUsageBestEffort(
+            "component",
+            id,
+            normalizedDSL,
+          );
+          return existing.currentVersion;
+        }
+        throw new VersionConflictError(
+          parsedOptions.expectedVersion,
+          existing?.currentVersion ?? null,
+        );
+      }
+      if (shouldSkipIfContentUnchanged && existing) {
+        if (currentHash === incomingHash) {
+          await context.syncMediaUsageBestEffort(
+            "component",
+            id,
+            normalizedDSL,
+          );
+          return existing.currentVersion;
         }
       }
 

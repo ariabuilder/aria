@@ -83,6 +83,9 @@ export const HEADING_TAG_OVERRIDES = [
   "span",
 ] as const;
 
+export const LIST_TAG_OVERRIDES = ["ul", "ol", "dl"] as const;
+export const LIST_ITEM_TAG_OVERRIDES = ["li", "dt", "dd"] as const;
+
 const NATIVE_TYPE_TO_TAG: Record<string, string> = {
   Heading: "h1",
   heading: "h1",
@@ -143,6 +146,8 @@ const NATIVE_TYPE_TO_TAG: Record<string, string> = {
 const CONTAINER_TAG_OVERRIDE_SET = new Set<string>(CONTAINER_TAG_OVERRIDES);
 const TEXT_TAG_OVERRIDE_SET = new Set<string>(TEXT_TAG_OVERRIDES);
 const HEADING_TAG_OVERRIDE_SET = new Set<string>(HEADING_TAG_OVERRIDES);
+const LIST_TAG_OVERRIDE_SET = new Set<string>(LIST_TAG_OVERRIDES);
+const LIST_ITEM_TAG_OVERRIDE_SET = new Set<string>(LIST_ITEM_TAG_OVERRIDES);
 
 export function stripConsumedRenderProps(props: JsonObject): JsonObject {
   const nextProps = { ...props };
@@ -307,6 +312,20 @@ export function getNativeTagForRenderableNode(
 
   const elementOverride = props.element;
   if (typeof elementOverride === "string") {
+    if (
+      ["List", "list"].includes(normalizedType) &&
+      LIST_TAG_OVERRIDE_SET.has(elementOverride)
+    ) {
+      return elementOverride;
+    }
+
+    if (
+      ["ListItem", "listitem"].includes(normalizedType) &&
+      LIST_ITEM_TAG_OVERRIDE_SET.has(elementOverride)
+    ) {
+      return elementOverride;
+    }
+
     if (
       isRenderableContainerNodeType(node.type) &&
       CONTAINER_TAG_OVERRIDE_SET.has(elementOverride)

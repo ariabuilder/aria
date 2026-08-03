@@ -566,6 +566,102 @@ function parseInlineStyles(styleStr: string): StyleMap {
   return styles;
 }
 
+const IMPORTED_LIST_STYLE_UTILITY_PATTERN =
+  /^(?:(?:[^:\s]+):)*(?:list-(?:none|disc|decimal))$/;
+const IMPORTED_PADDING_UTILITY_PATTERN =
+  /^(?:(?:[^:\s]+):)*(?:p|px|pl|pr|ps|pe)-.+$/;
+const IMPORTED_WIDTH_UTILITY_PATTERN =
+  /^(?:(?:[^:\s]+):)*(?:(?:w|min-w|max-w|basis)-.+|flex-(?:1|auto|initial|none|\[.+\])|grow(?:-.+)?|self-stretch)$/;
+
+function hasImportedListStyleUtility(classTokens: readonly string[]): boolean {
+  return classTokens.some((token) =>
+    IMPORTED_LIST_STYLE_UTILITY_PATTERN.test(token),
+  );
+}
+
+function hasImportedPadding(
+  styles: StyleMap,
+  classTokens: readonly string[],
+): boolean {
+  const hasPaddingStyle = Object.keys(styles).some(
+    (property) => property === "padding" || property.startsWith("padding"),
+  );
+
+  return (
+    hasPaddingStyle ||
+    classTokens.some((token) => IMPORTED_PADDING_UTILITY_PATTERN.test(token))
+  );
+}
+
+function hasImportedWidthSizing(
+  styles: StyleMap,
+  classTokens: readonly string[],
+): boolean {
+  const widthStyleProperties = new Set([
+    "width",
+    "widthSizing",
+    "minWidth",
+    "maxWidth",
+    "flexBasis",
+    "flexGrow",
+    "alignSelf",
+  ]);
+  const hasWidthStyle = Object.keys(styles).some((property) =>
+    widthStyleProperties.has(property),
+  );
+
+  return (
+    hasWidthStyle ||
+    classTokens.some((token) => IMPORTED_WIDTH_UTILITY_PATTERN.test(token))
+  );
+}
+
+function applyImportedListWidthDefault(
+  styles: StyleMap,
+  classTokens: readonly string[],
+): void {
+  if (!hasImportedWidthSizing(styles, classTokens)) {
+    styles.widthSizing = { base: "hug" };
+  }
+}
+
+function applyImportedListSemantics(
+  tagName: string,
+  props: JsonObject,
+  styles: StyleMap,
+  classTokens: readonly string[],
+): void {
+  if (tagName === "ul" || tagName === "ol") {
+    const ordered = tagName === "ol";
+    props.ordered = ordered;
+    const hasListStyleUtility = hasImportedListStyleUtility(classTokens);
+
+    if (styles.listStyleType === undefined && !hasListStyleUtility) {
+      styles.listStyleType = { base: ordered ? "decimal" : "none" };
+    }
+
+    const removesMarkersAtBase =
+      !ordered &&
+      (styles.listStyleType?.base === "none" ||
+        classTokens.includes("list-none"));
+    if (removesMarkersAtBase && !hasImportedPadding(styles, classTokens)) {
+      styles.padding = { base: "0" };
+    }
+    applyImportedListWidthDefault(styles, classTokens);
+    return;
+  }
+
+  if (tagName === "dl") {
+    props.element = "dl";
+    applyImportedListWidthDefault(styles, classTokens);
+    return;
+  }
+
+  if (tagName === "dt" || tagName === "dd") {
+    props.element = tagName;
+  }
+}
+
 function shouldDropAttribute(name: string): boolean {
   return (
     name.startsWith("on") ||
@@ -967,6 +1063,8 @@ function importElementToNode(
   if (tagName.startsWith("h")) {
     props.level = getHeadingLevel(tagName);
   }
+
+  applyImportedListSemantics(tagName, props, styles, classTokens);
 
   if (tagName === "img") {
     props.src = typeof props.src === "string" ? props.src : "";
@@ -1379,6 +1477,7 @@ function elementToNode(element: Element): BuilderNode {
 
   // Parse class attribute into classNames
   const classNameStr = element.getAttribute("class") || undefined;
+  const classTokens = tokenizeImportedClasses(classNameStr ?? null);
   const classNames = classNameStr
     ? parseClassNameString(classNameStr)
     : undefined;
@@ -1390,6 +1489,8 @@ function elementToNode(element: Element): BuilderNode {
   if (tagName.startsWith("h")) {
     props.level = getHeadingLevel(tagName);
   }
+
+  applyImportedListSemantics(tagName, props, styles, classTokens);
 
   if (tagName === "img") {
     props.src = element.getAttribute("src") || "";

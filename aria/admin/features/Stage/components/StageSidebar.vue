@@ -47,6 +47,8 @@ defineExpose<AppLeftSidebarShellExpose>({
         :open="props.sidebarProps.open"
         :active-blocks="props.sidebarProps.activeBlocks"
         :show-outlines="props.sidebarProps.showOutlines"
+        :show-selection-sizing="props.sidebarProps.showSelectionSizing"
+        :show-selection-toolbar="props.sidebarProps.showSelectionToolbar"
         :wireframe-mode="props.sidebarProps.wireframeMode"
         :has-unsaved-changes="props.sidebarProps.hasUnsavedChanges"
         :current-item-slug="props.sidebarProps.currentItemSlug"

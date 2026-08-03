@@ -28,6 +28,8 @@ export interface UseStageAppBindingsDeps {
   toggleRightSidebar: () => void;
   loadingState: Ref<LoadingState>;
   showOutlines: Ref<boolean>;
+  showSelectionSizing: Ref<boolean>;
+  showSelectionToolbar: Ref<boolean>;
   wireframeMode: Ref<boolean>;
   currentLayout: Ref<LayoutDSL | null>;
   stageKey: ComputedRef<string>;
@@ -91,6 +93,8 @@ export function useStageAppBindings(
     toggleRightSidebar,
     loadingState,
     showOutlines,
+    showSelectionSizing,
+    showSelectionToolbar,
     wireframeMode,
     currentLayout,
     stageKey,
@@ -172,6 +176,8 @@ export function useStageAppBindings(
     isLoading: loadingState.value.isLoading,
     loadError: loadingState.value.loadError,
     showOutlines: showOutlines.value,
+    showSelectionSizing: showSelectionSizing.value,
+    showSelectionToolbar: showSelectionToolbar.value,
     wireframeMode: wireframeMode.value,
     currentLayout: currentLayout.value,
     stageKey: stageKey.value,

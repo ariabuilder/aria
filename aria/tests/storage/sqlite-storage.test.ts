@@ -521,6 +521,70 @@ describe("SQLiteStorageAdapter", () => {
     expect(versions.map((entry) => entry.version)).toEqual([firstVersion]);
   });
 
+  it("reconciles committed page, layout, and component retries by source hash", async () => {
+    const pageV1 = await adapter.savePageDSL(samplePage.id, samplePage, {
+      preserveVersion: true,
+      versionHint: "retry-page-v1",
+    });
+    const layoutV1 = await adapter.saveLayoutDSL(sampleLayout.id, sampleLayout, {
+      preserveVersion: true,
+      versionHint: "retry-layout-v1",
+    });
+    const componentV1 = await adapter.saveComponentDSL(
+      sampleComponent.id,
+      sampleComponent,
+      {
+        preserveVersion: true,
+        versionHint: "retry-component-v1",
+      },
+    );
+    const updatedPage = { ...samplePage, title: "Committed page" };
+    const updatedLayout = {
+      ...sampleLayout,
+      description: "Committed layout",
+    };
+    const updatedComponent = {
+      ...sampleComponent,
+      description: "Committed component",
+    };
+
+    const pageV2 = await adapter.savePageDSL(samplePage.id, updatedPage, {
+      expectedVersion: pageV1,
+    });
+    const layoutV2 = await adapter.saveLayoutDSL(
+      sampleLayout.id,
+      updatedLayout,
+      { expectedVersion: layoutV1 },
+    );
+    const componentV2 = await adapter.saveComponentDSL(
+      sampleComponent.id,
+      updatedComponent,
+      { expectedVersion: componentV1 },
+    );
+
+    await expect(
+      adapter.savePageDSL(samplePage.id, updatedPage, {
+        expectedVersion: pageV1,
+      }),
+    ).resolves.toBe(pageV2);
+    await expect(
+      adapter.saveLayoutDSL(sampleLayout.id, updatedLayout, {
+        expectedVersion: layoutV1,
+      }),
+    ).resolves.toBe(layoutV2);
+    await expect(
+      adapter.saveComponentDSL(sampleComponent.id, updatedComponent, {
+        expectedVersion: componentV1,
+      }),
+    ).resolves.toBe(componentV2);
+
+    expect(await adapter.getPageVersions(samplePage.id)).toHaveLength(2);
+    expect(await adapter.listLayoutVersions(sampleLayout.id)).toHaveLength(2);
+    expect(await adapter.listComponentVersions(sampleComponent.id)).toHaveLength(
+      2,
+    );
+  });
+
   it("compares legacy stored rows by normalized semantic source hash", async () => {
     const firstVersion = await adapter.savePageDSL(samplePage.id, samplePage);
     const stored = await client.execute({
@@ -601,18 +665,41 @@ describe("SQLiteStorageAdapter", () => {
       versionHint: "page-v1",
     });
 
-    await adapter.savePageDSL(
+    const atomicPage = { ...samplePage, title: "Atomic update" };
+    const atomicLayout = {
+      ...sampleLayout,
+      description: "Atomic layout update",
+    };
+    const atomicPageVersion = await adapter.savePageDSL(
       samplePage.id,
-      { ...samplePage, title: "Atomic update" },
+      atomicPage,
       {
         expectedVersion: "page-v1",
         linkedLayoutDraft: {
           id: sampleLayout.id,
           expectedVersion: "layout-v1",
-          dsl: { ...sampleLayout, description: "Atomic layout update" },
+          dsl: atomicLayout,
         },
       },
     );
+    const atomicLayoutVersion = (await adapter.getLayoutDSL(sampleLayout.id))
+      ?.version;
+
+    await expect(
+      adapter.savePageDSL(samplePage.id, atomicPage, {
+        expectedVersion: "page-v1",
+        linkedLayoutDraft: {
+          id: sampleLayout.id,
+          expectedVersion: "layout-v1",
+          dsl: atomicLayout,
+        },
+      }),
+    ).resolves.toBe(atomicPageVersion);
+    expect((await adapter.getLayoutDSL(sampleLayout.id))?.version).toBe(
+      atomicLayoutVersion,
+    );
+    expect(await adapter.getPageVersions(samplePage.id)).toHaveLength(2);
+    expect(await adapter.listLayoutVersions(sampleLayout.id)).toHaveLength(2);
 
     expect((await adapter.getPageDSL(samplePage.id))?.title).toBe(
       "Atomic update",
@@ -621,8 +708,7 @@ describe("SQLiteStorageAdapter", () => {
       "Atomic layout update",
     );
 
-    const layoutVersion = (await adapter.getLayoutDSL(sampleLayout.id))
-      ?.version;
+    const layoutVersion = atomicLayoutVersion;
     await expect(
       adapter.savePageDSL(
         samplePage.id,

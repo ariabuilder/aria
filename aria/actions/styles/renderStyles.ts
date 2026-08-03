@@ -3,9 +3,13 @@ import type { ActionAPIContext } from "astro:actions";
 import { z } from "astro/zod";
 import { getStorageAdapterAsync } from "../../lib/storage/getStorageAdapter";
 import { getRuntimeKVNamespace } from "../../lib/cloudflare/env";
-import { resolveBreakpointDefinitionsFromDesignSystem } from "../../lib/styles/universalDesignSystem";
+import type { UniversalDesignSystem } from "../../lib/styles/universalDesignSystem";
 import { requireAuth } from "../_shared";
-import { resolveSiteStyleRevision } from "../../lib/storage/adapter";
+import {
+  getSiteSettingsUtilityEngine,
+  resolveSiteStyleRevision,
+  type SiteSettings,
+} from "../../lib/storage/adapter";
 import {
   endPerformanceTracking,
   generateCSSHash,
@@ -14,11 +18,6 @@ import {
   startPerformanceTracking,
   type StylesStorageAdapter,
 } from "./_shared";
-import {
-  buildGeneratedDocumentStyleBands,
-  buildStageRenderStylesData,
-  buildStoredRenderStylesData,
-} from "./globalCssArtifacts";
 
 const RenderStylesDataSchema = z.object({
   baseCSS: z.string(),
@@ -47,7 +46,8 @@ type KVNamespaceLike = {
   delete?(key: string): Promise<void>;
 };
 
-const RENDER_STYLES_CACHE_VERSION = 2;
+const RENDER_STYLES_CACHE_VERSION = 3;
+const STORED_RENDER_STYLES_SIGNATURE = "stored-artifacts";
 const RENDER_STYLES_CACHE_TTL_SECONDS = 60 * 60 * 24; // 24h
 const RENDER_STYLES_MEMORY_CACHE_TTL_MS = 5 * 60 * 1000; // 5m
 const renderStylesMemoryCache = new Map<
@@ -156,6 +156,66 @@ export async function buildRenderStylesContentSignature(
   );
 }
 
+const STORED_RENDER_STYLE_SEGMENTS = [
+  "artifacts-base-css",
+  "artifacts-custom-classes-css",
+  "artifacts-custom-fonts-css",
+  "artifacts-compiled-unocss",
+  "artifacts-global-css",
+  "artifacts-utility-css",
+  "artifacts-meta",
+] as const;
+
+function getCssHash(css: string, storedHash: string | undefined): string {
+  return storedHash?.trim() || generateCSSHash(css);
+}
+
+/**
+ * Builds the Stage payload from already-compiled storage artifacts only.
+ * Current page-responsive rules are generated inside Stage from its active
+ * node tree, so a read action must never scan every persisted surface.
+ */
+export function buildPersistedRenderStylesData(
+  designSystem: UniversalDesignSystem,
+  siteSettings: SiteSettings | null,
+): RenderStylesData {
+  const artifacts = designSystem.artifacts;
+  const baseCSS = artifacts.baseCSS ?? "";
+  const utilityCSS =
+    artifacts.utilityCSS || artifacts.compiledUnoCSS || "";
+  const customClassesCSS = artifacts.customClassesCSS ?? "";
+  const customFontsCSS = artifacts.customFontsCSS ?? "";
+  const globalCSS =
+    artifacts.globalCSS ||
+    [baseCSS, utilityCSS, customClassesCSS]
+      .map((section) => section.trim())
+      .filter(Boolean)
+      .join("\n\n");
+
+  return {
+    baseCSS,
+    baseCSSHash: getCssHash(baseCSS, artifacts.baseCSSHash),
+    utilityCSS,
+    utilityCSSHash: getCssHash(utilityCSS, artifacts.utilityCSSHash),
+    customClassesCSS,
+    customFontsCSS,
+    globalCSS,
+    globalCSSHash: getCssHash(globalCSS, artifacts.globalCSSHash),
+    lastCompiled: artifacts.lastCompiled ?? "",
+    styleRevision: resolveSiteStyleRevision(siteSettings),
+    utilityEngine: getSiteSettingsUtilityEngine(siteSettings),
+  };
+}
+
+async function getPersistedRenderStylesDesignSystem(
+  adapter: StylesStorageAdapter,
+): Promise<UniversalDesignSystem> {
+  return (
+    (await adapter.getDesignSystemSegments(STORED_RENDER_STYLE_SEGMENTS)) ??
+    (await getDesignSystem(adapter))
+  );
+}
+
 export const getRenderStylesAction = defineAction({
   accept: "json",
   handler: async (_, context) => {
@@ -166,24 +226,12 @@ export const getRenderStylesAction = defineAction({
 
     try {
       const adapter = await getStorageAdapterAsync(context.locals);
-      const [siteSettings, contentState] = await Promise.all([
-        adapter.getSiteSettings(),
-        typeof adapter.getContentSiteState === "function"
-          ? adapter.getContentSiteState()
-          : Promise.resolve(null),
-      ]);
+      const siteSettings = await adapter.getSiteSettings();
       const styleRevision = resolveSiteStyleRevision(siteSettings);
-      const contentSignature =
-        contentState?.currentRevisionId ??
-        (await buildRenderStylesContentSignature(adapter));
-
-      // Design changes bump `styleRevision`; content actions atomically bump
-      // the single content revision. This avoids three collection scans for
-      // every cache lookup.
       const cacheKV = getRenderStylesCacheKV(context);
       const cacheKey = buildRenderStylesCacheKey(
         styleRevision,
-        contentSignature,
+        STORED_RENDER_STYLES_SIGNATURE,
       );
 
       const memoryCached = getMemoryCachedRenderStyles(cacheKey);
@@ -192,7 +240,6 @@ export const getRenderStylesAction = defineAction({
         log("info", "Render styles loaded (memory cache hit)", {
           duration: `${duration}ms`,
           styleRevision,
-          contentSignature,
           cacheKey,
         });
         return { success: true, data: memoryCached };
@@ -208,7 +255,6 @@ export const getRenderStylesAction = defineAction({
             log("info", "Render styles loaded (cache hit)", {
               duration: `${duration}ms`,
               styleRevision,
-              contentSignature,
               cacheKey,
             });
             return { success: true, data: cached };
@@ -216,20 +262,11 @@ export const getRenderStylesAction = defineAction({
         }
       }
 
-      const designSystem = await getDesignSystem(adapter);
-      const generatedStyleBands = await buildGeneratedDocumentStyleBands(
-        adapter,
-        resolveBreakpointDefinitionsFromDesignSystem(designSystem),
-      );
-      const storedRenderStyles = buildStoredRenderStylesData(
+      const designSystem = await getPersistedRenderStylesDesignSystem(adapter);
+      const renderStyles = buildPersistedRenderStylesData(
         designSystem,
         siteSettings,
       );
-      const renderStyles = buildStageRenderStylesData({
-        storedRenderStyles,
-        generatedDocumentCss: generatedStyleBands.generatedDocumentCss,
-        rendererBaseFragment: generatedStyleBands.rendererBaseFragment,
-      });
 
       const parsed = RenderStylesDataSchema.parse(renderStyles);
       setMemoryCachedRenderStyles(cacheKey, parsed);
@@ -259,7 +296,6 @@ export const getRenderStylesAction = defineAction({
         baseCssSize: renderStyles.baseCSS.length,
         utilityCssSize: renderStyles.utilityCSS.length,
         styleRevision,
-        contentSignature,
         cached: false,
       });
 

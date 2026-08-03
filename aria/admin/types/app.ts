@@ -87,6 +87,10 @@ export interface UIVisibilityState {
   /** Right inspector sidebar expanded state */
   readonly rightSidebarOpen: boolean;
   readonly showOutlines: boolean;
+  /** Dimension badge visibility for the selected canvas element */
+  readonly showSelectionSizing: boolean;
+  /** Floating toolbar visibility for the selected canvas element */
+  readonly showSelectionToolbar: boolean;
   /** Show slot placeholders in canvas */
   readonly showSlots: boolean;
   /** Wireframe mode - simplified element rendering */

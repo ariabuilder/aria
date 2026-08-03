@@ -112,6 +112,7 @@ export function usePageActions(): UsePageActionsReturn {
       const publishResult = await actions.publishing.publish({
         id: page.id,
         expectedVersion: full.version,
+        skipCSSRegeneration: true,
       });
       if (publishResult.error) {
         throw new Error(publishResult.error.message);

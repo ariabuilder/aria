@@ -29,6 +29,8 @@ export const EN_COMPOSER_MESSAGES = {
   "composer.options.appearance": "Appearance",
   "composer.options.publishing": "Publishing",
   "composer.options.showOutlines": "Show outlines",
+  "composer.options.showSelectionSizing": "Show selection sizing",
+  "composer.options.showSelectionToolbar": "Show selection toolbar",
   "composer.options.wireframe": "Wireframe mode",
   "composer.options.showLayoutSlots": "Show layout slots",
   "composer.options.enterFullscreen": "Enter fullscreen",
@@ -161,6 +163,10 @@ export const FR_COMPOSER_MESSAGES = {
   "composer.options.appearance": "Apparence",
   "composer.options.publishing": "Publication",
   "composer.options.showOutlines": "Afficher les contours",
+  "composer.options.showSelectionSizing":
+    "Afficher les dimensions de la sélection",
+  "composer.options.showSelectionToolbar":
+    "Afficher la barre d’outils de sélection",
   "composer.options.wireframe": "Mode filaire",
   "composer.options.showLayoutSlots": "Afficher les zones de mise en page",
   "composer.options.enterFullscreen": "Passer en plein écran",

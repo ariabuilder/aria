@@ -23,8 +23,9 @@ const { t } = useStudioI18n();
     v-if="showLoopButton || showLinkButton || showImageButton || showTextButton"
   >
   <div
-            class="mx-1.5 h-3 shrink-0 border-l border-solid border-border/70"
-            aria-hidden="true" />
+            class="mx-1.5 h-2.5 shrink-0 border-l border-solid border-muted-foreground/30"
+            aria-hidden="true"
+          />
 
 
     <div class="flex items-center gap-0 px-0" @click.stop>

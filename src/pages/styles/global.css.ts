@@ -4,63 +4,15 @@
  */
 
 import type { APIRoute } from "astro";
-import { buildGlobalCSSArtifactsSnapshot } from "../../../aria/actions/styles";
-import { getAuthAdapterAsync, getSessionIdFromCookies } from "../../../aria/lib/auth";
 import { getStorageAdapterAsync } from "../../../aria/lib/storage/getStorageAdapter";
-import { readSessionUserFromLocals } from "../../../aria/lib/runtime/requestLocals";
 import { log } from "../../../aria/lib/utils/logger";
 
-export const GET: APIRoute = async ({ locals, request, cookies }) => {
+export const GET: APIRoute = async ({ locals, request }) => {
   try {
     // Get storage adapter (works in both dev and production)
     const adapter = await getStorageAdapterAsync(locals);
     const url = new URL(request.url);
     const isPreviewRequest = url.searchParams.get("preview") === "1";
-
-    let previewUser = readSessionUserFromLocals(locals);
-    if (isPreviewRequest && !previewUser) {
-      const sessionId = getSessionIdFromCookies(cookies);
-
-      if (sessionId) {
-        const authAdapter = await getAuthAdapterAsync(locals);
-        previewUser = await authAdapter.getSessionUser(sessionId);
-      }
-    }
-
-    if (isPreviewRequest && previewUser) {
-      try {
-        const freshSnapshot = await buildGlobalCSSArtifactsSnapshot(adapter);
-        return new Response(freshSnapshot.designSystem.artifacts.globalCSS, {
-          status: 200,
-          headers: {
-            "Content-Type": "text/css; charset=utf-8",
-            "Cache-Control": "no-store, must-revalidate",
-          },
-        });
-      } catch (previewCompileError) {
-        const designSystem = await adapter.getDesignSystem();
-        const storedGlobalCSS = designSystem?.artifacts.globalCSS;
-
-        if (storedGlobalCSS) {
-          log("warn", "Preview global CSS compile failed; serving stored artifacts", {
-            error:
-              previewCompileError instanceof Error
-                ? previewCompileError.message
-                : String(previewCompileError),
-          });
-
-          return new Response(storedGlobalCSS, {
-            status: 200,
-            headers: {
-              "Content-Type": "text/css; charset=utf-8",
-              "Cache-Control": "no-store, must-revalidate",
-            },
-          });
-        }
-
-        throw previewCompileError;
-      }
-    }
 
     // Load canonical design-system artifacts from storage
     const designSystem = await adapter.getDesignSystem();
@@ -83,6 +35,8 @@ export const GET: APIRoute = async ({ locals, request, cookies }) => {
     // Check for conditional request (browser cache)
     const ifNoneMatch = request.headers.get("If-None-Match");
     const etag = `"${globalCSSHash}"`;
+    const requestedVersion = url.searchParams.get("v");
+    const hasMatchingVersion = requestedVersion === globalCSSHash;
 
     if (ifNoneMatch === etag) {
       // Browser has current version - return 304 Not Modified
@@ -99,8 +53,11 @@ export const GET: APIRoute = async ({ locals, request, cookies }) => {
       status: 200,
       headers: {
         "Content-Type": "text/css; charset=utf-8",
-        // Cache for 1 year (hash changes on updates)
-        "Cache-Control": "public, max-age=31536000, immutable",
+        "Cache-Control": isPreviewRequest
+          ? "no-store, must-revalidate"
+          : hasMatchingVersion
+            ? "public, max-age=31536000, immutable"
+            : "no-cache, must-revalidate",
         // ETag for cache validation
         ETag: etag,
         // Optional: Add CORS headers if serving to external domains

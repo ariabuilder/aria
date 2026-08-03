@@ -1,8 +1,8 @@
-
 import { describe, expect, it } from "vitest";
 
 import {
   collectUndefinedPropPaths,
+  htmlToNodes,
   importHtmlToNodes,
 } from "../../lib/blocks/htmlToNodes";
 import type { BuilderNode } from "../../lib/types/nodes";
@@ -252,6 +252,54 @@ describe("importHtmlToNodes", () => {
       type: "Heading",
       props: { text: "Premium" },
       children: [],
+    });
+  });
+
+  it("defaults pasted unordered lists to no marker while preserving ordered semantics", async () => {
+    const imported = await importHtmlToNodes(`
+      <section>
+        <ul class="mt-12 space-y-4"><li>Unordered</li></ul>
+        <ol><li>Ordered</li></ol>
+        <ul style="list-style-type: square"><li>Explicit marker</li></ul>
+        <ul class="list-none pl-6 w-full"><li>Explicit sizing</li></ul>
+      </section>
+    `);
+
+    const [unordered, ordered, explicit, padded] = imported.nodes[0]!.children;
+
+    expect(unordered).toMatchObject({
+      type: "List",
+      props: { ordered: false },
+      styles: {
+        widthSizing: { base: "hug" },
+        listStyleType: { base: "none" },
+        padding: { base: "0" },
+      },
+    });
+    expect(ordered).toMatchObject({
+      type: "List",
+      props: { ordered: true },
+      styles: {
+        widthSizing: { base: "hug" },
+        listStyleType: { base: "decimal" },
+      },
+    });
+    expect(explicit?.styles.listStyleType).toEqual({ base: "square" });
+    expect(padded?.styles.padding).toBeUndefined();
+    expect(padded?.styles.widthSizing).toBeUndefined();
+    expect(padded?.classNames?.base).toEqual(
+      expect.arrayContaining(["list-none", "pl-6", "w-full"]),
+    );
+
+    const [legacyUnordered] = htmlToNodes(`<ul><li>Legacy path</li></ul>`);
+    expect(legacyUnordered).toMatchObject({
+      type: "List",
+      props: { ordered: false },
+      styles: {
+        widthSizing: { base: "hug" },
+        listStyleType: { base: "none" },
+        padding: { base: "0" },
+      },
     });
   });
 

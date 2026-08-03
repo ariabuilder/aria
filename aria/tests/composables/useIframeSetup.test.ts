@@ -173,4 +173,32 @@ describe("useIframeSetup", () => {
     expect(STAGE_SCREEN_READER_UTILITY_CSS).toContain(":where(.sr-only)");
     expect(STAGE_SCREEN_READER_UTILITY_CSS).toContain(":where(.not-sr-only)");
   });
+
+  it("loads stored global CSS when the render-style action has no payload", () => {
+    const siteSettings = ref({ utilityEngine: "unocss" as const });
+    const renderStyles = ref(
+      createRenderStyles({
+        baseCSS: "",
+        baseCSSHash: "",
+        globalCSS: "",
+        globalCSSHash: "",
+        styleRevision: "",
+        utilityCSS: "",
+        utilityCSSHash: "",
+        utilityEngine: "unocss",
+      }),
+    );
+
+    const { iframeHtml } = useIframeSetup({
+      siteSettings,
+      renderStyles,
+      configJSON: computed(() => "{}"),
+      cssVariables: computed(() => ""),
+    });
+
+    expect(iframeHtml.value).toContain(
+      'data-aria-global-css href="/styles/global.css"',
+    );
+    expect(iframeHtml.value).not.toContain("preview=1");
+  });
 });
