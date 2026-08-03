@@ -121,32 +121,61 @@ async function prepareLinkedLayoutDraft(
   }
 
   const existing = await context.resolveLayoutVersionState(input.id);
+  const incomingHash = normalized.sourceHash;
+  const currentVersionRow = existing
+    ? await context.getStoredVersionRow(
+        "aria_layout_versions",
+        existing.id,
+        existing.currentVersion,
+      )
+    : null;
+  const currentHash = currentVersionRow
+    ? await resolveStoredSemanticSourceHash({
+        kind: "layout",
+        row: currentVersionRow,
+        fallback: () =>
+          context.resolveStoredVersionContentHash(currentVersionRow),
+      })
+    : null;
+
+  const confirmLayoutVersionUnchanged = async (): Promise<string> => {
+    if (!existing) {
+      throw new VersionConflictError(input.expectedVersion, null);
+    }
+    const latest = await context.resolveLayoutVersionState(input.id);
+    if (latest?.currentVersion !== existing.currentVersion) {
+      throw new VersionConflictError(
+        input.expectedVersion,
+        latest?.currentVersion ?? null,
+      );
+    }
+    return latest.currentVersion;
+  };
+
   if (existing?.currentVersion !== input.expectedVersion) {
+    if (existing && currentHash === incomingHash) {
+      const stableVersion = await confirmLayoutVersionUnchanged();
+      return {
+        id: input.id,
+        dsl: normalizedDSL,
+        version: stableVersion,
+        expectedVersion: input.expectedVersion,
+        statements: [],
+        changed: false,
+      };
+    }
     throw new VersionConflictError(
       input.expectedVersion,
       existing?.currentVersion ?? null,
     );
   }
 
-  const incomingHash = normalized.sourceHash;
-  const currentVersionRow = await context.getStoredVersionRow(
-    "aria_layout_versions",
-    existing.id,
-    existing.currentVersion,
-  );
-  if (
-    currentVersionRow &&
-    (await resolveStoredSemanticSourceHash({
-      kind: "layout",
-      row: currentVersionRow,
-      fallback: () =>
-        context.resolveStoredVersionContentHash(currentVersionRow),
-    })) === incomingHash
-  ) {
+  if (currentHash === incomingHash) {
+    const stableVersion = await confirmLayoutVersionUnchanged();
     return {
       id: input.id,
       dsl: normalizedDSL,
-      version: existing.currentVersion,
+      version: stableVersion,
       expectedVersion: input.expectedVersion,
       statements: [],
       changed: false,
@@ -298,11 +327,60 @@ export function createPageLifecycleStorageDomain(
       const currentDraftVersion =
         existing?.draftVersion ?? existing?.currentVersion;
       const now = context.nowIso();
+      const currentVersionRow =
+        existing && currentDraftVersion
+          ? await context.getStoredVersionRow(
+              "aria_page_versions",
+              existing.id,
+              currentDraftVersion,
+            )
+          : null;
+      const currentHash = currentVersionRow
+        ? await resolveStoredSemanticSourceHash({
+            kind: "page",
+            row: currentVersionRow,
+            fallback: () =>
+              context.resolveStoredVersionContentHash(currentVersionRow),
+          })
+        : null;
 
       if (
         parsedOptions.expectedVersion &&
         currentDraftVersion !== parsedOptions.expectedVersion
       ) {
+        if (existing && currentDraftVersion && currentHash === incomingHash) {
+          const reconciledLinkedLayout = linkedLayoutDraft
+            ? await prepareLinkedLayoutDraft(
+                context,
+                linkedLayoutDraft,
+                parsedAuthorship,
+                now,
+                {
+                  id: existing.id,
+                  expectedVersion: currentDraftVersion,
+                  status: existing.status,
+                  publishedVersion: existing.publishedVersion,
+                },
+              )
+            : null;
+
+          if (!reconciledLinkedLayout?.changed) {
+            await settlePostCommit([
+              () => context.syncPageUsage(id, normalizedDSL),
+              ...(reconciledLinkedLayout
+                ? [
+                    () =>
+                      context.syncMediaUsageBestEffort(
+                        "layout",
+                        reconciledLinkedLayout.id,
+                        reconciledLinkedLayout.dsl,
+                      ),
+                  ]
+                : []),
+            ]);
+            return currentDraftVersion;
+          }
+        }
         throw new VersionConflictError(
           parsedOptions.expectedVersion,
           currentDraftVersion ?? null,
@@ -336,34 +414,30 @@ export function createPageLifecycleStorageDomain(
         existing &&
         currentDraftVersion
       ) {
-        const currentVersionRow = await context.getStoredVersionRow(
-          "aria_page_versions",
-          existing.id,
-          currentDraftVersion,
-        );
-
-        if (currentVersionRow) {
-          const currentHash = await resolveStoredSemanticSourceHash({
-            kind: "page",
-            row: currentVersionRow,
-            fallback: () =>
-              context.resolveStoredVersionContentHash(currentVersionRow),
-          });
-          if (currentHash === incomingHash) {
-            const latest = await context.resolvePageIdentity(existing.id);
-            const latestDraftVersion =
-              latest?.draftVersion ?? latest?.currentVersion;
-            if (latestDraftVersion !== currentDraftVersion) {
-              throw new VersionConflictError(
-                parsedOptions.expectedVersion ?? currentDraftVersion,
-                latestDraftVersion ?? null,
-              );
-            }
-            await settlePostCommit([
-              () => context.syncPageUsage(id, normalizedDSL),
-            ]);
-            return currentDraftVersion;
+        if (currentHash === incomingHash) {
+          const latest = await context.resolvePageIdentity(existing.id);
+          const latestDraftVersion =
+            latest?.draftVersion ?? latest?.currentVersion;
+          if (latestDraftVersion !== currentDraftVersion) {
+            throw new VersionConflictError(
+              parsedOptions.expectedVersion ?? currentDraftVersion,
+              latestDraftVersion ?? null,
+            );
           }
+          await settlePostCommit([
+            () => context.syncPageUsage(id, normalizedDSL),
+            ...(preparedLinkedLayout
+              ? [
+                  () =>
+                    context.syncMediaUsageBestEffort(
+                      "layout",
+                      preparedLinkedLayout.id,
+                      preparedLinkedLayout.dsl,
+                    ),
+                ]
+              : []),
+          ]);
+          return currentDraftVersion;
         }
       }
 
@@ -428,13 +502,14 @@ export function createPageLifecycleStorageDomain(
            updated_at = excluded.updated_at`;
 
       let shouldInsertVersion = true;
+      let existingVersionHash: string | null = null;
       const existingVersionRow = await context.getStoredVersionRow(
         "aria_page_versions",
         id,
         version,
       );
       if (existingVersionRow) {
-        const existingVersionHash = await resolveStoredSemanticSourceHash({
+        existingVersionHash = await resolveStoredSemanticSourceHash({
           kind: "page",
           row: existingVersionRow,
           fallback: () =>
@@ -460,12 +535,6 @@ export function createPageLifecycleStorageDomain(
       let committedWithGuard = false;
 
       if (!shouldInsertVersion && existingVersionRow) {
-        const existingVersionHash = await resolveStoredSemanticSourceHash({
-          kind: "page",
-          row: existingVersionRow,
-          fallback: () =>
-            context.resolveStoredVersionContentHash(existingVersionRow),
-        });
         if (existingVersionHash !== incomingHash) {
           await context.run(
             `UPDATE aria_page_versions

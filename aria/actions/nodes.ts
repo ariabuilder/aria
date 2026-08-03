@@ -42,6 +42,7 @@ import { normalizeNodeForPersist } from "../lib/blocks/normalizeNodeForPersist";
 import { ensureNavigationPresetClassesForAdapter } from "./styles";
 import { isTypographyNodeType } from "../lib/blocks/typographyTypes";
 import {
+  BuilderNodeSchema,
   NodeDataSourceSchema,
   NodeIdSchema as StrictNodeIdSchema,
   NodeMetadataSchema,
@@ -50,7 +51,12 @@ import {
   preflightBuilderNodeArrayInput,
   preflightBuilderNodeInput,
 } from "../lib/rendering/canonical/preflight";
-import type { RenderSurfaceKind } from "../lib/rendering/canonical";
+import {
+  RenderContractError,
+  createRenderFailure,
+  renderSurfaceKindForCollection,
+  type RenderSurfaceKind,
+} from "../lib/rendering/canonical";
 import { throwSafeRenderContractActionError } from "./_renderContractError";
 
 type LogLevel = "debug" | "info" | "warn" | "error";
@@ -68,15 +74,60 @@ function collectionMutationKind(
   }
 }
 
-function collectionSurfaceKind(collection: CollectionType): RenderSurfaceKind {
-  switch (collection) {
-    case "pages":
-      return "page";
-    case "layouts":
-      return "layout";
-    case "components":
-      return "component";
+function invalidBuilderNodeInput(
+  kind: RenderSurfaceKind,
+  issueCount: number,
+): RenderContractError {
+  return new RenderContractError(
+    createRenderFailure("RENDER_INPUT_INVALID", {
+      surfaceKind: kind,
+      stage: "schema",
+      issue: "builder-node-schema",
+      issueCount,
+    }),
+  );
+}
+
+function withGeneratedNodeIds(value: unknown): unknown {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return value;
   }
+  const record = value as Record<string, unknown>;
+  const children = Array.isArray(record.children)
+    ? record.children.map(withGeneratedNodeIds)
+    : record.children;
+  return {
+    ...record,
+    ...(children === undefined ? {} : { children }),
+    id:
+      typeof record.id === "string" && record.id.length > 0
+        ? record.id
+        : generateNodeId(),
+  };
+}
+
+function parsePreflightedBuilderNode(
+  kind: RenderSurfaceKind,
+  value: unknown,
+  generateMissingId = false,
+): BuilderNode {
+  const parsed = BuilderNodeSchema.safeParse(
+    generateMissingId ? withGeneratedNodeIds(value) : value,
+  );
+  if (!parsed.success) {
+    throw invalidBuilderNodeInput(kind, parsed.error.issues.length);
+  }
+  return parsed.data;
+}
+
+function parsePreflightedBuilderNodes(
+  kind: RenderSurfaceKind,
+  value: unknown,
+): BuilderNode[] {
+  if (!Array.isArray(value)) {
+    throw invalidBuilderNodeInput(kind, 1);
+  }
+  return value.map((node) => parsePreflightedBuilderNode(kind, node, true));
 }
 
 async function authorizeNodeMutation(
@@ -650,16 +701,15 @@ export async function handleInsertNodes(
       sanitizedId,
     );
 
+    const surfaceKind = renderSurfaceKindForCollection(input.collection);
     const preflightedNodes = preflightBuilderNodeArrayInput({
-      kind: collectionSurfaceKind(input.collection),
+      kind: surfaceKind,
       nodes: input.nodes,
-    }).source as BuilderNode[];
-    const normalizedNodes = preflightedNodes.map((node) =>
-      normalizeNodeForPersist({
-        ...node,
-        id: node.id || generateNodeId(),
-      } as BuilderNode),
-    );
+    }).source;
+    const normalizedNodes = parsePreflightedBuilderNodes(
+      surfaceKind,
+      preflightedNodes,
+    ).map(normalizeNodeForPersist);
     if (nodeListContainsNavigation(normalizedNodes)) {
       await ensureNavigationPresetClassesForAdapter(adapter, authorship);
     }
@@ -951,15 +1001,16 @@ export const nodes = {
           sanitizedId,
         );
 
-        // Ensure node has an ID
+        const surfaceKind = renderSurfaceKindForCollection(input.collection);
         const preflightedNode = preflightBuilderNodeInput({
-          kind: collectionSurfaceKind(input.collection),
+          kind: surfaceKind,
           node: input.node,
-        }).source as BuilderNode;
-        const nodeToInsert: BuilderNode = {
-          ...preflightedNode,
-          id: preflightedNode.id || generateNodeId(),
-        } as BuilderNode;
+        }).source;
+        const nodeToInsert = parsePreflightedBuilderNode(
+          surfaceKind,
+          preflightedNode,
+          true,
+        );
 
         const normalizedNodeToInsert = normalizeNodeForPersist(nodeToInsert);
         if (nodeTreeContainsNavigation(normalizedNodeToInsert)) {
@@ -1085,20 +1136,22 @@ export const nodes = {
           );
         }
 
-        const preflightedReplacement = preflightBuilderNodeInput({
-          kind: collectionSurfaceKind(input.collection),
-          node: input.node,
-        }).source as BuilderNode;
+        const surfaceKind = renderSurfaceKindForCollection(input.collection);
+        const preflightedReplacement = parsePreflightedBuilderNode(
+          surfaceKind,
+          preflightBuilderNodeInput({
+            kind: surfaceKind,
+            node: input.node,
+          }).source,
+        );
         if (preflightedReplacement.id !== input.nodeId) {
-          throw createError(
-            "RENDER_INPUT_INVALID",
-            "The render input is invalid.",
-            {
-              surfaceKind: collectionSurfaceKind(input.collection),
+          throw new RenderContractError(
+            createRenderFailure("RENDER_INPUT_INVALID", {
+              surfaceKind,
               stage: "preflight",
               issue: "replacement-node-id-mismatch",
               issueCount: 1,
-            },
+            }),
           );
         }
         const normalizedReplacement = normalizeNodeForPersist(

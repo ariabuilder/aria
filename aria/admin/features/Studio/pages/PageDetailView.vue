@@ -348,10 +348,8 @@ const savedPageContentSnapshot = ref<string | null>(null);
 const isPageContentDirty = computed(
   () =>
     savedPageContentSnapshot.value !== null &&
-    serializePageContentDraft(
-      page.value?.nodes,
-      page.value?.featuredImage,
-    ) !== savedPageContentSnapshot.value,
+    serializePageContentDraft(page.value?.nodes, page.value?.featuredImage) !==
+      savedPageContentSnapshot.value,
 );
 
 function markPageContentDraftSaved(
@@ -674,9 +672,9 @@ watch(
   { immediate: true },
 );
 
-const pageStatus = computed<
-  "draft" | "published" | "scheduled" | "archived"
->(() => currentBuilderPage.value?.status ?? "draft");
+const pageStatus = computed<"draft" | "published" | "scheduled" | "archived">(
+  () => currentBuilderPage.value?.status ?? "draft",
+);
 
 const pageScheduledFor = computed(
   () => currentBuilderPage.value?.scheduledFor ?? null,
@@ -799,8 +797,8 @@ function bumpPreviewRefreshToken(): void {
 
 const previewBreakpoints = useCanonicalBreakpoints({ autoLoad: true });
 const pagePreviewViewport = ref("base");
-const pagePreviewViewportOptions = computed(() =>
-  previewBreakpoints.activeViewports.value,
+const pagePreviewViewportOptions = computed(
+  () => previewBreakpoints.activeViewports.value,
 );
 
 const orderedPagePreviewViewportOptions = computed(() => {
@@ -932,7 +930,10 @@ onMounted(async () => {
     },
   }));
 
-  window.addEventListener(AGENT_PAGE_SEO_UPDATED_EVENT, handleAgentPageSeoUpdated);
+  window.addEventListener(
+    AGENT_PAGE_SEO_UPDATED_EVENT,
+    handleAgentPageSeoUpdated,
+  );
   await reloadPageDetail();
   applyRouteTabQuery();
 });
@@ -1036,7 +1037,9 @@ async function handleRevertVersion(versionId: string): Promise<void> {
       undo: async () => {
         const expectedVersion = page.value?.version;
         if (!expectedVersion) {
-          throw new Error("Reload this page before restoring its previous state");
+          throw new Error(
+            "Reload this page before restoring its previous state",
+          );
         }
         const updateResult = unwrapStudioCrudActionResult(
           "update",
@@ -1156,9 +1159,7 @@ const submitPageDetailForm = handleSubmit(async (formData) => {
       expectedVersion,
     });
     if (result.error) {
-      throw new Error(
-        result.error.message || t("pages.detail.pageSaveFailed"),
-      );
+      throw new Error(result.error.message || t("pages.detail.pageSaveFailed"));
     }
     const saved = PageDetailSaveResultSchema.safeParse(result.data);
     if (!saved.success) {
@@ -1225,9 +1226,12 @@ const submitPageDetailForm = handleSubmit(async (formData) => {
     await refreshPagesNow().catch(() => undefined);
 
     if (policySaveError) {
-      toast.error(`Page saved, but access settings failed: ${policySaveError}`, {
-        id: PAGE_DETAIL_OPERATION_TOAST_ID,
-      });
+      toast.error(
+        `Page saved, but access settings failed: ${policySaveError}`,
+        {
+          id: PAGE_DETAIL_OPERATION_TOAST_ID,
+        },
+      );
     } else {
       toast.success(t("pages.detail.pageSaved"), {
         id: PAGE_DETAIL_OPERATION_TOAST_ID,
@@ -1326,6 +1330,7 @@ async function handlePublishNow(): Promise<void> {
     const result = await actions.publishing.publish({
       id: pageToPublish.id,
       expectedVersion: requestedVersion,
+      skipCSSRegeneration: true,
     });
     assertPublishActionSucceeded(result);
     await refreshAfterPublishMutation(pageToPublish.slug);
@@ -1359,12 +1364,15 @@ async function handleSchedulePublish(scheduledFor?: string): Promise<void> {
     const result = await actions.publishing.publish({
       id: pageToPublish.id,
       expectedVersion: requestedVersion,
+      skipCSSRegeneration: true,
       scheduledFor,
     });
     assertPublishActionSucceeded(result);
     await refreshAfterPublishMutation(pageToPublish.slug);
     toast.success(
-      scheduledFor ? t("pages.detail.pageScheduled") : t("pages.detail.pagePublished"),
+      scheduledFor
+        ? t("pages.detail.pageScheduled")
+        : t("pages.detail.pagePublished"),
       { id: PAGE_DETAIL_OPERATION_TOAST_ID },
     );
   } catch (err) {
@@ -1441,7 +1449,9 @@ const pageBreadcrumbs = computed(() => [
   { label: t("pages.title"), href: "/pages" },
   {
     label:
-      page.value?.title || currentBuilderPage.value?.title || t("pages.detail.loading"),
+      page.value?.title ||
+      currentBuilderPage.value?.title ||
+      t("pages.detail.loading"),
   },
 ]);
 
@@ -1549,10 +1559,7 @@ function handleToggleSectionVisibility(sectionId: string): void {
   persistPageStructure(nextNodes);
 }
 
-function handleMoveSection(
-  sectionId: string,
-  direction: "up" | "down",
-): void {
+function handleMoveSection(sectionId: string, direction: "up" | "down"): void {
   const currentNodes = page.value?.nodes ?? [];
   const currentIndex = currentNodes.findIndex((node) => node.id === sectionId);
   if (currentIndex < 0) return;
@@ -1730,10 +1737,7 @@ async function handleTypeTabCollectionAssigned(): Promise<void> {
         };
       }
     }
-    await Promise.all([
-      cmsTemplateAssignments.refresh(),
-      refreshPagesNow(),
-    ]);
+    await Promise.all([cmsTemplateAssignments.refresh(), refreshPagesNow()]);
     dispatchCmsPageUsageUpdated();
   } finally {
     isPageTypeAssignmentSyncing.value = false;
@@ -1827,30 +1831,34 @@ function handleDeleteClick() {
 
 <template>
   <div class="flex h-full min-h-0 flex-col bg-sidebar">
-          <!-- Modified banner -->
-          <Transition name="banner-slide">
-        <div
-          v-if="isModified"
-          class="flex shrink-0 items-center justify-center gap-2 overflow-hidden px-5 pb-2 text-sm text-primary bg-sidebar"
+    <!-- Modified banner -->
+    <Transition name="banner-slide">
+      <div
+        v-if="isModified"
+        class="flex shrink-0 items-center justify-center gap-2 overflow-hidden px-5 pb-2 text-sm text-primary bg-sidebar"
+      >
+        <span :class="[studioIcons.warning, 'size-3.5 shrink-0']" />
+        <span>{{ t("pages.detail.unpublishedChanges") }}</span>
+        <Button
+          v-if="canPublish"
+          variant="link"
+          size="sm"
+          class="h-auto p-0 text-sm text-primary/90 underline hover:text-primary"
+          :disabled="isPublishing"
+          @click="handlePublishNow"
         >
-          <span :class="[studioIcons.warning, 'size-3.5 shrink-0']" />
-          <span>{{ t("pages.detail.unpublishedChanges") }}</span>
-          <Button
-            v-if="canPublish"
-            variant="link"
-            size="sm"
-            class="h-auto p-0 text-sm text-primary/90 underline hover:text-primary"
-            :disabled="isPublishing"
-            @click="handlePublishNow"
-          >
-            <span
-              v-if="isPublishing"
-              class="i-hugeicons:loading-01 mr-1.5 size-3.5 animate-spin"
-            />
-            {{ isPublishing ? t("pages.action.publishing") : t("pages.detail.publishNow") }}
-          </Button>
-        </div>
-      </Transition>
+          <span
+            v-if="isPublishing"
+            class="i-hugeicons:loading-01 mr-1.5 size-3.5 animate-spin"
+          />
+          {{
+            isPublishing
+              ? t("pages.action.publishing")
+              : t("pages.detail.publishNow")
+          }}
+        </Button>
+      </div>
+    </Transition>
 
     <section
       class="relative isolate flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-md border border-solid border-border bg-background"
@@ -1864,11 +1872,7 @@ function handleDeleteClick() {
         class="flex min-w-0 w-full max-w-full items-center justify-between px-3 pt-3 shrink-0 page-card-enter"
       >
         <div class="flex min-w-0 flex-1 items-center gap-1.5">
-          <Button
-            variant="bread"
-            size="icon"
-            @click="handleBack"
-          >
+          <Button variant="bread" size="icon" @click="handleBack">
             <span :class="[studioIcons.chevronLeft, 'size-4']" />
           </Button>
           <Breadcrumbs :items="pageBreadcrumbs" />
@@ -1876,7 +1880,9 @@ function handleDeleteClick() {
       </header>
 
       <PageHeader
-        :title="page?.title || currentBuilderPage?.title || t('pages.detail.loading')"
+        :title="
+          page?.title || currentBuilderPage?.title || t('pages.detail.loading')
+        "
         class="page-card-enter"
         hide-search
         hide-create
@@ -1898,9 +1904,12 @@ function handleDeleteClick() {
               class="m-0 block min-w-0 truncate text-left font-serif text-2xl font-medium tracking-tight text-foreground transition-colors hover:text-primary"
               @click="startTitleEdit"
             >
-              {{ page?.title || currentBuilderPage?.title || t("pages.detail.loading") }}
+              {{
+                page?.title ||
+                currentBuilderPage?.title ||
+                t("pages.detail.loading")
+              }}
             </button>
-
           </div>
         </template>
 
@@ -1945,14 +1954,18 @@ function handleDeleteClick() {
             :is-busy="isPublishing"
             :scheduled-for="pageScheduledFor"
             :publish-disabled-reason="publishDisabledReason"
-            :unpublish-forbidden-message="getForbiddenMessage('publishing.unpublish')"
+            :unpublish-forbidden-message="
+              getForbiddenMessage('publishing.unpublish')
+            "
             :archive-forbidden-message="
               pageStatus === 'archived'
                 ? getForbiddenMessage('publishing.unarchive')
                 : getForbiddenMessage('publishing.archive')
             "
             :delete-forbidden-message="getForbiddenMessage('crud.deleteItem')"
-            :schedule-forbidden-message="getForbiddenMessage('publishing.publish')"
+            :schedule-forbidden-message="
+              getForbiddenMessage('publishing.publish')
+            "
             @schedule="handleSchedulePublish"
             @reschedule="handleSchedulePublish"
             @cancel-schedule="handleUnpublish"
@@ -1976,7 +1989,7 @@ function handleDeleteClick() {
             :is-modified-since-publish="
               Boolean(
                 currentBuilderPage?.isModifiedSincePublish ||
-                  hasUnsavedPageChanges,
+                hasUnsavedPageChanges,
               )
             "
             :can-publish="canPublish"
@@ -2167,7 +2180,6 @@ function handleDeleteClick() {
                 :url="googlePreview.url"
                 :title-length-warning="googlePreview.title.length > 60"
               />
-
             </template>
 
             <template v-else>
@@ -2177,7 +2189,9 @@ function handleDeleteClick() {
               >
                 <div class="flex items-center justify-between gap-3 px-5 pt-3">
                   <div class="min-w-0">
-                    <p class="m-0 text-sm font-semibold leading-none text-foreground">
+                    <p
+                      class="m-0 text-sm font-semibold leading-none text-foreground"
+                    >
                       {{ t("pages.detail.pagePreview") }}
                     </p>
                   </div>
@@ -2202,7 +2216,11 @@ function handleDeleteClick() {
                               ? 'border-primary/60 bg-sidebar text-foreground'
                               : ''
                           "
-                          :aria-label="t('pages.detail.previewViewport', { viewport: option.label })"
+                          :aria-label="
+                            t('pages.detail.previewViewport', {
+                              viewport: option.label,
+                            })
+                          "
                           :aria-pressed="option.id === pagePreviewViewport"
                           @click="pagePreviewViewport = option.id"
                         >
@@ -2221,7 +2239,9 @@ function handleDeleteClick() {
                     </div>
 
                     <HeaderActionTooltip
-                      :label="previewDisabledReason ?? t('pages.detail.openPreview')"
+                      :label="
+                        previewDisabledReason ?? t('pages.detail.openPreview')
+                      "
                       :disabled="Boolean(previewDisabledReason)"
                     >
                       <Button
@@ -2243,7 +2263,9 @@ function handleDeleteClick() {
                     type="button"
                     class="relative block w-full overflow-hidden rounded-lg border border-border bg-muted/20 transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-60"
                     :disabled="Boolean(previewDisabledReason)"
-                    :title="previewDisabledReason ?? t('pages.detail.openPreview')"
+                    :title="
+                      previewDisabledReason ?? t('pages.detail.openPreview')
+                    "
                     @click="openPreview"
                   >
                     <div class="aspect-4/5 w-full">
@@ -2261,10 +2283,7 @@ function handleDeleteClick() {
                         class="pointer-events-none h-full w-full !rounded-none !border-0"
                       />
                     </div>
-                    <span
-                      class="absolute inset-0 z-10"
-                      aria-hidden="true"
-                    />
+                    <span class="absolute inset-0 z-10" aria-hidden="true" />
                   </button>
                 </div>
               </div>
@@ -2305,7 +2324,11 @@ function handleDeleteClick() {
       :impact="blockedImpact"
       :can-unbind="canUnbindCollections"
       :is-loading="isUnbinding"
-      @update:open="(open: boolean) => { if (!open) cancelBlockedDelete(); }"
+      @update:open="
+        (open: boolean) => {
+          if (!open) cancelBlockedDelete();
+        }
+      "
       @cancel="cancelBlockedDelete()"
       @unbind-and-delete="
         void confirmUnbindAndDelete().then((deleted) => {
@@ -2341,9 +2364,14 @@ function handleDeleteClick() {
         <DialogHeader>
           <DialogTitle>{{ t("pages.detail.notFoundAssigned") }}</DialogTitle>
           <DialogDescription>
-            {{ t("pages.detail.notFoundOverride", {
-              page: existingNotFoundPage?.title ?? existingNotFoundPage?.slug ?? "",
-            }) }}
+            {{
+              t("pages.detail.notFoundOverride", {
+                page:
+                  existingNotFoundPage?.title ??
+                  existingNotFoundPage?.slug ??
+                  "",
+              })
+            }}
           </DialogDescription>
         </DialogHeader>
         <DialogFooter>
@@ -2354,7 +2382,11 @@ function handleDeleteClick() {
             :disabled="isPageAccessSaving"
             @click="void confirmNotFoundOverride()"
           >
-            {{ isPageAccessSaving ? t("pages.detail.saving") : t("pages.detail.overrideNotFound") }}
+            {{
+              isPageAccessSaving
+                ? t("pages.detail.saving")
+                : t("pages.detail.overrideNotFound")
+            }}
           </Button>
         </DialogFooter>
       </DialogContent>

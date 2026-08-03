@@ -19,7 +19,12 @@ const { actionsMock, toastMock } = vi.hoisted(() => ({
         error: null,
       })),
     },
-    getItem: vi.fn(async () => ({ data: { nodes: [] }, error: null })),
+    getItem: vi.fn(
+      async (): Promise<{
+        data: { nodes: BuilderNode[] };
+        error: null;
+      }> => ({ data: { nodes: [] }, error: null }),
+    ),
   },
   toastMock: {
     success: vi.fn(),
@@ -182,11 +187,12 @@ function createComponentHandlersForTest(input: {
   } | null;
   getDefaultSlotName: () => string;
   regenerateNodeIds?: (node: BuilderNode) => BuilderNode;
+  editorNodeRegistry?: ReturnType<typeof useEditorNodeRegistry>;
 }) {
   const options = {
     pageBlocks: input.pageBlocks as Ref<BuilderNode[]>,
     currentPage: input.currentPage as Ref<PageDSL | null>,
-    currentLayout: input.currentLayout as Ref<null>,
+    currentLayout: input.currentLayout as Ref<LayoutDSL | null>,
     currentComponent: input.currentComponent as Ref<null>,
     nodeManipulation: {
       findNodeById: findTestNodeById,
@@ -201,6 +207,7 @@ function createComponentHandlersForTest(input: {
     handleElementAdded: input.handleElementAdded ?? (() => null),
     resolveMutationPath: input.resolveMutationPath,
     getDefaultSlotName: input.getDefaultSlotName,
+    editorNodeRegistry: input.editorNodeRegistry,
   } as ComponentHandlersOptions;
 
   return useNodeComponentHandlers(options);
@@ -1049,6 +1056,366 @@ describe("extracted node event handlers", () => {
     expect(executeNodeEventOperation).toHaveBeenCalledTimes(1);
   });
 
+  it("detaches a nested page component and replays undo and redo", async () => {
+    const component = {
+      ...createNode("component-1", "Component", [
+        createNode("detached-a", "Heading"),
+        createNode("detached-b", "Text"),
+      ]),
+      componentRef: "hero-banner",
+      reference: { type: "instance" as const, masterId: "hero-banner" },
+    };
+    const pageBlocks = pageBlocksRef([
+      createNode("parent", "Container", [
+        createNode("before", "Text"),
+        component,
+        createNode("after", "Text"),
+      ]),
+    ]);
+    let historyCallbacks:
+      | {
+          undo: () => void | Promise<void>;
+          redo: () => void | Promise<void>;
+        }
+      | undefined;
+    const executeNodeEventOperation = vi.fn(
+      async (
+        _metadata: unknown,
+        callbacks: {
+          undo: () => void | Promise<void>;
+          redo: () => void | Promise<void>;
+        },
+      ) => {
+        historyCallbacks = callbacks;
+        await callbacks.redo();
+        return { success: true };
+      },
+    );
+    const setSelectedBlock = vi.fn();
+    const { handleDetachComponent } = createComponentHandlersForTest({
+      pageBlocks,
+      currentPage: ref(null),
+      currentLayout: ref(null),
+      currentComponent: ref(null),
+      executeNodeEventOperation,
+      setSelectedBlock,
+      resolveMutationPath: () => ({ collection: "pages", id: "page-1" }),
+      getDefaultSlotName: () => "main",
+    });
+
+    await handleDetachComponent("component-1");
+
+    expect(collectNodeIds(pageBlocks.value[0]?.children)).toEqual([
+      "before",
+      "detached-a",
+      "detached-b",
+      "after",
+    ]);
+    expect(setSelectedBlock).toHaveBeenLastCalledWith(null);
+
+    await historyCallbacks?.undo();
+    expect(collectNodeIds(pageBlocks.value[0]?.children)).toEqual([
+      "before",
+      "component-1",
+      "after",
+    ]);
+    expect(setSelectedBlock).toHaveBeenLastCalledWith("component-1");
+
+    await historyCallbacks?.redo();
+    expect(collectNodeIds(pageBlocks.value[0]?.children)).toEqual([
+      "before",
+      "detached-a",
+      "detached-b",
+      "after",
+    ]);
+  });
+
+  it("detaches a root component from shared layout slot content", async () => {
+    const component = {
+      ...createNode("header-component", "Component", [
+        createNode("header-logo", "Image"),
+        createNode("header-nav", "Navigation"),
+      ]),
+      componentRef: "site-header",
+      reference: { type: "instance" as const, masterId: "site-header" },
+    };
+    const pageBlocks = pageBlocksRef([createNode("main-page", "Section")]);
+    const currentLayout = layoutRef({
+      id: "layout-1",
+      name: "Default",
+      slots: [
+        {
+          name: "header",
+          defaultContent: [
+            createNode("header-before", "Text"),
+            component,
+            createNode("header-after", "Text"),
+          ],
+        },
+        { name: "main", isDefault: true },
+      ],
+    } as LayoutDSL);
+    const activeSlot = ref({ name: "header", scope: "layout" as const });
+    const editorNodeRegistry = useEditorNodeRegistry({
+      pageBlocks,
+      currentLayout,
+      activeSlot,
+      currentItemType: ref("page"),
+    });
+    let historyCallbacks:
+      | {
+          undo: () => void | Promise<void>;
+          redo: () => void | Promise<void>;
+        }
+      | undefined;
+    const executeNodeEventOperation = vi.fn(
+      async (
+        _metadata: unknown,
+        callbacks: {
+          undo: () => void | Promise<void>;
+          redo: () => void | Promise<void>;
+        },
+      ) => {
+        historyCallbacks = callbacks;
+        await callbacks.redo();
+        return { success: true };
+      },
+    );
+    const { handleDetachComponent } = createComponentHandlersForTest({
+      pageBlocks,
+      currentPage: ref(null),
+      currentLayout,
+      currentComponent: ref(null),
+      executeNodeEventOperation,
+      setSelectedBlock: vi.fn(),
+      resolveMutationPath: () => ({ collection: "pages", id: "page-1" }),
+      getDefaultSlotName: () => "main",
+      editorNodeRegistry,
+    });
+
+    await handleDetachComponent("header-component");
+
+    const headerIds = () =>
+      collectNodeIds(
+        currentLayout.value?.slots?.find((slot) => slot.name === "header")
+          ?.defaultContent,
+      );
+    expect(headerIds()).toEqual([
+      "header-before",
+      "header-logo",
+      "header-nav",
+      "header-after",
+    ]);
+    expect(collectNodeIds(pageBlocks.value)).toEqual(["main-page"]);
+
+    await historyCallbacks?.undo();
+    expect(headerIds()).toEqual([
+      "header-before",
+      "header-component",
+      "header-after",
+    ]);
+
+    await historyCallbacks?.redo();
+    expect(headerIds()).toEqual([
+      "header-before",
+      "header-logo",
+      "header-nav",
+      "header-after",
+    ]);
+  });
+
+  it("detaches a nested component within a shared layout slot", async () => {
+    const component = {
+      ...createNode("nested-component", "Component", [
+        createNode("nested-content", "Text"),
+      ]),
+      componentRef: "announcement",
+      reference: { type: "instance" as const, masterId: "announcement" },
+    };
+    const pageBlocks = pageBlocksRef([createNode("main-page", "Section")]);
+    const currentLayout = layoutRef({
+      id: "layout-1",
+      name: "Default",
+      slots: [
+        {
+          name: "header",
+          defaultContent: [
+            createNode("header-root", "Container", [
+              createNode("nested-before", "Text"),
+              component,
+              createNode("nested-after", "Text"),
+            ]),
+          ],
+        },
+        { name: "main", isDefault: true },
+      ],
+    } as LayoutDSL);
+    const activeSlot = ref({ name: "header", scope: "layout" as const });
+    const editorNodeRegistry = useEditorNodeRegistry({
+      pageBlocks,
+      currentLayout,
+      activeSlot,
+      currentItemType: ref("page"),
+    });
+    const { handleDetachComponent } = createComponentHandlersForTest({
+      pageBlocks,
+      currentPage: ref(null),
+      currentLayout,
+      currentComponent: ref(null),
+      executeNodeEventOperation: createNodeEventExecutorMock({ runRedo: true }),
+      setSelectedBlock: vi.fn(),
+      resolveMutationPath: () => ({ collection: "pages", id: "page-1" }),
+      getDefaultSlotName: () => "main",
+      editorNodeRegistry,
+    });
+
+    await handleDetachComponent("nested-component");
+
+    expect(
+      currentLayout.value?.slots?.[0]?.defaultContent?.[0]?.children.map(
+        (node) => node.id,
+      ),
+    ).toEqual(["nested-before", "nested-content", "nested-after"]);
+    expect(collectNodeIds(pageBlocks.value)).toEqual(["main-page"]);
+  });
+
+  it("regenerates fetched component identities once before detaching", async () => {
+    const pageBlocks = pageBlocksRef([
+      {
+        ...createNode("component-1", "Component"),
+        componentRef: "hero-banner",
+        reference: { type: "instance" as const, masterId: "hero-banner" },
+      },
+    ]);
+    actionsMock.getItem.mockResolvedValueOnce({
+      data: {
+        nodes: [
+          createNode("master-heading", "Heading"),
+          createNode("master-copy", "Text"),
+        ],
+      },
+      error: null,
+    });
+    const regenerateNodeIds = vi.fn((node: BuilderNode) => ({
+      ...node,
+      id: `${node.id}-detached`,
+    }));
+    const { handleDetachComponent } = createComponentHandlersForTest({
+      pageBlocks,
+      currentPage: ref(null),
+      currentLayout: ref(null),
+      currentComponent: ref(null),
+      executeNodeEventOperation: createNodeEventExecutorMock({ runRedo: true }),
+      setSelectedBlock: vi.fn(),
+      resolveMutationPath: () => ({ collection: "pages", id: "page-1" }),
+      getDefaultSlotName: () => "main",
+      regenerateNodeIds,
+    });
+
+    await handleDetachComponent("component-1");
+
+    expect(regenerateNodeIds).toHaveBeenCalledTimes(2);
+    expect(collectNodeIds(pageBlocks.value)).toEqual([
+      "master-heading-detached",
+      "master-copy-detached",
+    ]);
+  });
+
+  it("does not mutate or create history when detached content is unavailable", async () => {
+    const pageBlocks = pageBlocksRef([
+      {
+        ...createNode("component-1", "Component"),
+        componentRef: "empty-component",
+        reference: { type: "instance" as const, masterId: "empty-component" },
+      },
+    ]);
+    actionsMock.getItem.mockResolvedValueOnce({
+      data: { nodes: [] },
+      error: null,
+    });
+    const executeNodeEventOperation = createNodeEventExecutorMock({
+      runRedo: true,
+    });
+    const { handleDetachComponent } = createComponentHandlersForTest({
+      pageBlocks,
+      currentPage: ref(null),
+      currentLayout: ref(null),
+      currentComponent: ref(null),
+      executeNodeEventOperation,
+      setSelectedBlock: vi.fn(),
+      resolveMutationPath: () => ({ collection: "pages", id: "page-1" }),
+      getDefaultSlotName: () => "main",
+    });
+
+    await handleDetachComponent("component-1");
+
+    expect(collectNodeIds(pageBlocks.value)).toEqual(["component-1"]);
+    expect(executeNodeEventOperation).not.toHaveBeenCalled();
+    expect(toastMock.error).toHaveBeenCalledWith(
+      "Component has no content to detach",
+    );
+  });
+
+  it("does not mutate or create history when the detach target is unresolved", async () => {
+    const pageBlocks = pageBlocksRef([createNode("heading-1", "Heading")]);
+    const executeNodeEventOperation = createNodeEventExecutorMock({
+      runRedo: true,
+    });
+    const { handleDetachComponent } = createComponentHandlersForTest({
+      pageBlocks,
+      currentPage: ref(null),
+      currentLayout: ref(null),
+      currentComponent: ref(null),
+      executeNodeEventOperation,
+      setSelectedBlock: vi.fn(),
+      resolveMutationPath: () => ({ collection: "pages", id: "page-1" }),
+      getDefaultSlotName: () => "main",
+    });
+
+    await handleDetachComponent("missing-node");
+
+    expect(collectNodeIds(pageBlocks.value)).toEqual(["heading-1"]);
+    expect(executeNodeEventOperation).not.toHaveBeenCalled();
+    expect(toastMock.error).toHaveBeenCalledWith("Component not found");
+  });
+
+  it("does not mutate or create history when component loading fails", async () => {
+    const pageBlocks = pageBlocksRef([
+      {
+        ...createNode("component-1", "Component"),
+        componentRef: "missing-component",
+        reference: {
+          type: "instance" as const,
+          masterId: "missing-component",
+        },
+      },
+    ]);
+    actionsMock.getItem.mockRejectedValueOnce(
+      new Error("Component unavailable"),
+    );
+    const executeNodeEventOperation = createNodeEventExecutorMock({
+      runRedo: true,
+    });
+    const { handleDetachComponent } = createComponentHandlersForTest({
+      pageBlocks,
+      currentPage: ref(null),
+      currentLayout: ref(null),
+      currentComponent: ref(null),
+      executeNodeEventOperation,
+      setSelectedBlock: vi.fn(),
+      resolveMutationPath: () => ({ collection: "pages", id: "page-1" }),
+      getDefaultSlotName: () => "main",
+    });
+
+    await handleDetachComponent("component-1");
+
+    expect(collectNodeIds(pageBlocks.value)).toEqual(["component-1"]);
+    expect(executeNodeEventOperation).not.toHaveBeenCalled();
+    expect(toastMock.error).toHaveBeenCalledWith(
+      "Failed to fetch component content",
+    );
+  });
+
   it("replaces a block with a component instance", async () => {
     const pageBlocks = pageBlocksRef([
       createNode("heading-1", "Heading"),
@@ -1088,6 +1455,77 @@ describe("extracted node event handlers", () => {
     expect(toastMock.success).toHaveBeenCalledWith(
       "Converted Heading to component",
     );
+  });
+
+  it("replaces a block in shared layout slot content with a component", async () => {
+    const pageBlocks = pageBlocksRef([createNode("main-page", "Section")]);
+    const currentLayout = layoutRef({
+      id: "layout-1",
+      name: "Default",
+      slots: [
+        {
+          name: "header",
+          defaultContent: [createNode("header-heading", "Heading")],
+        },
+        { name: "main", isDefault: true },
+      ],
+    } as LayoutDSL);
+    const activeSlot = ref({ name: "header", scope: "layout" as const });
+    const editorNodeRegistry = useEditorNodeRegistry({
+      pageBlocks,
+      currentLayout,
+      activeSlot,
+      currentItemType: ref("page"),
+    });
+    let historyCallbacks:
+      | {
+          undo: () => void | Promise<void>;
+          redo: () => void | Promise<void>;
+        }
+      | undefined;
+    const executeNodeEventOperation = vi.fn(
+      async (
+        _metadata: unknown,
+        callbacks: {
+          undo: () => void | Promise<void>;
+          redo: () => void | Promise<void>;
+        },
+      ) => {
+        historyCallbacks = callbacks;
+        await callbacks.redo();
+        return { success: true };
+      },
+    );
+    const { handleReplaceBlockWithComponent } = createComponentHandlersForTest({
+      pageBlocks,
+      currentPage: ref(null),
+      currentLayout,
+      currentComponent: ref(null),
+      executeNodeEventOperation,
+      setSelectedBlock: vi.fn(),
+      resolveMutationPath: () => ({ collection: "pages", id: "page-1" }),
+      getDefaultSlotName: () => "main",
+      editorNodeRegistry,
+    });
+
+    await handleReplaceBlockWithComponent("header-heading", "site-header");
+
+    expect(currentLayout.value?.slots?.[0]?.defaultContent?.[0]).toMatchObject({
+      id: "header-heading",
+      type: "Component",
+      componentRef: "site-header",
+      reference: { type: "instance", masterId: "site-header" },
+    });
+    expect(collectNodeIds(pageBlocks.value)).toEqual(["main-page"]);
+
+    await historyCallbacks?.undo();
+    const restored = currentLayout.value?.slots?.[0]?.defaultContent?.[0];
+    expect(restored).toMatchObject({
+      id: "header-heading",
+      type: "Heading",
+    });
+    expect(restored?.componentRef).toBeUndefined();
+    expect(restored?.reference).toBeUndefined();
   });
 
   it("reorders nodes from layers handler", () => {

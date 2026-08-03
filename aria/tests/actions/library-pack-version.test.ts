@@ -10,7 +10,7 @@ const { getComponentDSLMock, saveComponentDSLMock, touchContentRevisionMock } =
     touchContentRevisionMock: vi.fn(),
   }));
 
-const { manifest, payload } = vi.hoisted(() => {
+const { manifest, payload, starterManifest } = vi.hoisted(() => {
   const packManifest: PackManifest = {
     id: "test-pack",
     name: "Test Pack",
@@ -21,6 +21,14 @@ const { manifest, payload } = vi.hoisted(() => {
   };
   return {
     manifest: packManifest,
+    starterManifest: {
+      id: "aria-free-pack",
+      name: "Starter Button Pack",
+      version: "3.2.1",
+      tier: "free" as const,
+      componentIds: ["aria.button"],
+      publishedAt: "2026-08-02T00:00:00.000Z",
+    },
     payload: {
       manifest: packManifest,
       components: [
@@ -53,7 +61,7 @@ vi.mock("../../lib/registry/seed", () => ({
   SEEDED_REGISTRY_MANIFEST: {
     schemaVersion: "1",
     updatedAt: "2026-08-02T00:00:00.000Z",
-    packs: [manifest],
+    packs: [manifest, starterManifest],
   },
   getSeededPayload: vi.fn(() => payload),
 }));
@@ -86,6 +94,13 @@ describe("library pack versions", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     getComponentDSLMock.mockResolvedValue(null);
+  });
+
+  it("prefers the seeded starter-pack semver over the component revision", async () => {
+    const { resolveStarterButtonPackVersion } =
+      await import("../../actions/library");
+
+    expect(resolveStarterButtonPackVersion()).toBe(starterManifest.version);
   });
 
   it("reports the lowest valid installed pack version", async () => {

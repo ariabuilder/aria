@@ -13,7 +13,10 @@ import {
   getPublicPageCacheTags,
   purgePublicCacheTags,
 } from "../../lib/cache/service";
-import { touchContentRevisionForAction } from "../../lib/content-sync/mutations";
+import {
+  deliverContentRevisionForAction,
+  touchContentRevisionForAction,
+} from "../../lib/content-sync/mutations";
 
 describe("public page cache", () => {
   const originalFetch = globalThis.fetch;
@@ -103,5 +106,26 @@ describe("public page cache", () => {
         body: JSON.stringify({ tags: [getAllPublicPagesCacheTag()] }),
       }),
     );
+  });
+
+  it("does not purge public pages for a draft component delivery", async () => {
+    await deliverContentRevisionForAction(
+      {
+        scope: "default",
+        currentRevisionId: "rev-2",
+        revisionSeq: 2,
+        updatedAt: "2026-08-02T23:00:00.000Z",
+        lastMutationKind: "save-component",
+        lastMutationTarget: "header",
+      },
+      {
+        mutationKind: "save-component",
+        mutationTarget: "header",
+      },
+      { locals: {} },
+      { purgePublicPages: false },
+    );
+
+    expect(globalThis.fetch).not.toHaveBeenCalled();
   });
 });

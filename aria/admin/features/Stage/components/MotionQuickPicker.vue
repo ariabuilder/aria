@@ -59,15 +59,15 @@ function selectPreset(presetId: MotionPresetId): void {
     <PopoverTrigger as-child>
       <Button
         type="button"
-        variant="sidebar-action"
+        variant="ghost"
         size="icon-sm"
-        class="shrink-0"
+        class="shrink-0 h-6! w-6!"
         :class="{ '!text-primary': active || open }"
         :title="t('composer.toolbar.motion.title')"
         :aria-label="t('composer.toolbar.motion.title')"
         :aria-pressed="active || open"
       >
-        <span :class="[icon, 'size-4', active || open ? '!text-primary' : '']" />
+        <span :class="[icon, 'size-3.5 shrink-0', active || open ? '!text-primary' : '']" />
       </Button>
     </PopoverTrigger>
     <PopoverContent

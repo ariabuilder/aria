@@ -110,8 +110,12 @@ export type UseStageWorkspaceBindingsDeps = Omit<
   | "currentPage"
   | "currentComponent"
   | "showOutlines"
+  | "showSelectionSizing"
+  | "showSelectionToolbar"
   | "wireframeMode"
   | "setShowOutlines"
+  | "setShowSelectionSizing"
+  | "setShowSelectionToolbar"
   | "setWireframeMode"
 > &
   Omit<
@@ -146,8 +150,12 @@ export type UseStageWorkspaceBindingsDeps = Omit<
     | "handleRedo"
     | "isPreview"
     | "showOutlines"
+    | "showSelectionSizing"
+    | "showSelectionToolbar"
     | "wireframeMode"
     | "setShowOutlines"
+    | "setShowSelectionSizing"
+    | "setShowSelectionToolbar"
     | "setWireframeMode"
     | "handleOpenPicker"
     | "handleEditLayoutRegion"
@@ -230,8 +238,16 @@ export function useStageWorkspaceBindings(
   }
 
   const { isPreview } = useStagePreviewState();
-  const { showOutlines, wireframeMode, setShowOutlines, setWireframeMode } =
-    useStageDisplayState();
+  const {
+    showOutlines,
+    showSelectionSizing,
+    showSelectionToolbar,
+    wireframeMode,
+    setShowOutlines,
+    setShowSelectionSizing,
+    setShowSelectionToolbar,
+    setWireframeMode,
+  } = useStageDisplayState();
   const openLayersEditorTab = (): void => {
     setEditingTab("layers");
     openLeftSidebar();
@@ -343,8 +359,12 @@ export function useStageWorkspaceBindings(
     appSidebarRef,
     isPreview,
     showOutlines,
+    showSelectionSizing,
+    showSelectionToolbar,
     wireframeMode,
     setShowOutlines,
+    setShowSelectionSizing,
+    setShowSelectionToolbar,
     setWireframeMode,
     handleComponentSelect,
     handleLayoutUpdate,
@@ -392,6 +412,8 @@ export function useStageWorkspaceBindings(
       toggleRightSidebar,
       isPreview,
       showOutlines,
+      showSelectionSizing,
+      showSelectionToolbar,
       wireframeMode,
       handleUndo,
       handleRedo,

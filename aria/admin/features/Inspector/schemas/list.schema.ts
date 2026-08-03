@@ -48,6 +48,6 @@ export type ListValue = z.infer<typeof ListValueSchema>;
 
 export const DEFAULT_LIST: ListValue = {
   ordered: false,
-  listStyleType: createDefaultResponsive("disc"),
+  listStyleType: createDefaultResponsive("none"),
   listStylePosition: createDefaultResponsive("outside"),
 };

@@ -19,7 +19,7 @@ async function onSelect(presetId: MotionPresetId): Promise<void> {
 
 <template>
   <template v-if="showMotionButton">
-    <div class="flex items-center gap-1 px-0.5" @click.stop>
+    <div class="flex items-center gap-0" @click.stop>
       <MotionQuickPicker
         :icon="TOOLBAR_ICONS.motion"
         :active="isMotionActive"

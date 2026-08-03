@@ -12,10 +12,6 @@ import type {
   DropComponentPayload,
 } from "../../../types/app";
 import {
-  insertNode as insertNodeInTree,
-  deleteNodeById,
-} from "../../../../lib/blocks/nodeUtils";
-import {
   collectNodeIds,
   ensureUniqueNodeIdentities,
 } from "../../../../lib/blocks/nodeIdentity";
@@ -63,6 +59,12 @@ interface UseNodeComponentHandlersOptions {
   activeSlot?: Ref<{ name: string; scope: "page" | "layout" }>;
   showLayoutSlotGroups?: Ref<boolean>;
   editorNodeRegistry?: ReturnType<typeof useEditorNodeRegistry>;
+}
+
+interface EditableComponentTreeContext {
+  roots: BuilderNode[];
+  commit: (roots: BuilderNode[]) => void;
+  node: BuilderNode;
 }
 
 export function useNodeComponentHandlers(
@@ -115,39 +117,61 @@ export function useNodeComponentHandlers(
     return prepared;
   };
 
-  const replaceNodeInEditorTree = (
+  const resolveEditableComponentTree = (
     nodeId: string,
-    parentId: string | null,
-    index: number,
-    replacementNode: BuilderNode,
-  ): void => {
-    pageBlocks.value = insertNodeInTree(
-      deleteNodeById(pageBlocks.value, nodeId),
-      parentId,
-      replacementNode,
-      index,
-    );
+  ): EditableComponentTreeContext | null => {
+    const editable = editorNodeRegistry?.getEditableTreeForNode(nodeId);
+    const roots = editable?.roots ?? pageBlocks.value;
+    const position = findParentAndIndex(roots, nodeId);
+    if (!position) {
+      return null;
+    }
+
+    const targetArray = position.parent?.children ?? roots;
+    const node = targetArray[position.index];
+    if (!node) {
+      return null;
+    }
+
+    return {
+      roots,
+      commit:
+        editable?.commit ??
+        ((nextRoots) => {
+          pageBlocks.value = nextRoots;
+        }),
+      node,
+    };
+  };
+
+  const replaceNodeInEditorTree = (
+    roots: BuilderNode[],
+    nodeId: string,
+    replacementNodes: readonly BuilderNode[],
+  ): BuilderNode[] | null => {
+    const nextRoots = cloneDeep(roots);
+    const position = findParentAndIndex(nextRoots, nodeId);
+    if (!position) {
+      return null;
+    }
+
+    const targetArray = position.parent?.children ?? nextRoots;
+    targetArray.splice(position.index, 1, ...cloneDeep([...replacementNodes]));
+    return nextRoots;
   };
 
   const handleDetachComponent = async (nodeId: string): Promise<void> => {
-    const componentNode = nodeManipulation.findNodeById(
-      pageBlocks.value,
-      nodeId,
-    );
-    if (!componentNode || !isComponentInstance(componentNode)) {
+    const editableTree = resolveEditableComponentTree(nodeId);
+    if (!editableTree) {
+      toast.error("Component not found");
+      return;
+    }
+
+    const componentNode = editableTree.node;
+    if (!isComponentInstance(componentNode)) {
       toast.error("Not a component instance");
       return;
     }
-
-    const result = findParentAndIndex(pageBlocks.value, nodeId);
-    if (!result) {
-      toast.error("Could not find component position");
-      return;
-    }
-
-    const { parent, index } = result;
-    const targetArray = parent ? parent.children! : pageBlocks.value;
-    const originalComponent = cloneDeep(componentNode);
 
     let detachedChildren: BuilderNode[] = [];
 
@@ -203,6 +227,17 @@ export function useNodeComponentHandlers(
       return;
     }
 
+    const beforeRoots = cloneDeep(editableTree.roots);
+    const afterRoots = replaceNodeInEditorTree(
+      beforeRoots,
+      nodeId,
+      detachedChildren,
+    );
+    if (!afterRoots) {
+      toast.error("Could not find component position");
+      return;
+    }
+
     const executeResult = await executeNodeEventOperation(
       {
         type: "update-node",
@@ -211,10 +246,11 @@ export function useNodeComponentHandlers(
       },
       {
         undo: () => {
-          targetArray.splice(index, detachedChildren.length, originalComponent);
+          editableTree.commit(cloneDeep(beforeRoots));
+          setSelectedBlock(nodeId);
         },
         redo: () => {
-          targetArray.splice(index, 1, ...detachedChildren);
+          editableTree.commit(cloneDeep(afterRoots));
           setSelectedBlock(null);
         },
       },
@@ -232,17 +268,12 @@ export function useNodeComponentHandlers(
     nodeId: string,
     componentSlug: string,
   ): Promise<void> => {
-    const sourceNode = nodeManipulation.findNodeById(pageBlocks.value, nodeId);
-    if (!sourceNode) {
+    const editableTree = resolveEditableComponentTree(nodeId);
+    if (!editableTree) {
       toast.error("Block not found");
       return;
     }
-
-    const result = findParentAndIndex(pageBlocks.value, nodeId);
-    if (!result) {
-      toast.error("Could not find block position");
-      return;
-    }
+    const sourceNode = editableTree.node;
 
     const mutationPath = resolveMutationPath();
     if (!mutationPath) {
@@ -250,8 +281,6 @@ export function useNodeComponentHandlers(
       return;
     }
 
-    const { parent, index } = result;
-    const parentId = parent?.id ?? null;
     const originalNode = cloneDeep(sourceNode);
     const componentInstanceNode: BuilderNode = {
       id: originalNode.id,
@@ -266,6 +295,14 @@ export function useNodeComponentHandlers(
         masterId: componentSlug,
       },
     };
+    const beforeRoots = cloneDeep(editableTree.roots);
+    const afterRoots = replaceNodeInEditorTree(beforeRoots, nodeId, [
+      componentInstanceNode,
+    ]);
+    if (!afterRoots) {
+      toast.error("Could not find block position");
+      return;
+    }
 
     const executeResult = await executeNodeEventOperation(
       {
@@ -275,16 +312,11 @@ export function useNodeComponentHandlers(
       },
       {
         undo: async () => {
-          replaceNodeInEditorTree(nodeId, parentId, index, originalNode);
+          editableTree.commit(cloneDeep(beforeRoots));
           setSelectedBlock(originalNode.id);
         },
         redo: async () => {
-          replaceNodeInEditorTree(
-            nodeId,
-            parentId,
-            index,
-            componentInstanceNode,
-          );
+          editableTree.commit(cloneDeep(afterRoots));
           setSelectedBlock(componentInstanceNode.id);
         },
       },

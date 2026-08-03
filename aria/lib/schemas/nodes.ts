@@ -816,6 +816,10 @@ export const ComponentSourceSchema = z.enum(["custom", "aria"]);
  */
 export const ComponentTierSchema = z.enum(["free", "pro"]);
 
+export const PackVersionSchema = z
+  .string()
+  .regex(/^\d+\.\d+\.\d+$/, "Version must be semver format");
+
 /**
  * Component DSL schema
  */
@@ -830,7 +834,7 @@ export const ComponentDSLSchema: z.ZodType<ComponentDSL> = z
 
     source: ComponentSourceSchema.optional(), // Defaults to 'custom' for existing components
     packId: z.string().optional(), // Pack identifier for aria-sourced components
-    packVersion: z.string().optional(), // Installed pack version, not storage revision
+    packVersion: PackVersionSchema.optional(), // Installed pack version, not storage revision
     tier: ComponentTierSchema.optional(), // Defaults to 'free'
     isLocked: z.boolean().optional(), // If true, component structure cannot be edited
 
@@ -894,9 +898,7 @@ export const PackManifestSchema = z
     id: z.string().min(1, "Pack ID is required"),
     name: z.string().min(1, "Pack name is required"),
     description: z.string().optional(),
-    version: z
-      .string()
-      .regex(/^\d+\.\d+\.\d+$/, "Version must be semver format"),
+    version: PackVersionSchema,
     minAppVersion: z.string().optional(),
     tier: ComponentTierSchema,
     componentIds: z

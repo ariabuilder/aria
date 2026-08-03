@@ -89,6 +89,7 @@ export async function runProjectCommand(
       await runAstro(["preview", ...args], "cloudflare");
       return;
     case "check":
+      await runScript("aria/scripts/check-rendering-writer-boundaries.ts");
       await runAstro(["check", ...args], "cloudflare");
       return;
     case "integrations:worker":

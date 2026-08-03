@@ -71,6 +71,36 @@ type DslAssetStorageContext = Pick<
 export function createDslAssetStorageDomain(
   context: DslAssetStorageContext,
 ): DslAssetStorageDomain {
+  async function confirmLayoutVersionUnchanged(
+    id: string,
+    observedVersion: string,
+    expectedVersion: string,
+  ): Promise<string> {
+    const latest = await context.resolveLayoutVersionState(id);
+    if (latest?.currentVersion !== observedVersion) {
+      throw new VersionConflictError(
+        expectedVersion,
+        latest?.currentVersion ?? null,
+      );
+    }
+    return latest.currentVersion;
+  }
+
+  async function confirmComponentVersionUnchanged(
+    id: string,
+    observedVersion: string,
+    expectedVersion: string,
+  ): Promise<string> {
+    const latest = await context.resolveComponentVersionState(id);
+    if (latest?.currentVersion !== observedVersion) {
+      throw new VersionConflictError(
+        expectedVersion,
+        latest?.currentVersion ?? null,
+      );
+    }
+    return latest.currentVersion;
+  }
+
   return {
     async getLayoutDSL(
       id: string,
@@ -135,33 +165,57 @@ export function createDslAssetStorageDomain(
       }
 
       const existing = await context.resolveLayoutVersionState(id);
-      if (
-        parsedOptions.expectedVersion &&
-        existing?.currentVersion !== parsedOptions.expectedVersion
-      ) {
-        throw new VersionConflictError(
-          parsedOptions.expectedVersion,
-          existing?.currentVersion ?? null,
-        );
-      }
       const incomingHash = normalized.sourceHash;
-      if (shouldSkipIfContentUnchanged && existing) {
-        const currentVersionRow = await context.getStoredVersionRow(
+      let currentVersionRow: Awaited<
+        ReturnType<typeof context.getStoredVersionRow>
+      > = null;
+      let currentHash: string | null = null;
+      if (existing) {
+        currentVersionRow = await context.getStoredVersionRow(
           "aria_layout_versions",
           existing.id,
           existing.currentVersion,
         );
         if (currentVersionRow) {
-          const currentHash = await resolveStoredSemanticSourceHash({
+          currentHash = await resolveStoredSemanticSourceHash({
             kind: "layout",
             row: currentVersionRow,
             fallback: () =>
-              context.resolveStoredVersionContentHash(currentVersionRow),
+              context.resolveStoredVersionContentHash(currentVersionRow!),
           });
-          if (currentHash === incomingHash) {
-            await context.syncMediaUsageBestEffort("layout", id, normalizedDSL);
-            return existing.currentVersion;
-          }
+        }
+      }
+      if (
+        parsedOptions.expectedVersion &&
+        existing?.currentVersion !== parsedOptions.expectedVersion
+      ) {
+        if (
+          shouldSkipIfContentUnchanged &&
+          existing &&
+          currentHash === incomingHash
+        ) {
+          const stableVersion = await confirmLayoutVersionUnchanged(
+            id,
+            existing.currentVersion,
+            parsedOptions.expectedVersion,
+          );
+          await context.syncMediaUsageBestEffort("layout", id, normalizedDSL);
+          return stableVersion;
+        }
+        throw new VersionConflictError(
+          parsedOptions.expectedVersion,
+          existing?.currentVersion ?? null,
+        );
+      }
+      if (shouldSkipIfContentUnchanged && existing) {
+        if (currentHash === incomingHash) {
+          const stableVersion = await confirmLayoutVersionUnchanged(
+            id,
+            existing.currentVersion,
+            parsedOptions.expectedVersion ?? existing.currentVersion,
+          );
+          await context.syncMediaUsageBestEffort("layout", id, normalizedDSL);
+          return stableVersion;
         }
       }
 
@@ -187,13 +241,14 @@ export function createDslAssetStorageDomain(
           : null;
 
       let shouldInsertVersion = true;
+      let existingVersionHash: string | null = null;
       const existingVersionRow = await context.getStoredVersionRow(
         "aria_layout_versions",
         id,
         version,
       );
       if (existingVersionRow) {
-        const existingVersionHash = await resolveStoredSemanticSourceHash({
+        existingVersionHash = await resolveStoredSemanticSourceHash({
           kind: "layout",
           row: existingVersionRow,
           fallback: () =>
@@ -212,12 +267,6 @@ export function createDslAssetStorageDomain(
       }
 
       if (!shouldInsertVersion && existingVersionRow) {
-        const existingVersionHash = await resolveStoredSemanticSourceHash({
-          kind: "layout",
-          row: existingVersionRow,
-          fallback: () =>
-            context.resolveStoredVersionContentHash(existingVersionRow),
-        });
         if (existingVersionHash !== incomingHash) {
           await context.run(
             `UPDATE aria_layout_versions
@@ -424,37 +473,65 @@ export function createDslAssetStorageDomain(
       }
 
       const existing = await context.resolveComponentVersionState(id);
-      if (
-        parsedOptions.expectedVersion &&
-        existing?.currentVersion !== parsedOptions.expectedVersion
-      ) {
-        throw new VersionConflictError(
-          parsedOptions.expectedVersion,
-          existing?.currentVersion ?? null,
-        );
-      }
       const incomingHash = normalized.sourceHash;
-      if (shouldSkipIfContentUnchanged && existing) {
-        const currentVersionRow = await context.getStoredVersionRow(
+      let currentVersionRow: Awaited<
+        ReturnType<typeof context.getStoredVersionRow>
+      > = null;
+      let currentHash: string | null = null;
+      if (existing) {
+        currentVersionRow = await context.getStoredVersionRow(
           "aria_component_versions",
           existing.id,
           existing.currentVersion,
         );
         if (currentVersionRow) {
-          const currentHash = await resolveStoredSemanticSourceHash({
+          currentHash = await resolveStoredSemanticSourceHash({
             kind: "component",
             row: currentVersionRow,
             fallback: () =>
-              context.resolveStoredVersionContentHash(currentVersionRow),
+              context.resolveStoredVersionContentHash(currentVersionRow!),
           });
-          if (currentHash === incomingHash) {
-            await context.syncMediaUsageBestEffort(
-              "component",
-              id,
-              normalizedDSL,
-            );
-            return existing.currentVersion;
-          }
+        }
+      }
+      if (
+        parsedOptions.expectedVersion &&
+        existing?.currentVersion !== parsedOptions.expectedVersion
+      ) {
+        if (
+          shouldSkipIfContentUnchanged &&
+          existing &&
+          currentHash === incomingHash
+        ) {
+          const stableVersion = await confirmComponentVersionUnchanged(
+            id,
+            existing.currentVersion,
+            parsedOptions.expectedVersion,
+          );
+          await context.syncMediaUsageBestEffort(
+            "component",
+            id,
+            normalizedDSL,
+          );
+          return stableVersion;
+        }
+        throw new VersionConflictError(
+          parsedOptions.expectedVersion,
+          existing?.currentVersion ?? null,
+        );
+      }
+      if (shouldSkipIfContentUnchanged && existing) {
+        if (currentHash === incomingHash) {
+          const stableVersion = await confirmComponentVersionUnchanged(
+            id,
+            existing.currentVersion,
+            parsedOptions.expectedVersion ?? existing.currentVersion,
+          );
+          await context.syncMediaUsageBestEffort(
+            "component",
+            id,
+            normalizedDSL,
+          );
+          return stableVersion;
         }
       }
 
@@ -471,13 +548,14 @@ export function createDslAssetStorageDomain(
       };
 
       let shouldInsertVersion = true;
+      let existingVersionHash: string | null = null;
       const existingVersionRow = await context.getStoredVersionRow(
         "aria_component_versions",
         id,
         version,
       );
       if (existingVersionRow) {
-        const existingVersionHash = await resolveStoredSemanticSourceHash({
+        existingVersionHash = await resolveStoredSemanticSourceHash({
           kind: "component",
           row: existingVersionRow,
           fallback: () =>
@@ -496,12 +574,6 @@ export function createDslAssetStorageDomain(
       }
 
       if (!shouldInsertVersion && existingVersionRow) {
-        const existingVersionHash = await resolveStoredSemanticSourceHash({
-          kind: "component",
-          row: existingVersionRow,
-          fallback: () =>
-            context.resolveStoredVersionContentHash(existingVersionRow),
-        });
         if (existingVersionHash !== incomingHash) {
           await context.run(
             `UPDATE aria_component_versions

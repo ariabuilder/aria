@@ -281,7 +281,7 @@ describe("useCanvasOverlays", () => {
     });
   });
 
-  it("keeps iframe selection overlays border-only without a fill tint", async () => {
+  it("keeps the iframe selection geometry anchor visually transparent", async () => {
     const iframe = document.createElement("iframe");
     const iframeDoc = document.implementation.createHTMLDocument("stage");
 
@@ -310,7 +310,7 @@ describe("useCanvasOverlays", () => {
     ) as HTMLElement | null;
 
     expect(selectionOverlay).not.toBeNull();
-    expect(selectionOverlay?.style.border).toContain("2px");
+    expect(selectionOverlay?.style.border).toBe("0px");
     expect(selectionOverlay?.style.background).toMatch(
       /transparent|rgba\(0,\s*0,\s*0,\s*0\)/,
     );

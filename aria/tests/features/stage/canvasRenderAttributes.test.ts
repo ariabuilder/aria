@@ -37,4 +37,19 @@ describe("canvasRenderAttributes", () => {
       disabled: false,
     });
   });
+
+  it("strips renderer-consumed list semantics from Stage attributes", () => {
+    expect(
+      normalizeCanvasAttributeProps(
+        { type: "List" },
+        { element: "dl", ordered: true, items: ["legacy"] },
+      ),
+    ).toEqual({});
+    expect(
+      normalizeCanvasAttributeProps(
+        { type: "ListItem" },
+        { element: "dt", title: "Term" },
+      ),
+    ).toEqual({ title: "Term" });
+  });
 });

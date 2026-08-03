@@ -1,6 +1,8 @@
 import { readdir, readFile } from "node:fs/promises";
 import path from "node:path";
 
+import ts from "typescript";
+
 import { isMainModule } from "./lib/node-command";
 
 const workspaceRoot = path.resolve(import.meta.dirname, "../..");
@@ -13,8 +15,10 @@ const VERSION_WRITE_RE =
   /(?:INSERT(?:\s+OR\s+(?:IGNORE|REPLACE))?\s+INTO|UPDATE)\s+aria_(?:page|layout|component)_versions\b/iu;
 const DSL_COLUMN_RE = /\bdsl_json\b/iu;
 const NORMALIZER_IMPORT_RE = /from\s+["'][^"']*surfaceNormalization["']/u;
-const NORMALIZER_CALL_RE =
-  /await\s+(?:normalizeSurfaceForPersistence|prepareNormalizedSurfaceVersion)\s*\(/u;
+const NORMALIZER_FUNCTIONS = new Set([
+  "normalizeSurfaceForPersistence",
+  "prepareNormalizedSurfaceVersion",
+]);
 
 export interface RenderingWriterBoundaryProblem {
   file: string;
@@ -37,7 +41,29 @@ async function listWriterSources(directory: string): Promise<string[]> {
   return nested.flat().sort();
 }
 
-/** Flags a direct DSL version-table writer without the shared normalizer. */
+function scriptKindForFile(file: string): ts.ScriptKind {
+  return /\.(?:mjs|js)$/u.test(file) ? ts.ScriptKind.JS : ts.ScriptKind.TS;
+}
+
+function enclosingWriterScope(node: ts.Node): ts.Node {
+  let current: ts.Node | undefined = node;
+  while (current && !ts.isFunctionLike(current) && !ts.isSourceFile(current)) {
+    current = current.parent;
+  }
+  return current ?? node.getSourceFile();
+}
+
+function isAwaitedNormalizerCall(node: ts.Node): node is ts.CallExpression {
+  return (
+    ts.isCallExpression(node) &&
+    ts.isIdentifier(node.expression) &&
+    NORMALIZER_FUNCTIONS.has(node.expression.text) &&
+    node.parent !== undefined &&
+    ts.isAwaitExpression(node.parent)
+  );
+}
+
+/** Flags each direct DSL version-table writer not normalized in its own scope. */
 export function inspectRenderingWriterSource(
   file: string,
   source: string,
@@ -45,9 +71,57 @@ export function inspectRenderingWriterSource(
   if (!VERSION_WRITE_RE.test(source) || !DSL_COLUMN_RE.test(source)) {
     return null;
   }
-  if (NORMALIZER_IMPORT_RE.test(source) && NORMALIZER_CALL_RE.test(source)) {
+  if (!NORMALIZER_IMPORT_RE.test(source)) {
+    return {
+      file,
+      message:
+        "direct Page/Layout/Component dsl_json write does not use the shared surface normalizer",
+    };
+  }
+
+  const sourceFile = ts.createSourceFile(
+    file,
+    source,
+    ts.ScriptTarget.Latest,
+    true,
+    scriptKindForFile(file),
+  );
+  const writes: Array<{ scope: ts.Node; position: number }> = [];
+  const normalizers: Array<{ scope: ts.Node; position: number }> = [];
+
+  const visit = (node: ts.Node): void => {
+    if (
+      ts.isStringLiteralLike(node) &&
+      VERSION_WRITE_RE.test(node.text) &&
+      DSL_COLUMN_RE.test(node.text)
+    ) {
+      writes.push({
+        scope: enclosingWriterScope(node),
+        position: node.getStart(sourceFile),
+      });
+    }
+    if (isAwaitedNormalizerCall(node)) {
+      normalizers.push({
+        scope: enclosingWriterScope(node),
+        position: node.getStart(sourceFile),
+      });
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(sourceFile);
+
+  const unsafeWrite = writes.some(
+    (write) =>
+      !normalizers.some(
+        (normalizer) =>
+          normalizer.scope === write.scope &&
+          normalizer.position < write.position,
+      ),
+  );
+  if (!unsafeWrite && writes.length > 0) {
     return null;
   }
+
   return {
     file,
     message:

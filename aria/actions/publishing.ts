@@ -1,17 +1,13 @@
-/**
- * Astro actions for publishing immutable page revisions. Integrates with global CSS
- * compilation and validates renderability before advancing the published page pointer.
- */
+/** Astro actions for advancing immutable page publication pointers. */
 
 import { defineAction } from "astro:actions";
 import { z } from "astro/zod";
 import { getStorageAdapterAsync } from "../lib/storage/getStorageAdapter";
-import { touchContentRevisionForAction } from "../lib/content-sync/mutations";
 import {
-  createDefaultUniversalDesignSystem,
-  getCustomFontsLibraryFromUniversalDesignSystem,
-  type UniversalDesignSystem,
-} from "../lib/styles/universalDesignSystem";
+  deliverContentRevisionForAction,
+  touchContentRevision,
+  touchContentRevisionForAction,
+} from "../lib/content-sync/mutations";
 import {
   invalidateComposeCache,
   purgePublicPageCache,
@@ -21,19 +17,13 @@ import {
   parseAuthorshipSaveContext,
 } from "../lib/authorship/stamping";
 import { buildPageActivityMetadata } from "../lib/pages/activityMetadata";
-import { DiscoverySettingsSchema } from "../lib/crawl/schemas";
-import { pingSearchEnginesForSitemap } from "../lib/seo/pingSitemap";
 import { requireOperation, resolveAuthorizedMutation } from "./_shared";
 import { log as baseLog } from "../lib/utils/logger";
 import { getSiteSettingsUtilityEngine } from "../lib/storage/adapter";
-import { regenerateGlobalCSSArtifacts } from "./styles";
-import {
-  deletePageSnapshots,
-  savePageSnapshot,
-} from "../lib/rendering/pageSnapshots";
-import { assertExecutableContentChangeAllowed } from "../lib/security/executableContent";
 import { buildCurrentCompilerMetadata } from "../lib/system/metadata";
 import { resolvePagePublicationDependencies } from "../lib/publishing/pageDependencies";
+import { deferWithWaitUntil } from "../lib/cloudflare/waitUntil";
+import type { PageDSL } from "../lib/types/nodes";
 
 type LogLevel = "debug" | "info" | "warn" | "error";
 
@@ -86,32 +76,86 @@ async function settlePublishSideEffects(
   });
 }
 
-async function getDesignSystem(
+type PublishingActionContext = Parameters<typeof resolveAuthorizedMutation>[0];
+
+async function runCommittedPublishDelivery(
   adapter: PublishingStorageAdapter,
-): Promise<UniversalDesignSystem> {
-  return (
-    (await adapter.getDesignSystem()) ?? createDefaultUniversalDesignSystem()
-  );
+  context: PublishingActionContext,
+  page: Pick<PageDSL, "id" | "slug">,
+  publishedVersion: string,
+): Promise<void> {
+  await settlePublishSideEffects("Publish delivery", [
+    async () => {
+      const mutation = {
+        mutationKind: "save-page" as const,
+        mutationTarget: page.id,
+      };
+      const revision = await touchContentRevision(adapter, mutation, context);
+      await deliverContentRevisionForAction(revision, mutation, context);
+    },
+    () =>
+      invalidateComposeCache(
+        context,
+        "page",
+        page.slug || page.id,
+        publishedVersion,
+        "publishing",
+      ),
+    () =>
+      purgePublicPageCache(context, {
+        id: page.id,
+        slug: page.slug || page.id,
+      }),
+    async () => {
+      const publishedPage = await adapter.getPublishedPageDSL(page.id);
+      if (!publishedPage) return;
+      const { savePageSnapshot } =
+        await import("../lib/rendering/pageSnapshots");
+      await savePageSnapshot(
+        { page: publishedPage, stage: "published" },
+        adapter,
+        { locals: context.locals },
+      );
+    },
+  ]);
 }
 
-export const PublishPageInputSchema = z.object({
-  id: z.string().min(1).max(255),
-  expectedVersion: z.string().trim().min(1),
-  skipCSSRegeneration: z.boolean().optional(),
-  scheduledFor: z.iso.datetime().optional(),
-}).strict();
+async function scheduleCommittedPublishDelivery(
+  adapter: PublishingStorageAdapter,
+  context: PublishingActionContext,
+  page: Pick<PageDSL, "id" | "slug">,
+  publishedVersion: string,
+): Promise<void> {
+  const deliveryTask = Promise.resolve().then(() =>
+    runCommittedPublishDelivery(adapter, context, page, publishedVersion),
+  );
+
+  if (deferWithWaitUntil(context.locals, deliveryTask)) {
+    return;
+  }
+
+  await deliveryTask;
+}
+
+export const PublishPageInputSchema = z
+  .object({
+    id: z.string().min(1).max(255),
+    expectedVersion: z.string().trim().min(1),
+    skipCSSRegeneration: z.boolean().optional(),
+    scheduledFor: z.iso.datetime().optional(),
+  })
+  .strict();
 
 async function publishPageHandler(
   input: z.infer<typeof PublishPageInputSchema>,
-  context: Parameters<typeof resolveAuthorizedMutation>[0],
+  context: PublishingActionContext,
 ) {
-  const { user, authorship } = await resolveAuthorizedMutation(
+  const { authorship } = await resolveAuthorizedMutation(
     context,
     "publishing.publish",
     "save-page",
   );
   const parsedAuthorship = parseAuthorshipSaveContext(authorship);
-  const stylesAuthorship = buildAuthorshipSaveContext(user, "save-styles");
 
   const operation = `publishPage:${input.id}`;
   startPerformanceTracking(operation);
@@ -143,153 +187,34 @@ async function publishPageHandler(
       };
     }
     const canonicalSlug = currentPage.slug || currentPage.id;
-    assertExecutableContentChangeAllowed({
-      user,
-      previousNodes: currentPage.nodes,
-      nextNodes: currentPage.nodes,
-      previousHeadHtml: currentPage.settings?.headHTML,
-      nextHeadHtml: currentPage.settings?.headHTML,
-    });
-
-    if (!input.skipCSSRegeneration) {
-      log("info", "Auto-regenerating CSS before publish");
-
-      const result = await regenerateGlobalCSSArtifacts(adapter, {
-        authorship: stylesAuthorship,
-        utilityNodes: currentPage.nodes,
-      });
-      await settlePublishSideEffects("CSS revision", [
-        () =>
-          touchContentRevisionForAction(
-            adapter,
-            {
-              mutationKind: "save-styles",
-              mutationTarget: "default",
-            },
-            context,
-          ),
-      ]);
-
-      log("info", "CSS regenerated successfully", {
-        size: `${(result.cssSize / 1024).toFixed(2)}KB`,
-        hash: result.globalCSSHash,
-        framework: result.framework,
-      });
-    }
-
-    const [siteSettings, designSystem] = await Promise.all([
+    // Phase 5 publishes an already-normalized immutable draft using the
+    // stylesheet artifacts that were persisted by the style lifecycle. Full
+    // site Uno compilation and public HTML assembly cannot share a 10 ms
+    // Cloudflare request with the authoritative pointer transaction.
+    void input.skipCSSRegeneration;
+    const [siteSettings, designSystemArtifacts] = await Promise.all([
       adapter.getSiteSettings(),
-      getDesignSystem(adapter),
+      adapter.getDesignSystemSegments(["artifacts-meta"]),
     ]);
 
     const framework = getSiteSettingsUtilityEngine(siteSettings);
     const darkMode = siteSettings?.darkMode || "disabled";
-    const customFonts =
-      getCustomFontsLibraryFromUniversalDesignSystem(designSystem);
-
-    const hasCompiledCSS = Boolean(
-      designSystem.artifacts.globalCSS && designSystem.artifacts.globalCSSHash,
+    const globalCSSEnabled = Boolean(
+      designSystemArtifacts?.artifacts.globalCSSHash,
     );
-    const globalCSSEnabled = hasCompiledCSS;
+    const htmlSize = 0;
 
-    log("info", "Publish render validation config", {
+    log("info", "Publish pointer transaction config", {
       slug: canonicalSlug,
       framework,
       darkMode,
       globalCSSEnabled,
-      hasCSSHash: designSystem.artifacts.globalCSSHash,
+      cssSource: "stored-artifacts",
     });
-
-    const { compileAnalyticsScripts } =
-      await import("../lib/analytics/compileAnalyticsScripts");
-    const { analyzeCustomCode } =
-      await import("../lib/security/analyzeCustomCode");
-    const {
-      analyzeRenderPipelineRequirements,
-      analyzeStructuredHead,
-      planEffectiveCsp,
-      renderCspMetaTag,
-      serializeCspHeaderValue,
-    } = await import("../lib/security/csp");
-
-    const compiledAnalytics = compileAnalyticsScripts(siteSettings?.analytics);
-
-    if (compiledAnalytics.warnings.length > 0) {
-      log("warn", "Analytics compile warnings", {
-        slug: canonicalSlug,
-        warnings: compiledAnalytics.warnings,
-      });
-    }
-
-    const customCodeAnalysis = analyzeCustomCode([
-      { label: "site customHeadCode", code: siteSettings?.customHeadCode },
-      { label: "site customBodyCode", code: siteSettings?.customBodyCode },
-      {
-        label: "site customFooterCode",
-        code: siteSettings?.customFooterCode,
-      },
-      { label: "page headHTML", code: currentPage.settings?.headHTML },
-    ]);
-
-    const cspPlan = planEffectiveCsp({
-      analytics: compiledAnalytics.csp,
-      customCode: customCodeAnalysis,
-      structuredHead: analyzeStructuredHead(currentPage.settings?.head),
-      renderPipeline: analyzeRenderPipelineRequirements({
-        framework,
-        customFrameworkURL: siteSettings?.customFrameworkURL,
-        globalCSSEnabled,
-        customFonts,
-        darkMode: darkMode === "disabled" ? undefined : darkMode,
-        includesStructuredDataJsonLd: true,
-      }),
-    });
-
-    if (cspPlan.warnings.length > 0) {
-      log("warn", "CSP planning warnings", {
-        slug: canonicalSlug,
-        warnings: cspPlan.warnings,
-        csp: serializeCspHeaderValue(cspPlan),
-      });
-    }
-
-    const cspMetaTag = renderCspMetaTag(cspPlan);
-    const publicationDependencies =
-      await resolvePagePublicationDependencies(currentPage, adapter);
-
-    const { renderPageDslToHtml } =
-      await import("../lib/rendering/renderPageDslToHtml");
-    const rendered = await renderPageDslToHtml({
-      page: {
-        ...currentPage,
-        status: "published",
-        _publicationDependencies: publicationDependencies,
-      },
+    const publicationDependencies = await resolvePagePublicationDependencies(
+      currentPage,
       adapter,
-      pathOrSlug: currentPage.slug,
-      headHTMLPrefix: cspMetaTag,
-      locals: context.locals,
-      logger: (level, message, meta) => log(level, message, meta),
-    });
-    const html = rendered.html;
-
-    const htmlSize = html.length;
-    const htmlSizeMB = (htmlSize / (1024 * 1024)).toFixed(2);
-    const MAX_HTML_SIZE = 10 * 1024 * 1024;
-
-    if (htmlSize > MAX_HTML_SIZE) {
-      log("error", "Generated HTML exceeds 10MB limit", {
-        size: `${htmlSizeMB}MB`,
-      });
-      return {
-        success: false,
-        error: {
-          code: "HTML_TOO_LARGE",
-          message: `Generated HTML (${htmlSizeMB}MB) exceeds 10MB limit. Page may be too complex.`,
-          context: { htmlSize, limit: MAX_HTML_SIZE },
-        },
-      };
-    }
+    );
 
     if (input.scheduledFor) {
       if (Date.parse(input.scheduledFor) <= Date.now()) {
@@ -386,56 +311,12 @@ async function publishPageHandler(
       };
     }
 
-    await settlePublishSideEffects("Publish", [
-      async () => {
-        const publishedPage = await adapter.getPublishedPageDSL(input.id);
-        if (publishedPage) {
-          await savePageSnapshot(
-            {
-              page: publishedPage,
-              stage: "published",
-            },
-            adapter,
-            { locals: context.locals },
-          );
-        }
-      },
-      () =>
-        touchContentRevisionForAction(
-          adapter,
-          {
-            mutationKind: "save-page",
-            mutationTarget: input.id,
-          },
-          context,
-        ),
-      () =>
-        invalidateComposeCache(
-          context,
-          "page",
-          currentPage.slug,
-          publishedVersion,
-          "publishing",
-        ),
-      () =>
-        purgePublicPageCache(context, {
-          id: input.id,
-          slug: currentPage.slug,
-        }),
-    ]);
-
-    const discovery = DiscoverySettingsSchema.parse(
-      siteSettings?.discovery ?? {},
+    await scheduleCommittedPublishDelivery(
+      adapter,
+      context,
+      currentPage,
+      publishedVersion,
     );
-    if (discovery.sitemapPingOnPublish) {
-      try {
-        await pingSearchEnginesForSitemap(siteSettings?.siteUrl);
-      } catch (error) {
-        log("warn", "Sitemap ping failed after publish", {
-          error: error instanceof Error ? error.message : String(error),
-        });
-      }
-    }
 
     log("info", `Page "${canonicalSlug}" marked as published`, {
       version: publishedVersion,
@@ -445,7 +326,6 @@ async function publishPageHandler(
 
     log("info", "Page revision published successfully", {
       slug: canonicalSlug,
-      size: `${(htmlSize / 1024).toFixed(2)}KB`,
       duration: `${duration}ms`,
       withCompiledCSS: globalCSSEnabled,
     });
@@ -542,7 +422,11 @@ export const publishing = {
 
         await adapter.unpublishPageDSL(id);
         await settlePublishSideEffects("Unpublish", [
-          () => deletePageSnapshots(slug, adapter),
+          async () => {
+            const { deletePageSnapshots } =
+              await import("../lib/rendering/pageSnapshots");
+            await deletePageSnapshots(slug, adapter);
+          },
           // Keep published thumbnail — PagePreviewFrame falls back to it while
           // a fresh draft thumbnail is generated, avoiding a blank flash.
           () =>
@@ -747,6 +631,7 @@ export const publishing = {
         if (!skipCSSRegeneration) {
           log("info", "Regenerating CSS before batch publish");
 
+          const { regenerateGlobalCSSArtifacts } = await import("./styles");
           const result = await regenerateGlobalCSSArtifacts(adapter, {
             authorship: stylesAuthorship,
           });
@@ -796,8 +681,10 @@ export const publishing = {
                   "page_published",
                   "this page",
                 ),
-                dependencies:
-                  await resolvePagePublicationDependencies(page, adapter),
+                dependencies: await resolvePagePublicationDependencies(
+                  page,
+                  adapter,
+                ),
               },
             );
             if (!publishedVersion) {
@@ -810,9 +697,10 @@ export const publishing = {
 
             await settlePublishSideEffects(`Batch publish ${pageId}`, [
               async () => {
-                const publishedPage =
-                  await adapter.getPublishedPageDSL(pageId);
+                const publishedPage = await adapter.getPublishedPageDSL(pageId);
                 if (publishedPage) {
+                  const { savePageSnapshot } =
+                    await import("../lib/rendering/pageSnapshots");
                   await savePageSnapshot(
                     {
                       page: publishedPage,

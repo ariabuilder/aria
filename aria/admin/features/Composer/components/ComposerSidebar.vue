@@ -87,6 +87,8 @@ interface Props {
   currentPage?: PageDSL | null;
   currentComponent?: ComponentDSL | null;
   showOutlines?: boolean;
+  showSelectionSizing?: boolean;
+  showSelectionToolbar?: boolean;
   wireframeMode?: boolean;
   hasUnsavedChanges?: boolean;
   editingTab?: StageEditingTab;
@@ -122,6 +124,8 @@ const props = withDefaults(defineProps<Props>(), {
   open: true,
   activeBlocks: () => [],
   showOutlines: false,
+  showSelectionSizing: true,
+  showSelectionToolbar: true,
   wireframeMode: false,
   hasUnsavedChanges: false,
   editingTab: "layers",
@@ -147,6 +151,8 @@ const emit = defineEmits<{
   "page-saved": [page: PageDSL];
   "component-saved": [component: ComponentDSL];
   "update:show-outlines": [value: boolean];
+  "update:show-selection-sizing": [value: boolean];
+  "update:show-selection-toolbar": [value: boolean];
   "update:wireframe-mode": [value: boolean];
   unpublish: [];
   "select-page": [slug: string];
@@ -318,11 +324,15 @@ defineExpose({
           <HeaderActionTooltip :label="t('composer.options.label')">
             <ComposerCanvasOptionsMenu
               :show-outlines="props.showOutlines"
+              :show-selection-sizing="props.showSelectionSizing"
+              :show-selection-toolbar="props.showSelectionToolbar"
               :wireframe-mode="props.wireframeMode"
               :is-published="isPublished"
               :live-page-href="livePageHref"
               :show-slot-groups="showLayoutSlotGroups"
               @update:show-outlines="emit('update:show-outlines', $event)"
+              @update:show-selection-sizing="emit('update:show-selection-sizing', $event)"
+              @update:show-selection-toolbar="emit('update:show-selection-toolbar', $event)"
               @update:wireframe-mode="emit('update:wireframe-mode', $event)"
               @update:show-slot-groups="handleShowSlotGroupsUpdate"
               @unpublish="emit('unpublish')"

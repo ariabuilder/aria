@@ -9,6 +9,21 @@ import type { CanonicalSha256 } from "./hash";
 
 export type RenderSurfaceKind = "page" | "layout" | "component";
 
+export type RenderSurfaceCollection = "pages" | "layouts" | "components";
+
+export function renderSurfaceKindForCollection(
+  collection: RenderSurfaceCollection,
+): RenderSurfaceKind {
+  switch (collection) {
+    case "pages":
+      return "page";
+    case "layouts":
+      return "layout";
+    case "components":
+      return "component";
+  }
+}
+
 export type RenderSurfaceSourceByKind = {
   page: PageDSL;
   layout: LayoutDSL;

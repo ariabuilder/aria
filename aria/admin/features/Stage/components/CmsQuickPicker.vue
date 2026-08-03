@@ -194,9 +194,9 @@ async function applyMappings(): Promise<void> {
       <Button
         v-bind="attrs"
         type="button"
-        variant="sidebar-action"
+        variant="ghost"
         size="icon-sm"
-        class="shrink-0"
+        class="shrink-0 h-6!"
         :class="{ '!text-primary': active || open }"
         :title="label"
         :aria-label="label"
@@ -219,8 +219,8 @@ async function applyMappings(): Promise<void> {
           v-if="page !== 'collection'"
           type="button"
           variant="ghost"
-          size="icon-xs"
-          class="h-5! w-5!"
+          size="icon-sm"
+          class="h-6! w-6!"
           :aria-label="t('common.back')"
           @click.stop.prevent="
             page = page === 'mapping' && requiresEntryStep ? 'entry' : 'collection'

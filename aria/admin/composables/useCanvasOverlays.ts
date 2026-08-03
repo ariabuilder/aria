@@ -770,7 +770,10 @@ function applyIframeOverlayTheme(): void {
   }
 
   if (iframeSelectionOverlayEl) {
-    iframeSelectionOverlayEl.style.border = `2px solid ${colors.border}`;
+    // The interactive primary selection frame lives in CanvasOverlayLayer so
+    // its handles and size badge can receive pointer/keyboard input outside
+    // the authored iframe document. Keep this element as a geometry anchor.
+    iframeSelectionOverlayEl.style.border = "0";
     iframeSelectionOverlayEl.style.background = colors.selectionBackground;
   }
 

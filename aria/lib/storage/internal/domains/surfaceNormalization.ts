@@ -3,6 +3,7 @@ import {
   type NormalizedRenderSurface,
   type RenderSurfaceKind,
 } from "../../../rendering/canonical";
+import { log } from "../../../utils/logger";
 
 /**
  * Storage-side entry point for the portable normalizer.
@@ -60,7 +61,14 @@ export async function resolveStoredSemanticSourceHash(input: {
       JSON.parse(dslJson),
     );
     return normalized.sourceHash;
-  } catch {
+  } catch (error) {
+    log("warn", "Stored semantic source hash normalization failed", {
+      kind: input.kind,
+      id: typeof input.row.id === "string" ? input.row.id : undefined,
+      version:
+        typeof input.row.version === "string" ? input.row.version : undefined,
+      error,
+    });
     return input.fallback();
   }
 }

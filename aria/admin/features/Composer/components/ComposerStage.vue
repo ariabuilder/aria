@@ -13,6 +13,8 @@ const props = defineProps<{
   footerComponent?: string;
   expandedBlocks: BuilderNode[]; // Expanded tree with component references resolved
   showOutlines?: boolean;
+  showSelectionSizing?: boolean;
+  showSelectionToolbar?: boolean;
   wireframeMode?: boolean;
   pageSlug?: string | null;
   currentLayout?: LayoutDSL | null;
@@ -62,6 +64,8 @@ defineExpose({ stageFrameRef });
         :current-item-type="props.currentItemType"
         :current-item-slug="props.currentItemSlug"
         :show-outlines="props.showOutlines"
+        :show-selection-sizing="props.showSelectionSizing"
+        :show-selection-toolbar="props.showSelectionToolbar"
         :wireframe-mode="props.wireframeMode"
         @ready="emit('ready')"
         @select-block="(id) => emit('selectBlock', id)"

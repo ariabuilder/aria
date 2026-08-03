@@ -157,7 +157,7 @@ const sectionOpen = computed({
 });
 
 const ordered = ref(false);
-const listStyleType = ref<ListStyleType>("disc");
+const listStyleType = ref<ListStyleType>("none");
 const listStylePosition = ref<ListStylePosition>("outside");
 const validationError = ref<string | null>(null);
 
@@ -169,7 +169,9 @@ function hasSaveContext(): boolean {
 
 const { isPersisting, isPanelDisabled } = useInspectorPanelControls({
   hasSaveContext,
-  isLoading: computed(() => propertySave.isLoading.value || listStyleTarget.isLoading.value),
+  isLoading: computed(
+    () => propertySave.isLoading.value || listStyleTarget.isLoading.value,
+  ),
 });
 
 const targetError = computed(() => listStyleTarget.error.value);
@@ -217,9 +219,16 @@ function listOptionLabel(value: ListStyleType | ListStylePosition): string {
   return t(keys[value]);
 }
 const isIconList = computed(() => isIconListNode(targetNode.value));
-const showStandardListControls = computed(() => !isIconList.value);
+const isDescriptionList = computed(
+  () => targetNode.value?.props?.element === "dl",
+);
+const showStandardListControls = computed(
+  () => !isIconList.value && !isDescriptionList.value,
+);
 const canAddListItem = computed(
-  () => targetNode.value?.type?.toLowerCase() === "list",
+  () =>
+    targetNode.value?.type?.toLowerCase() === "list" &&
+    !isDescriptionList.value,
 );
 
 function isIconListNode(node: BuilderNode | null | undefined): boolean {
@@ -268,12 +277,16 @@ function hasStyleSaveContext(): boolean {
 }
 
 function getDefaultStyleValue(key: ListStyleKey, breakpoint: string): string {
+  if (key === "listStyleType") {
+    return ordered.value ? "decimal" : "none";
+  }
+
   const defaults = defaultList.value[key];
   return (
     defaults?.[breakpoint] ??
     defaults?.default ??
     DEFAULT_LIST[key].default ??
-    (key === "listStyleType" ? "disc" : "outside")
+    "outside"
   );
 }
 
@@ -281,7 +294,10 @@ function getStyleValue(key: ListStyleKey): string {
   const fallback = getDefaultStyleValue(key, breakpointName.value);
 
   if (listStyleTarget.isClassEditing.value) {
-    return listStyleTarget.getStyleValue(key, fallback, breakpointName.value) ?? fallback;
+    return (
+      listStyleTarget.getStyleValue(key, fallback, breakpointName.value) ??
+      fallback
+    );
   }
 
   return (
@@ -302,7 +318,9 @@ function syncListValues(): void {
   );
   listStyleType.value = nextListStyleType.success
     ? nextListStyleType.data
-    : "disc";
+    : ordered.value
+      ? "decimal"
+      : "none";
 
   const nextListStylePosition = ListStylePositionSchema.safeParse(
     getStyleValue("listStylePosition"),
@@ -337,7 +355,7 @@ function resolveCompatibleListStyleType(
     return currentType;
   }
 
-  return nextOrdered ? "decimal" : "disc";
+  return nextOrdered ? "decimal" : "none";
 }
 
 function validateList(

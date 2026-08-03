@@ -241,6 +241,8 @@ interface Props {
   currentItemType?: "page" | "layout" | "component";
   currentItemSlug?: string;
   showOutlines?: boolean;
+  showSelectionSizing?: boolean;
+  showSelectionToolbar?: boolean;
   wireframeMode?: boolean;
   selectedBlockId?: string | null;
   width?: string | number;
@@ -250,6 +252,8 @@ interface Props {
 const props = withDefaults(defineProps<Props>(), {
   currentLayout: null,
   showOutlines: false,
+  showSelectionSizing: true,
+  showSelectionToolbar: true,
   wireframeMode: false,
   selectedBlockId: null,
 });
@@ -676,16 +680,11 @@ function syncGlobalCssLink(
   const cacheKey =
     styles.globalCSSHash || styles.baseCSSHash || styles.styleRevision;
   const href = cacheKey
-    ? `/styles/global.css?preview=1&v=${encodeURIComponent(cacheKey)}`
-    : "";
+    ? `/styles/global.css?v=${encodeURIComponent(cacheKey)}`
+    : "/styles/global.css";
   let globalCssLinkEl = head.querySelector<HTMLLinkElement>(
     'link[data-aria-global-css="true"]',
   );
-
-  if (!href) {
-    globalCssLinkEl?.remove();
-    return;
-  }
 
   if (!globalCssLinkEl) {
     globalCssLinkEl = head.ownerDocument.createElement("link");
@@ -2730,6 +2729,10 @@ defineExpose({ iframeRef, getWindow, getDoc, getBody, getHead });
     <CanvasOverlayLayer
       ref="overlayLayerRef"
       :iframe-ref="iframeRef"
+      :current-item-type="currentItemType"
+      :current-item-slug="currentItemSlug"
+      :show-selection-sizing="showSelectionSizing"
+      :show-selection-toolbar="showSelectionToolbar"
       @toolbar-action="handleToolbarAction"
       @toolbar-style-change="handleToolbarStyleChange"
       @toolbar-props-change="handleToolbarPropsChange"

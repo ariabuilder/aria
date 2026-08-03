@@ -95,18 +95,49 @@ export async function touchContentRevisionForAction(
 ) {
   const revision = await touchContentRevision(adapter, mutation, context);
 
-  switch (mutation.mutationKind) {
-    case "save-layout":
-    case "delete-layout":
-    case "save-component":
-    case "delete-component":
-    case "save-styles":
-    case "save-site-settings": {
-      await purgeAllPublicPageCache(context ?? {}, mutation.mutationKind);
-      break;
+  await deliverContentRevisionForAction(revision, mutation, context);
+
+  return revision;
+}
+
+export type CommittedContentRevision = Awaited<
+  ReturnType<typeof touchContentRevision>
+>;
+
+export type ContentRevisionDeliveryOptions = {
+  /**
+   * Draft surface saves use immutable published dependency pins and must not
+   * purge public output. Immediately-public mutations retain the legacy purge.
+   */
+  purgePublicPages?: boolean;
+};
+
+/**
+ * Deliver non-authoritative notifications for an already committed revision.
+ * Callers that return an HTTP response may attach this promise to waitUntil.
+ */
+export async function deliverContentRevisionForAction(
+  revision: CommittedContentRevision,
+  mutation: Omit<TouchContentRevisionInput, "updatedBy">,
+  context?: ActionContextLike,
+  options: ContentRevisionDeliveryOptions = {},
+): Promise<void> {
+  const shouldPurgePublicPages = options.purgePublicPages !== false;
+
+  if (shouldPurgePublicPages) {
+    switch (mutation.mutationKind) {
+      case "save-layout":
+      case "delete-layout":
+      case "save-component":
+      case "delete-component":
+      case "save-styles":
+      case "save-site-settings": {
+        await purgeAllPublicPageCache(context ?? {}, mutation.mutationKind);
+        break;
+      }
+      default:
+        break;
     }
-    default:
-      break;
   }
 
   const resourceType = liveResourceTypeForMutation(mutation.mutationKind);
@@ -122,8 +153,6 @@ export async function touchContentRevisionForAction(
     });
     recordStudioDelivery(delivery);
   }
-
-  return revision;
 }
 
 export function withContentRevisionDefaults(

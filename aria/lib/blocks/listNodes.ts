@@ -147,9 +147,19 @@ export function createListNode(
       label: "List",
     },
     styles: {
+      widthSizing: {
+        base: "hug",
+      },
       listStyleType: {
         base: options.ordered ? "decimal" : "none",
       },
+      ...(options.ordered
+        ? {}
+        : {
+            padding: {
+              base: "0",
+            },
+          }),
     },
     children: options.items.map((item, index) =>
       createTextListItemNode(item, `Item ${index + 1}`),

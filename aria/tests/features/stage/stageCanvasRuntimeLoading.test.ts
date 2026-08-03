@@ -10,6 +10,10 @@ import { __resetShellModeTransitionForTests } from "../../../admin/features/Core
 vi.mock("../../../admin/features/Composer/components/ComposerStage.vue", () => ({
   default: defineComponent({
     name: "ComposerStage",
+    props: {
+      showSelectionSizing: Boolean,
+      showSelectionToolbar: Boolean,
+    },
     emits: [
       "ready",
       "select-block",
@@ -65,6 +69,8 @@ const baseProps = {
   isLoading: true,
   loadError: null,
   showOutlines: false,
+  showSelectionSizing: true,
+  showSelectionToolbar: true,
   wireframeMode: false,
   pageSlug: "home",
   currentLayout: null,
@@ -89,6 +95,16 @@ describe("StageCanvasRuntime loading lifecycle", () => {
     await wrapper.setProps({ isLoading: false });
 
     expect(wrapper.find("composer-stage-stub").exists()).toBe(true);
+    expect(
+      wrapper.getComponent({ name: "ComposerStage" }).props(
+        "showSelectionSizing",
+      ),
+    ).toBe(true);
+    expect(
+      wrapper.getComponent({ name: "ComposerStage" }).props(
+        "showSelectionToolbar",
+      ),
+    ).toBe(true);
 
     wrapper.getComponent({ name: "ComposerStage" }).vm.$emit("ready");
     await nextTick();
@@ -137,6 +153,8 @@ describe("AppCanvasShell transition overlay", () => {
         isItemTransitioning: true,
         loadError: null,
         showOutlines: false,
+        showSelectionSizing: true,
+        showSelectionToolbar: true,
         wireframeMode: false,
         currentLayout: null,
         stageKey: "stage-page-home",

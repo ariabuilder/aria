@@ -261,6 +261,24 @@ describe("editable surface normalization parity", () => {
     expect(first.source.packVersion).toBe("1.0.0");
   });
 
+  it("requires x.y.z pack versions", async () => {
+    const error = await expectInputErrorAsync(() =>
+      normalizeEditableSurface({
+        kind: "component",
+        source: component({
+          source: "aria",
+          packId: "core",
+          packVersion: "1.0",
+        }),
+      }),
+    );
+
+    expect(error.failure.context).toMatchObject({
+      surfaceKind: "component",
+      stage: "schema",
+    });
+  });
+
   it("normalizes legacy props, typography, classes, icons, and aliases", async () => {
     const result = await normalizeEditableSurface({
       kind: "component",
@@ -321,7 +339,9 @@ describe("editable surface normalization parity", () => {
   });
 
   it("deep-freezes only the returned surface when requested", async () => {
-    const source = component();
+    const source = component({
+      nodes: [builderNode({ props: { config: { enabled: true } } })],
+    });
     const frozen = await normalizeEditableSurface(
       { kind: "component", source },
       { freeze: true },
@@ -334,7 +354,11 @@ describe("editable surface normalization parity", () => {
     expect(Object.isFrozen(frozen)).toBe(true);
     expect(Object.isFrozen(frozen.source)).toBe(true);
     expect(Object.isFrozen(frozen.source.nodes[0])).toBe(true);
+    expect(Object.isFrozen(frozen.source.nodes[0]?.props.config)).toBe(true);
+    expect(frozen.source.nodes[0]?.props).not.toBe(source.nodes[0]?.props);
     expect(Object.isFrozen(source)).toBe(false);
+    expect(Object.isFrozen(source.nodes[0]?.props)).toBe(false);
+    expect(Object.isFrozen(source.nodes[0]?.props.config)).toBe(false);
     expect(Object.isFrozen(mutable)).toBe(false);
     expect(mutable.sourceHash).toBe(frozen.sourceHash);
   });

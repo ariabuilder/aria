@@ -17,6 +17,8 @@ interface Props {
   isLoading: boolean;
   loadError: string | null;
   showOutlines: boolean;
+  showSelectionSizing: boolean;
+  showSelectionToolbar: boolean;
   wireframeMode: boolean;
   pageSlug: string | null;
   currentLayout: LayoutDSL | null;
@@ -73,6 +75,8 @@ defineExpose({
       :footer-component="props.footerComponent"
       :expanded-blocks="props.expandedBlocks"
       :show-outlines="props.showOutlines"
+      :show-selection-sizing="props.showSelectionSizing"
+      :show-selection-toolbar="props.showSelectionToolbar"
       :wireframe-mode="props.wireframeMode"
       :page-slug="props.pageSlug"
       :current-layout="props.currentLayout"

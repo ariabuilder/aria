@@ -8,6 +8,7 @@ export function normalizeCanvasAttributeProps(
   props: Record<string, unknown>,
 ): Record<string, unknown> {
   const nextProps = { ...props };
+  delete nextProps.element;
   const normalizedType = normalizeContainerNodeType(
     block.type ?? "",
   ).toLowerCase();

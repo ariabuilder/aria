@@ -657,6 +657,52 @@ describe("nodesToHtml", () => {
     expect(html).not.toContain("aria-icon-alias.js");
   });
 
+  it("targets canonical icon styles at their rendered svg tag", () => {
+    const stylesheet = collectNodeStylesheet(
+      [
+        createNode({
+          id: "feature-icon",
+          type: "icon",
+          props: {
+            icon: normalizeIconValue("i-lucide:circle-check"),
+          },
+          styles: {
+            color: { base: "red", mobile: "blue" },
+          },
+        }),
+      ],
+      [
+        { name: "base", minWidth: "1280px", label: "Desktop" },
+        { name: "mobile", minWidth: "0px", label: "Mobile" },
+      ],
+    );
+
+    expect(stylesheet).toContain("svg.aria-feature-icon { color: red; }");
+    expect(stylesheet).toContain("svg.aria-feature-icon { color: blue; }");
+    expect(stylesheet).not.toContain("i.aria-feature-icon");
+  });
+
+  it("uses linked-container tag context for stylesheet selectors", () => {
+    const stylesheet = collectNodeStylesheet([
+      createNode({
+        id: "linked-card",
+        type: "Container",
+        props: { href: "/features" },
+        children: [
+          createNode({
+            id: "nested-link",
+            type: "Link",
+            props: { href: "/nested" },
+            styles: { color: { base: "red" } },
+          }),
+        ],
+      }),
+    ]);
+
+    expect(stylesheet).toContain("div.aria-nested-link { color: red; }");
+    expect(stylesheet).not.toContain("a.aria-nested-link");
+  });
+
   it("does not leak raw icon props into rendered icon markup", () => {
     const html = nodesToHtmlDocument(
       [

@@ -17,7 +17,7 @@ import {
   preflightBuilderNodeArrayInput,
   preflightBuilderNodeInput,
 } from "../../../../../../lib/rendering/canonical/preflight";
-import type { RenderSurfaceKind } from "../../../../../../lib/rendering/canonical";
+import { renderSurfaceKindForCollection } from "../../../../../../lib/rendering/canonical";
 import {
   AriaInsertNodesInputSchema,
   AriaInsertNodesOutputSchema,
@@ -40,14 +40,6 @@ import { denyUtilityClassesWhenDisabled } from "./utilityClassPolicy";
 
 function writeSuccessResult(): { success: true } {
   return { success: true as const };
-}
-
-function collectionSurfaceKind(
-  collection: "pages" | "layouts" | "components",
-): RenderSurfaceKind {
-  if (collection === "pages") return "page";
-  if (collection === "layouts") return "layout";
-  return "component";
 }
 
 function denyPageWrites(
@@ -87,7 +79,7 @@ export async function ariaInsertNodes(
   let preflightedNodes: unknown[];
   try {
     preflightedNodes = preflightBuilderNodeArrayInput({
-      kind: collectionSurfaceKind(parsed.data.collection),
+      kind: renderSurfaceKindForCollection(parsed.data.collection),
       nodes: parsed.data.nodes,
     }).source as unknown[];
   } catch {
@@ -455,7 +447,7 @@ export async function ariaReplaceNode(
   let preflightedNode: unknown;
   try {
     preflightedNode = preflightBuilderNodeInput({
-      kind: collectionSurfaceKind(parsed.data.collection),
+      kind: renderSurfaceKindForCollection(parsed.data.collection),
       node: parsed.data.node,
     }).source;
   } catch {

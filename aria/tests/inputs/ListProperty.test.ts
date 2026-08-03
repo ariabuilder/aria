@@ -28,15 +28,12 @@ const setClassRuleMock = vi.fn();
 const signalAddBlockMock = vi.fn();
 
 vi.mock("../../admin/features/Core", async (importOriginal) => {
-  const actual = await importOriginal<
-    typeof import("../../admin/features/Core")
-  >();
-  const { getComputedValue } = await import(
-    "../../admin/features/Core/utils/responsive"
-  );
-  const { normalizeResponsiveStyleMap } = await import(
-    "../../lib/blocks/normalizeResponsiveStyleMap"
-  );
+  const actual =
+    await importOriginal<typeof import("../../admin/features/Core")>();
+  const { getComputedValue } =
+    await import("../../admin/features/Core/utils/responsive");
+  const { normalizeResponsiveStyleMap } =
+    await import("../../lib/blocks/normalizeResponsiveStyleMap");
 
   return {
     ...actual,
@@ -137,7 +134,7 @@ vi.mock("../../admin/features/Inspector/composables/usePropertySchema", () => ({
     safeParse: vi.fn(() => ({ success: true })),
     getDefault: vi.fn(() => ({
       ordered: false,
-      listStyleType: { default: "disc" },
+      listStyleType: { default: "none" },
       listStylePosition: { default: "outside" },
     })),
   }),
@@ -359,13 +356,13 @@ describe("ListProperty", () => {
     expect(previewPropsMock).toHaveBeenCalledWith({ ordered: false }, "list-1");
     expect(previewStylePropertiesMock).toHaveBeenCalledWith(
       {
-        listStyleType: "disc",
+        listStyleType: "none",
       },
       "list-1",
     );
     expect(savePropertyMock).toHaveBeenCalledWith(
       "listStyleType",
-      "disc",
+      "none",
       "page",
       "home",
       "list-1",
@@ -629,6 +626,61 @@ describe("ListProperty", () => {
     expect(
       signalAddBlockMock.mock.calls[0]?.[0]?.block?.children?.[0]?.type,
     ).toBe("icon");
+  });
+
+  it("suppresses ordinary list authoring controls for description lists", async () => {
+    selectedNodeRef.value = {
+      id: "list-1",
+      type: "list",
+      props: {
+        element: "dl",
+      },
+      styles: {},
+      children: [],
+    };
+    selectionTreeRootNodesRef.value = [selectedNodeRef.value];
+
+    const wrapper = mount(ListProperty, {
+      props: {
+        currentItemType: "page",
+        currentItemSlug: "home",
+      },
+      global: {
+        stubs: {
+          BaseProperty: defineComponent({
+            setup(_, { slots }) {
+              return () =>
+                h("div", [slots["header-actions"]?.(), slots.default?.()]);
+            },
+          }),
+          InspectorBreakpointIndicators: true,
+          Tabs: true,
+          TabsList: true,
+          TabsTrigger: true,
+          Select: true,
+          SelectTrigger: true,
+          SelectValue: true,
+          SelectContent: true,
+          SelectItem: true,
+          Button: true,
+        },
+      },
+    });
+
+    await flushPromises();
+
+    expect(wrapper.find('[data-testid="list-add-item-button"]').exists()).toBe(
+      false,
+    );
+    expect(wrapper.find('[data-testid="list-ordered-tabs"]').exists()).toBe(
+      false,
+    );
+    expect(
+      wrapper.find('[data-testid="list-style-type-select"]').exists(),
+    ).toBe(false);
+    expect(
+      wrapper.find('[data-testid="list-style-position-select"]').exists(),
+    ).toBe(false);
   });
 
   it("cascades desktop list marker values to smaller breakpoints when reading", async () => {

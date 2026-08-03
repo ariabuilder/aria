@@ -246,6 +246,79 @@ export function useSavePublish(deps: SavePublishDeps): SavePublishReturn {
     );
   }
 
+  function isAmbiguousSaveTransportError(error: unknown): boolean {
+    if (error instanceof TypeError) {
+      const message = error.message.toLowerCase();
+      return (
+        message.includes("failed to fetch") ||
+        message.includes("network") ||
+        message.includes("load failed")
+      );
+    }
+
+    if (!error || typeof error !== "object") return false;
+    const candidate = error as {
+      code?: unknown;
+      message?: unknown;
+      status?: unknown;
+      statusCode?: unknown;
+    };
+    const status =
+      typeof candidate.status === "number"
+        ? candidate.status
+        : typeof candidate.statusCode === "number"
+          ? candidate.statusCode
+          : null;
+    if (status === 502 || status === 503 || status === 504) return true;
+
+    const code =
+      typeof candidate.code === "string" ? candidate.code.toUpperCase() : "";
+    if (
+      code === "SERVICE_UNAVAILABLE" ||
+      code === "BAD_GATEWAY" ||
+      code === "GATEWAY_TIMEOUT"
+    ) {
+      return true;
+    }
+
+    const message =
+      typeof candidate.message === "string"
+        ? candidate.message.toLowerCase()
+        : "";
+    return (
+      message.includes("failed to fetch") ||
+      message.includes("service unavailable") ||
+      message.includes("bad gateway") ||
+      message.includes("gateway timeout")
+    );
+  }
+
+  function createUnknownSaveStatusError(): Error {
+    return Object.assign(
+      new Error(
+        "Save status is unknown. Your local draft is preserved; try saving again before publishing.",
+      ),
+      { code: "SAVE_STATUS_UNKNOWN" },
+    );
+  }
+
+  async function runAmbiguousSaveRetry<T extends { error?: unknown }>(
+    request: () => Promise<T>,
+  ): Promise<T> {
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      try {
+        const result = await request();
+        if (!isAmbiguousSaveTransportError(result.error)) return result;
+        if (attempt === 1) throw createUnknownSaveStatusError();
+      } catch (error) {
+        if (!isAmbiguousSaveTransportError(error)) throw error;
+        if (attempt === 1) throw createUnknownSaveStatusError();
+      }
+    }
+
+    throw createUnknownSaveStatusError();
+  }
+
   function activeComposeSlug(): string | null {
     const itemType = currentItemType.value;
     if (itemType === "page" && currentPage.value) {
@@ -458,19 +531,21 @@ export function useSavePublish(deps: SavePublishDeps): SavePublishReturn {
   ): Promise<SaveActionData> {
     let nonce = initialNonce;
     for (let attempt = 0; attempt < 2; attempt++) {
-      const actionResult = await actions.savePage({
-        id: page.id,
-        blocks: sanitizedBlocks,
-        title: page.title,
-        description: page.description,
-        layout,
-        settings: page.settings
-          ? JsonObjectSchema.parse(JSON.parse(JSON.stringify(page.settings)))
-          : undefined,
-        nonce: nonce ?? undefined,
-        expectedVersion: expectedVersionFor(page),
-        ...(layoutDraft ? { layoutDraft } : {}),
-      });
+      const actionResult = await runAmbiguousSaveRetry(() =>
+        actions.savePage({
+          id: page.id,
+          blocks: sanitizedBlocks,
+          title: page.title,
+          description: page.description,
+          layout,
+          settings: page.settings
+            ? JsonObjectSchema.parse(JSON.parse(JSON.stringify(page.settings)))
+            : undefined,
+          nonce: nonce ?? undefined,
+          expectedVersion: expectedVersionFor(page),
+          ...(layoutDraft ? { layoutDraft } : {}),
+        }),
+      );
 
       if (!actionResult.error) {
         return parseSaveActionData(actionResult.data, "page");
@@ -511,14 +586,16 @@ export function useSavePublish(deps: SavePublishDeps): SavePublishReturn {
     sanitizedBlocks: BuilderNode[],
   ): Promise<SaveActionData> {
     for (let attempt = 0; attempt < 2; attempt++) {
-      const actionResult = await actions.saveComponent({
-        id: component.id,
-        blocks: sanitizedBlocks,
-        name: component.name,
-        category: component.category,
-        description: component.description,
-        expectedVersion: expectedVersionFor(component),
-      });
+      const actionResult = await runAmbiguousSaveRetry(() =>
+        actions.saveComponent({
+          id: component.id,
+          blocks: sanitizedBlocks,
+          name: component.name,
+          category: component.category,
+          description: component.description,
+          expectedVersion: expectedVersionFor(component),
+        }),
+      );
 
       if (!actionResult.error) {
         return parseSaveActionData(actionResult.data, "component");
@@ -677,12 +754,14 @@ export function useSavePublish(deps: SavePublishDeps): SavePublishReturn {
           nodes: sanitizedBlocks,
         });
         const layoutSlug = layoutToSave.slug ?? layoutToSave.id;
-        const layoutResult = await actions.updateItem({
-          collection: "layouts",
-          slug: layoutSlug,
-          data: layoutPayloadForStorage(layoutPayload),
-          expectedVersion: expectedVersionFor(layoutToSave),
-        });
+        const layoutResult = await runAmbiguousSaveRetry(() =>
+          actions.updateItem({
+            collection: "layouts",
+            slug: layoutSlug,
+            data: layoutPayloadForStorage(layoutPayload),
+            expectedVersion: expectedVersionFor(layoutToSave),
+          }),
+        );
         if (layoutResult.error) {
           throw actionErrorToError(
             layoutResult.error as { message?: string; code?: string },
@@ -841,6 +920,7 @@ export function useSavePublish(deps: SavePublishDeps): SavePublishReturn {
       const result = await actions.publishing.publish({
         id: publishingPageId,
         expectedVersion: requestedVersion,
+        skipCSSRegeneration: true,
       });
 
       if (result.error) {

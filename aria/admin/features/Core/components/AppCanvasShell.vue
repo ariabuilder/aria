@@ -27,6 +27,8 @@ const props = defineProps<{
   isItemTransitioning: boolean;
   loadError: string | null;
   showOutlines: boolean;
+  showSelectionSizing: boolean;
+  showSelectionToolbar: boolean;
   wireframeMode: boolean;
   currentLayout: LayoutDSL | null;
   stageKey: string;
@@ -164,6 +166,8 @@ defineExpose({
           :is-loading="props.isLoading"
           :load-error="props.loadError"
           :show-outlines="props.showOutlines"
+          :show-selection-sizing="props.showSelectionSizing"
+          :show-selection-toolbar="props.showSelectionToolbar"
           :wireframe-mode="props.wireframeMode"
           :page-slug="props.pageSlug"
           :current-layout="props.currentLayout"

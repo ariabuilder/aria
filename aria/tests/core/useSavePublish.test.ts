@@ -338,6 +338,7 @@ describe("useSavePublish", () => {
     expect(publishMock).toHaveBeenCalledWith({
       id: "page-home",
       expectedVersion: "v2",
+      skipCSSRegeneration: true,
     });
     expect(getItemMock).not.toHaveBeenCalled();
     expect(deps.currentPage.value?.status).toBe("published");
@@ -744,6 +745,106 @@ describe("useSavePublish", () => {
     ).not.toContain("typed-during-save");
     expect(deps.currentComponent.value?.version).toBe("component-v2");
     expect(deps.hasUnsavedChanges.value).toBe(true);
+  });
+
+  it("retries an ambiguous component save response with the same payload", async () => {
+    const { useSavePublish } =
+      await import("../../admin/features/Core/composables/useSavePublish");
+
+    const deps = createSaveDeps();
+    deps.currentItemType.value = "component";
+    deps.currentPage.value = null;
+    deps.currentComponent.value = {
+      id: "header",
+      name: "Header",
+      nodes: [createNode({ id: "old-header" })],
+      version: "component-v1",
+    };
+    deps.pageBlocks.value = [createNode({ id: "saved-header" })];
+    saveComponentMock
+      .mockRejectedValueOnce(new TypeError("Failed to fetch"))
+      .mockResolvedValueOnce({
+        data: {
+          version: "component-v2",
+          success: true,
+        },
+        error: null,
+      });
+
+    const { handleSave } = useSavePublish(deps);
+    await handleSave();
+
+    expect(saveComponentMock).toHaveBeenCalledTimes(2);
+    expect(saveComponentMock.mock.calls[1]?.[0]).toEqual(
+      saveComponentMock.mock.calls[0]?.[0],
+    );
+    expect(deps.currentComponent.value?.version).toBe("component-v2");
+    expect(commitSavedComponentToClientCachesMock).toHaveBeenCalledOnce();
+  });
+
+  it("retries a resolved ambiguous component save error with the same payload", async () => {
+    const { useSavePublish } =
+      await import("../../admin/features/Core/composables/useSavePublish");
+
+    const deps = createSaveDeps();
+    deps.currentItemType.value = "component";
+    deps.currentPage.value = null;
+    deps.currentComponent.value = {
+      id: "header",
+      name: "Header",
+      nodes: [createNode({ id: "old-header" })],
+      version: "component-v1",
+    };
+    deps.pageBlocks.value = [createNode({ id: "saved-header" })];
+    saveComponentMock
+      .mockResolvedValueOnce({
+        data: undefined,
+        error: { code: "SERVICE_UNAVAILABLE", message: "Try again" },
+      })
+      .mockResolvedValueOnce({
+        data: {
+          version: "component-v2",
+          success: true,
+        },
+        error: null,
+      });
+
+    const { handleSave } = useSavePublish(deps);
+    await handleSave();
+
+    expect(saveComponentMock).toHaveBeenCalledTimes(2);
+    expect(saveComponentMock.mock.calls[1]?.[0]).toEqual(
+      saveComponentMock.mock.calls[0]?.[0],
+    );
+    expect(deps.currentComponent.value?.version).toBe("component-v2");
+  });
+
+  it("preserves the local draft when component save status remains unknown", async () => {
+    const { useSavePublish } =
+      await import("../../admin/features/Core/composables/useSavePublish");
+
+    const deps = createSaveDeps();
+    deps.currentItemType.value = "component";
+    deps.currentPage.value = null;
+    deps.currentComponent.value = {
+      id: "header",
+      name: "Header",
+      nodes: [createNode({ id: "old-header" })],
+      version: "component-v1",
+    };
+    deps.pageBlocks.value = [createNode({ id: "unsaved-header" })];
+    saveComponentMock.mockRejectedValue(new TypeError("Failed to fetch"));
+
+    const { handleSave } = useSavePublish(deps);
+    await handleSave();
+
+    expect(saveComponentMock).toHaveBeenCalledTimes(2);
+    expect(commitSavedComponentToClientCachesMock).not.toHaveBeenCalled();
+    expect(deps.currentComponent.value?.version).toBe("component-v1");
+    expect(deps.hasUnsavedChanges.value).toBe(true);
+    expect(toastErrorMock).toHaveBeenCalledWith(
+      "Save status is unknown. Your local draft is preserved; try saving again before publishing.",
+    );
   });
 
   it("does not change component caches when the guarded save fails", async () => {

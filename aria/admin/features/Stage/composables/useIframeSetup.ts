@@ -108,11 +108,9 @@ function resolveStageGlobalCssHref(styles: IframeRenderStyles): string | null {
   const cacheKey =
     styles.globalCSSHash || styles.baseCSSHash || styles.styleRevision;
 
-  if (!cacheKey) {
-    return null;
-  }
-
-  return `/styles/global.css?preview=1&v=${encodeURIComponent(cacheKey)}`;
+  return cacheKey
+    ? `/styles/global.css?v=${encodeURIComponent(cacheKey)}`
+    : "/styles/global.css";
 }
 
 /**

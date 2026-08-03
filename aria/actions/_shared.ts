@@ -4,7 +4,11 @@
 
 import type { ActionAPIContext } from "astro:actions";
 import { getStorageAdapterAsync } from "../lib/storage/getStorageAdapter";
-import { touchContentRevisionForAction } from "../lib/content-sync/mutations";
+import {
+  deliverContentRevisionForAction,
+  touchContentRevision,
+  touchContentRevisionForAction,
+} from "../lib/content-sync/mutations";
 import {
   formatPageCmsRoutingDeleteMessage,
   getPageCmsRoutingImpact,
@@ -48,6 +52,7 @@ import {
 import { deletePageSnapshots } from "../lib/rendering/pageSnapshots";
 import { readSessionUserFromLocals } from "../lib/runtime/requestLocals";
 import { assertExecutableContentChangeAllowed } from "../lib/security/executableContent";
+import { deferWithWaitUntil } from "../lib/cloudflare/waitUntil";
 
 // Re-export auth helpers for use in action modules
 export {
@@ -166,6 +171,58 @@ export type SaveResourceOptions = {
   versionSaveOptions?: VersionSaveOptions;
   linkedLayoutDraft?: import("../lib/storage/adapter").LinkedLayoutDraftSave;
 };
+
+type DraftSurfaceMutation = {
+  mutationKind: "save-page" | "save-layout" | "save-component";
+  mutationTarget: string;
+};
+
+async function commitDraftRevisionAndScheduleDelivery(
+  adapter: StorageAdapter,
+  context: ActionContextLike,
+  mutation: DraftSurfaceMutation,
+  diagnostics: {
+    correlationId: string;
+    collection: CollectionType;
+    resourceId: string;
+    version: string;
+  },
+): Promise<void> {
+  let revision: Awaited<ReturnType<typeof touchContentRevision>>;
+  try {
+    revision = await touchContentRevision(adapter, mutation, context);
+  } catch (error) {
+    log("warn", "Resource save content revision failed after commit", {
+      code: "RESOURCE_SAVE_REVISION_FAILED",
+      ...diagnostics,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return;
+  }
+  log("info", "Resource save content revision committed", {
+    code: "RESOURCE_SAVE_REVISION_COMMITTED",
+    ...diagnostics,
+    revisionSeq: revision.revisionSeq,
+  });
+
+  const delivery = deliverContentRevisionForAction(
+    revision,
+    mutation,
+    context,
+    { purgePublicPages: false },
+  ).catch((error: unknown) => {
+    log("warn", "Resource save post-commit delivery failed", {
+      code: "RESOURCE_SAVE_DELIVERY_FAILED",
+      ...diagnostics,
+      revisionSeq: revision.revisionSeq,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  });
+
+  if (!deferWithWaitUntil(context.locals, delivery)) {
+    await delivery;
+  }
+}
 
 /**
  * Gate a mutation by operation ID and build Zod-parsed authorship context.
@@ -847,57 +904,28 @@ export async function saveResource(
           },
           parsedAuthorship,
         );
-        const pagePostCommitResults = await Promise.allSettled([
-          touchContentRevisionForAction(
+        await commitDraftRevisionAndScheduleDelivery(
+          adapter,
+          context,
+          { mutationKind: "save-page", mutationTarget: slug },
+          { correlationId, collection, resourceId: slug, version },
+        );
+        if (saveOptions?.linkedLayoutDraft) {
+          await commitDraftRevisionAndScheduleDelivery(
             adapter,
-            {
-              mutationKind: "save-page",
-              mutationTarget: slug,
-            },
             context,
-          ),
-          invalidateComposeCache(context, "page", slug, undefined, "crud"),
-          ...(saveOptions?.linkedLayoutDraft
-            ? [
-                touchContentRevisionForAction(
-                  adapter,
-                  {
-                    mutationKind: "save-layout" as const,
-                    mutationTarget: saveOptions.linkedLayoutDraft.id,
-                  },
-                  context,
-                ),
-                invalidateComposeCache(
-                  context,
-                  "layout",
-                  saveOptions.linkedLayoutDraft.id,
-                  undefined,
-                  "crud",
-                ),
-                invalidateDependentPageCaches(
-                  context,
-                  "layout",
-                  saveOptions.linkedLayoutDraft.id,
-                ),
-              ]
-            : []),
-        ]);
-        pagePostCommitResults.forEach((result, index) => {
-          if (result.status === "rejected") {
-            log("warn", "Resource save post-commit side effect failed", {
-              code: "RESOURCE_SAVE_POST_COMMIT_FAILED",
+            {
+              mutationKind: "save-layout",
+              mutationTarget: saveOptions.linkedLayoutDraft.id,
+            },
+            {
               correlationId,
               collection,
-              resourceId: slug,
+              resourceId: saveOptions.linkedLayoutDraft.id,
               version,
-              index,
-              error:
-                result.reason instanceof Error
-                  ? result.reason.message
-                  : String(result.reason),
-            });
-          }
-        });
+            },
+          );
+        }
         break;
       case "layouts":
         version = await adapter.saveLayoutDSL(
@@ -906,40 +934,12 @@ export async function saveResource(
           versionOptions,
           parsedAuthorship,
         );
-        const layoutPostCommitResults = await Promise.allSettled([
-          touchContentRevisionForAction(
-            adapter,
-            {
-              mutationKind: "save-layout",
-              mutationTarget: slug,
-            },
-            context,
-          ),
-          invalidateComposeCache(
-            context,
-            "layout",
-            slug,
-            undefined,
-            "crud",
-          ),
-          invalidateDependentPageCaches(context, "layout", slug),
-        ]);
-        layoutPostCommitResults.forEach((result, index) => {
-          if (result.status === "rejected") {
-            log("warn", "Resource save post-commit side effect failed", {
-              code: "RESOURCE_SAVE_POST_COMMIT_FAILED",
-              correlationId,
-              collection,
-              resourceId: slug,
-              version,
-              index,
-              error:
-                result.reason instanceof Error
-                  ? result.reason.message
-                  : String(result.reason),
-            });
-          }
-        });
+        await commitDraftRevisionAndScheduleDelivery(
+          adapter,
+          context,
+          { mutationKind: "save-layout", mutationTarget: slug },
+          { correlationId, collection, resourceId: slug, version },
+        );
         break;
       case "components":
         version = await adapter.saveComponentDSL(
@@ -948,40 +948,12 @@ export async function saveResource(
           versionOptions,
           parsedAuthorship,
         );
-        const componentPostCommitResults = await Promise.allSettled([
-          touchContentRevisionForAction(
-            adapter,
-            {
-              mutationKind: "save-component",
-              mutationTarget: slug,
-            },
-            context,
-          ),
-          invalidateComposeCache(
-            context,
-            "component",
-            slug,
-            undefined,
-            "crud",
-          ),
-          invalidateDependentPageCaches(context, "component", slug),
-        ]);
-        componentPostCommitResults.forEach((result, index) => {
-          if (result.status === "rejected") {
-            log("warn", "Resource save post-commit side effect failed", {
-              code: "RESOURCE_SAVE_POST_COMMIT_FAILED",
-              correlationId,
-              collection,
-              resourceId: slug,
-              version,
-              index,
-              error:
-                result.reason instanceof Error
-                  ? result.reason.message
-                  : String(result.reason),
-            });
-          }
-        });
+        await commitDraftRevisionAndScheduleDelivery(
+          adapter,
+          context,
+          { mutationKind: "save-component", mutationTarget: slug },
+          { correlationId, collection, resourceId: slug, version },
+        );
         break;
       default:
         throw createError(
