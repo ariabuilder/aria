@@ -1356,6 +1356,29 @@ describe("extracted node event handlers", () => {
     );
   });
 
+  it("does not mutate or create history when the detach target is unresolved", async () => {
+    const pageBlocks = pageBlocksRef([createNode("heading-1", "Heading")]);
+    const executeNodeEventOperation = createNodeEventExecutorMock({
+      runRedo: true,
+    });
+    const { handleDetachComponent } = createComponentHandlersForTest({
+      pageBlocks,
+      currentPage: ref(null),
+      currentLayout: ref(null),
+      currentComponent: ref(null),
+      executeNodeEventOperation,
+      setSelectedBlock: vi.fn(),
+      resolveMutationPath: () => ({ collection: "pages", id: "page-1" }),
+      getDefaultSlotName: () => "main",
+    });
+
+    await handleDetachComponent("missing-node");
+
+    expect(collectNodeIds(pageBlocks.value)).toEqual(["heading-1"]);
+    expect(executeNodeEventOperation).not.toHaveBeenCalled();
+    expect(toastMock.error).toHaveBeenCalledWith("Component not found");
+  });
+
   it("does not mutate or create history when component loading fails", async () => {
     const pageBlocks = pageBlocksRef([
       {
@@ -1367,7 +1390,9 @@ describe("extracted node event handlers", () => {
         },
       },
     ]);
-    actionsMock.getItem.mockRejectedValueOnce(new Error("Component unavailable"));
+    actionsMock.getItem.mockRejectedValueOnce(
+      new Error("Component unavailable"),
+    );
     const executeNodeEventOperation = createNodeEventExecutorMock({
       runRedo: true,
     });
@@ -1471,18 +1496,17 @@ describe("extracted node event handlers", () => {
         return { success: true };
       },
     );
-    const { handleReplaceBlockWithComponent } =
-      createComponentHandlersForTest({
-        pageBlocks,
-        currentPage: ref(null),
-        currentLayout,
-        currentComponent: ref(null),
-        executeNodeEventOperation,
-        setSelectedBlock: vi.fn(),
-        resolveMutationPath: () => ({ collection: "pages", id: "page-1" }),
-        getDefaultSlotName: () => "main",
-        editorNodeRegistry,
-      });
+    const { handleReplaceBlockWithComponent } = createComponentHandlersForTest({
+      pageBlocks,
+      currentPage: ref(null),
+      currentLayout,
+      currentComponent: ref(null),
+      executeNodeEventOperation,
+      setSelectedBlock: vi.fn(),
+      resolveMutationPath: () => ({ collection: "pages", id: "page-1" }),
+      getDefaultSlotName: () => "main",
+      editorNodeRegistry,
+    });
 
     await handleReplaceBlockWithComponent("header-heading", "site-header");
 
@@ -1495,10 +1519,13 @@ describe("extracted node event handlers", () => {
     expect(collectNodeIds(pageBlocks.value)).toEqual(["main-page"]);
 
     await historyCallbacks?.undo();
-    expect(currentLayout.value?.slots?.[0]?.defaultContent?.[0]).toMatchObject({
+    const restored = currentLayout.value?.slots?.[0]?.defaultContent?.[0];
+    expect(restored).toMatchObject({
       id: "header-heading",
       type: "Heading",
     });
+    expect(restored?.componentRef).toBeUndefined();
+    expect(restored?.reference).toBeUndefined();
   });
 
   it("reorders nodes from layers handler", () => {
