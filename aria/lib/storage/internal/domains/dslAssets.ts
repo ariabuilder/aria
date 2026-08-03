@@ -187,13 +187,14 @@ export function createDslAssetStorageDomain(
           : null;
 
       let shouldInsertVersion = true;
+      let existingVersionHash: string | null = null;
       const existingVersionRow = await context.getStoredVersionRow(
         "aria_layout_versions",
         id,
         version,
       );
       if (existingVersionRow) {
-        const existingVersionHash = await resolveStoredSemanticSourceHash({
+        existingVersionHash = await resolveStoredSemanticSourceHash({
           kind: "layout",
           row: existingVersionRow,
           fallback: () =>
@@ -212,12 +213,6 @@ export function createDslAssetStorageDomain(
       }
 
       if (!shouldInsertVersion && existingVersionRow) {
-        const existingVersionHash = await resolveStoredSemanticSourceHash({
-          kind: "layout",
-          row: existingVersionRow,
-          fallback: () =>
-            context.resolveStoredVersionContentHash(existingVersionRow),
-        });
         if (existingVersionHash !== incomingHash) {
           await context.run(
             `UPDATE aria_layout_versions
@@ -471,13 +466,14 @@ export function createDslAssetStorageDomain(
       };
 
       let shouldInsertVersion = true;
+      let existingVersionHash: string | null = null;
       const existingVersionRow = await context.getStoredVersionRow(
         "aria_component_versions",
         id,
         version,
       );
       if (existingVersionRow) {
-        const existingVersionHash = await resolveStoredSemanticSourceHash({
+        existingVersionHash = await resolveStoredSemanticSourceHash({
           kind: "component",
           row: existingVersionRow,
           fallback: () =>
@@ -496,12 +492,6 @@ export function createDslAssetStorageDomain(
       }
 
       if (!shouldInsertVersion && existingVersionRow) {
-        const existingVersionHash = await resolveStoredSemanticSourceHash({
-          kind: "component",
-          row: existingVersionRow,
-          fallback: () =>
-            context.resolveStoredVersionContentHash(existingVersionRow),
-        });
         if (existingVersionHash !== incomingHash) {
           await context.run(
             `UPDATE aria_component_versions

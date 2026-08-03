@@ -214,6 +214,16 @@ async function persistLibraryComponent(
   );
 }
 
+export function resolveStarterButtonPackVersion(): string {
+  const packId = ARIA_FREE_BUTTON_COMPONENT.packId ?? "aria-free-pack";
+  return (
+    SEEDED_REGISTRY_MANIFEST.packs.find((pack) => pack.id === packId)
+      ?.version ??
+    ARIA_FREE_BUTTON_COMPONENT.version ??
+    "1.0.0"
+  );
+}
+
 function normalizeAriaComponent(
   component: ComponentDSL,
   pack: PackManifest,
@@ -835,8 +845,8 @@ export const library = {
       const normalized = {
         ...ARIA_FREE_BUTTON_COMPONENT,
         source: "aria" as const,
-        packId: "aria-free-pack",
-        packVersion: ARIA_FREE_BUTTON_COMPONENT.version ?? "1.0.0",
+        packId: ARIA_FREE_BUTTON_COMPONENT.packId ?? "aria-free-pack",
+        packVersion: resolveStarterButtonPackVersion(),
         tier: "free" as const,
         isLocked: true,
         updatedAt: new Date().toISOString(),

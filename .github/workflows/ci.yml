@@ -38,9 +38,10 @@ jobs:
           node-version: "22"
           cache: npm
 
-      - run: npm run check:push-guards
       - run: npm ci
+      - run: npm run check:push-guards
       - run: npm run check:type-safety
+      - run: npm run check:rendering-writers
       - run: ${{ matrix.test-command }}
       - env:
           NODE_OPTIONS: --max-old-space-size=8192

@@ -38,12 +38,29 @@ export function defineAction<T extends { handler?: (...args: never[]) => unknown
 }
 
 export class ActionError extends Error {
+  readonly type = "AstroActionError";
   code: string;
 
   constructor(input: { code: string; message: string }) {
     super(input.message);
     this.code = input.code;
     this.name = "ActionError";
+  }
+
+  static fromJson(body: unknown): ActionError {
+    if (
+      body !== null &&
+      typeof body === "object" &&
+      "type" in body &&
+      body.type === "AstroActionError" &&
+      "code" in body &&
+      typeof body.code === "string" &&
+      "message" in body &&
+      typeof body.message === "string"
+    ) {
+      return new ActionError({ code: body.code, message: body.message });
+    }
+    return new ActionError({ code: "INTERNAL_SERVER_ERROR", message: "" });
   }
 }
 

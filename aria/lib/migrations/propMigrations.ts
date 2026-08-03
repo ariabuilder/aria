@@ -105,9 +105,16 @@ export function migrateNode(node: BuilderNode): BuilderNode {
           `v${currentVersion} → v${nextVersion}: ${migration.description}`,
         );
       } catch (error) {
+        // This module is bundled into the portable canonical normalizer, so avoid
+        // the environment-aware logger and preserve the original Error object.
         console.error(
           `[Migration Error] Failed to migrate ${node.type} from v${currentVersion} to v${nextVersion}`,
-          error instanceof Error ? error.message : "Unknown migration error",
+          {
+            nodeType: node.type,
+            fromVersion: currentVersion,
+            toVersion: nextVersion,
+            error: error instanceof Error ? error : new Error(String(error)),
+          },
         );
         // Continue with partial migration
       }

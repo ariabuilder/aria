@@ -75,6 +75,12 @@ if (violations.length > 0) {
   process.exit(1);
 }
 
+execFileSync(
+  process.execPath,
+  ["--import", "tsx", "aria/scripts/check-rendering-writer-boundaries.ts"],
+  { stdio: "inherit" },
+);
+
 console.log(
   `Repository push guard passed for ${trackedFiles.length} tracked files.`,
 );

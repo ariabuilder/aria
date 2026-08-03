@@ -51,7 +51,6 @@ import {
   type IconRenderResources,
 } from "../icons/iconRenderResources";
 import {
-  getNativeTagForRenderableNode,
   getNativeTagForRenderableNodeInContext,
   resolveRenderedButtonVariant,
   stripConsumedRenderPropsForNode,
@@ -846,6 +845,31 @@ function renderContainerLinkedChildren(
   return `\n${childIndentStr}${openTag("a", linkAttrs)}\n${linkedChildrenHtml}\n${childIndentStr}</a>\n${indentStr}`;
 }
 
+function resolveRenderedNodeTag(
+  node: BuilderNode,
+  props: JsonObject,
+  context: RenderableNodeTagContext = {},
+): string {
+  const normalizedType = normalizeContainerNodeType(node.type).toLowerCase();
+  if (
+    normalizedType === "icon" &&
+    getCanonicalIconIdFromValue(props.icon) !== null
+  ) {
+    return "svg";
+  }
+  return getNativeTagForRenderableNodeInContext(node, props, context);
+}
+
+function resolveChildTagContext(
+  node: BuilderNode,
+  context: RenderableNodeTagContext,
+): RenderableNodeTagContext {
+  return context.insideContainerLinkWrapper ||
+    shouldWrapContainerChildrenInLink(node)
+    ? { insideContainerLinkWrapper: true }
+    : context;
+}
+
 function renderNode(
   node: BuilderNode,
   indent: number = 0,
@@ -907,11 +931,7 @@ function renderNode(
   );
 
   // Determine HTML tag based on block type
-  const tag = getNativeTagForRenderableNodeInContext(
-    node,
-    renderProps,
-    renderContext,
-  );
+  const tag = resolveRenderedNodeTag(node, renderProps, renderContext);
 
   const attrs: string[] = [];
 
@@ -1217,7 +1237,11 @@ function collectResponsiveStyleRules(
   const resolvedBreakpoints = resolveBreakpoints(breakpoints);
   const buckets = new Map<string, ResponsiveStyleBucket>();
 
-  function traverse(node: BuilderNode, parent: BuilderNode | null) {
+  function traverse(
+    node: BuilderNode,
+    parent: BuilderNode | null,
+    renderContext: RenderableNodeTagContext = {},
+  ) {
     const { props: renderProps, styles: rawStyles } =
       normalizeLegacyNodeCompatibility(node);
     const renderStyles = mergeSizingResolutionAcrossBreakpoints(
@@ -1227,7 +1251,7 @@ function collectResponsiveStyleRules(
     );
 
     if (Object.keys(renderStyles).length > 0) {
-      const tag = getNativeTagForRenderableNode(node, renderProps) ?? "div";
+      const tag = resolveRenderedNodeTag(node, renderProps, renderContext);
       collectNodeResponsiveCssRules(
         renderStyles,
         node.id,
@@ -1238,7 +1262,8 @@ function collectResponsiveStyleRules(
     }
 
     if (node.children && node.children.length > 0) {
-      node.children.forEach((child) => traverse(child, node));
+      const childContext = resolveChildTagContext(node, renderContext);
+      node.children.forEach((child) => traverse(child, node, childContext));
     }
   }
 
@@ -1305,7 +1330,11 @@ export function collectNodeStylesheet(
   const baseRules = new Set<string>();
   const responsiveBuckets = new Map<string, ResponsiveStyleBucket>();
 
-  function traverse(node: BuilderNode, parent: BuilderNode | null): void {
+  function traverse(
+    node: BuilderNode,
+    parent: BuilderNode | null,
+    renderContext: RenderableNodeTagContext = {},
+  ): void {
     const { props: renderProps, styles: rawStyles } =
       normalizeLegacyNodeCompatibility(node);
     const resolvedStyles = mergeSizingResolutionAcrossBreakpoints(
@@ -1315,7 +1344,7 @@ export function collectNodeStylesheet(
     );
 
     if (hasRenderableStyles(resolvedStyles)) {
-      const tag = getNativeTagForRenderableNode(node, renderProps) ?? "div";
+      const tag = resolveRenderedNodeTag(node, renderProps, renderContext);
       collectNodeStylesheetRules(
         resolvedStyles,
         node.id,
@@ -1327,7 +1356,8 @@ export function collectNodeStylesheet(
     }
 
     if (node.children && node.children.length > 0) {
-      node.children.forEach((child) => traverse(child, node));
+      const childContext = resolveChildTagContext(node, renderContext);
+      node.children.forEach((child) => traverse(child, node, childContext));
     }
   }
 

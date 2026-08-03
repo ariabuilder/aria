@@ -86,6 +86,7 @@ export {
 } from "./errors";
 export {
   normalizeEditableSurface,
+  renderSurfaceKindForCollection,
   resolveRenderSurface,
   type NormalizeEditableSurfaceOptions,
   type NormalizedRenderSurface,
@@ -106,6 +107,7 @@ export {
   type RenderRouteContext,
   type RenderStyleArtifactManifest,
   type RenderStyleArtifactProvider,
+  type RenderSurfaceCollection,
   type RenderSurfaceKind,
   type RenderSurfaceProviders,
   type RenderSurfaceSourceByKind,

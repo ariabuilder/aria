@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { ActionError as ClientActionError } from "../../../node_modules/astro/dist/actions/runtime/client.js";
+import { ActionError as ClientActionError } from "astro:actions";
 
 import { decodeRenderActionErrorMessage } from "../../lib/rendering/actionErrorMessage";
 import { getActionHandler } from "../helpers/actionHandler";

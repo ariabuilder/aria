@@ -428,13 +428,14 @@ export function createPageLifecycleStorageDomain(
            updated_at = excluded.updated_at`;
 
       let shouldInsertVersion = true;
+      let existingVersionHash: string | null = null;
       const existingVersionRow = await context.getStoredVersionRow(
         "aria_page_versions",
         id,
         version,
       );
       if (existingVersionRow) {
-        const existingVersionHash = await resolveStoredSemanticSourceHash({
+        existingVersionHash = await resolveStoredSemanticSourceHash({
           kind: "page",
           row: existingVersionRow,
           fallback: () =>
@@ -460,12 +461,6 @@ export function createPageLifecycleStorageDomain(
       let committedWithGuard = false;
 
       if (!shouldInsertVersion && existingVersionRow) {
-        const existingVersionHash = await resolveStoredSemanticSourceHash({
-          kind: "page",
-          row: existingVersionRow,
-          fallback: () =>
-            context.resolveStoredVersionContentHash(existingVersionRow),
-        });
         if (existingVersionHash !== incomingHash) {
           await context.run(
             `UPDATE aria_page_versions

@@ -309,12 +309,14 @@ describe("CloudflareStorageAdapter", () => {
     });
 
     const [versions, metadata] = await Promise.all([
-      client.execute(
-        "SELECT COUNT(*) AS count FROM aria_page_versions WHERE id = 'page-home'",
-      ),
-      client.execute(
-        "SELECT COUNT(*) AS count FROM aria_page_meta WHERE id = 'page-home'",
-      ),
+      client.execute({
+        sql: "SELECT COUNT(*) AS count FROM aria_page_versions WHERE id = ?",
+        args: [samplePage.id],
+      }),
+      client.execute({
+        sql: "SELECT COUNT(*) AS count FROM aria_page_meta WHERE id = ?",
+        args: [samplePage.id],
+      }),
     ]);
     expect(Number(versions.rows[0]?.count)).toBe(0);
     expect(Number(metadata.rows[0]?.count)).toBe(0);

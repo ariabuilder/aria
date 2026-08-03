@@ -46,11 +46,18 @@ export function getTransportErrorMessage(
     return null;
   }
 
-  return (
-    decodeRenderActionErrorMessage(result.error.message)?.message ??
-    result.error.message ??
-    fallbackMessage
-  );
+  const decodedMessage = decodeRenderActionErrorMessage(
+    result.error.message,
+  )?.message;
+  if (decodedMessage && decodedMessage.trim().length > 0) {
+    return decodedMessage;
+  }
+
+  const transportMessage = result.error.message;
+  return typeof transportMessage === "string" &&
+    transportMessage.trim().length > 0
+    ? transportMessage
+    : fallbackMessage;
 }
 
 export function getTransportErrorCode(

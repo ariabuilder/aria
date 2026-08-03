@@ -20,6 +20,21 @@ describe("actionResult transport errors", () => {
     );
   });
 
+  it("uses the fallback for empty transport messages", () => {
+    expect(
+      getTransportErrorMessage(
+        { error: { code: "BAD_REQUEST", message: "" } },
+        "Fallback",
+      ),
+    ).toBe("Fallback");
+    expect(
+      getTransportErrorMessage(
+        { error: { code: "BAD_REQUEST", message: "   " } },
+        "Fallback",
+      ),
+    ).toBe("Fallback");
+  });
+
   it("preserves unrelated transport errors", () => {
     const result = {
       error: {

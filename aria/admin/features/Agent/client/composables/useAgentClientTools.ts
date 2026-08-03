@@ -44,19 +44,11 @@ import {
   preflightBuilderNodeArrayInput,
   preflightBuilderNodeInput,
 } from "../../../../../lib/rendering/canonical/preflight";
-import type { RenderSurfaceKind } from "../../../../../lib/rendering/canonical";
+import { renderSurfaceKindForCollection } from "../../../../../lib/rendering/canonical";
 
 export type ClientToolResult<T> =
   | { ok: true; data: T }
   | { ok: false; error: AgentToolError };
-
-function collectionSurfaceKind(
-  collection: "pages" | "layouts" | "components",
-): RenderSurfaceKind {
-  if (collection === "pages") return "page";
-  if (collection === "layouts") return "layout";
-  return "component";
-}
 
 type PageBlocksRef = { value: BuilderNode[] };
 type NodeMotionValue = NonNullable<BuilderNode["motion"]>;
@@ -292,7 +284,7 @@ export function useAgentClientTools() {
     let preflightedNodes: unknown[];
     try {
       preflightedNodes = preflightBuilderNodeArrayInput({
-        kind: collectionSurfaceKind(mutationPath.collection),
+        kind: renderSurfaceKindForCollection(mutationPath.collection),
         nodes: parsed.data.nodes,
       }).source as unknown[];
     } catch {
@@ -406,7 +398,7 @@ export function useAgentClientTools() {
     let preflightedNode: unknown;
     try {
       preflightedNode = preflightBuilderNodeInput({
-        kind: collectionSurfaceKind(mutationPath.collection),
+        kind: renderSurfaceKindForCollection(mutationPath.collection),
         node: parsed.data.node,
       }).source;
     } catch {
