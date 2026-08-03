@@ -15,7 +15,7 @@ import {
   consumeNonce,
 } from "./_shared";
 import { log as baseLog } from "../lib/utils/logger";
-import { normalizeEditableSurface } from "../lib/rendering/canonical";
+import { prepareSurfaceForPersistence } from "../lib/storage/internal/domains/surfaceNormalization";
 import { savePageSnapshot } from "../lib/rendering/pageSnapshots";
 import { deferWithWaitUntil } from "../lib/cloudflare/waitUntil";
 import { assertPageLayoutChangeAllowed } from "../lib/pages/layoutPolicy.server";
@@ -260,19 +260,16 @@ export const save = {
           updatedAt: new Date().toISOString(),
         };
         const updatedPage = (
-          await normalizeEditableSurface({
-            kind: "page",
-            source: updatedPageProposal,
-          })
+          await prepareSurfaceForPersistence("page", updatedPageProposal)
         ).source;
         const linkedLayoutDraft = input.layoutDraft
           ? {
               ...input.layoutDraft,
               dsl: (
-                await normalizeEditableSurface({
-                  kind: "layout",
-                  source: input.layoutDraft.dsl,
-                })
+                await prepareSurfaceForPersistence(
+                  "layout",
+                  input.layoutDraft.dsl,
+                )
               ).source,
             }
           : undefined;
@@ -400,10 +397,10 @@ export const save = {
           updatedAt: new Date().toISOString(),
         };
         const updatedComponent = (
-          await normalizeEditableSurface({
-            kind: "component",
-            source: updatedComponentProposal,
-          })
+          await prepareSurfaceForPersistence(
+            "component",
+            updatedComponentProposal,
+          )
         ).source;
 
         const version = await saveResource(
@@ -484,10 +481,7 @@ export const save = {
           updatedAt: new Date().toISOString(),
         };
         const updatedLayout = (
-          await normalizeEditableSurface({
-            kind: "layout",
-            source: updatedLayoutProposal,
-          })
+          await prepareSurfaceForPersistence("layout", updatedLayoutProposal)
         ).source;
 
         const version = await saveResource(
