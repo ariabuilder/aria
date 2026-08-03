@@ -26,16 +26,20 @@ export interface AddElementsDropLayout {
   orientation: "horizontal" | "vertical";
 }
 
-function isPointInsideRect(
-  x: number,
-  y: number,
-  rect: DOMRect,
-): boolean {
-  return (
-    x >= rect.left &&
-    x <= rect.right &&
-    y >= rect.top &&
-    y <= rect.bottom
+function orientationForRect(rect: ViewportRect): "horizontal" | "vertical" {
+  return rect.height > rect.width ? "vertical" : "horizontal";
+}
+
+function isPointInsideRect(x: number, y: number, rect: DOMRect): boolean {
+  return x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom;
+}
+
+function isHtmlElement(value: Element | null): value is HTMLElement {
+  return Boolean(
+    value &&
+    value.nodeType === 1 &&
+    "style" in value &&
+    typeof value.getBoundingClientRect === "function",
   );
 }
 
@@ -46,7 +50,7 @@ export function findNearestAriaBlock(
   let current: Element | null = hit;
 
   while (current && current !== stopAt) {
-    if (current instanceof HTMLElement && current.hasAttribute("data-aria-id")) {
+    if (isHtmlElement(current) && current.hasAttribute("data-aria-id")) {
       return current;
     }
     current = current.parentElement;
@@ -83,7 +87,7 @@ function findDeepestStructuralContainerFromPoint(
     let current: Element | null = el;
 
     while (current && current !== stopAt) {
-      if (current instanceof HTMLElement && current.hasAttribute("data-aria-id")) {
+      if (isHtmlElement(current) && current.hasAttribute("data-aria-id")) {
         const ariaType = current.getAttribute("data-aria-type") ?? "";
         if (isStructuralContainerNodeType(ariaType)) {
           const rect = current.getBoundingClientRect();
@@ -97,11 +101,13 @@ function findDeepestStructuralContainerFromPoint(
     }
   }
 
-  return Array.from(candidates).sort((a, b) => {
-    const rectA = a.getBoundingClientRect();
-    const rectB = b.getBoundingClientRect();
-    return rectA.width * rectA.height - rectB.width * rectB.height;
-  })[0] ?? null;
+  return (
+    Array.from(candidates).sort((a, b) => {
+      const rectA = a.getBoundingClientRect();
+      const rectB = b.getBoundingClientRect();
+      return rectA.width * rectA.height - rectB.width * rectB.height;
+    })[0] ?? null
+  );
 }
 
 export function findInsertionParentElement(
@@ -112,10 +118,7 @@ export function findInsertionParentElement(
   let parentEl = block.parentElement;
 
   while (parentEl && parentEl !== body) {
-    if (
-      parentEl instanceof HTMLElement &&
-      parentEl.hasAttribute("data-drop-zone")
-    ) {
+    if (isHtmlElement(parentEl) && parentEl.hasAttribute("data-drop-zone")) {
       const ariaType = parentEl.getAttribute("data-aria-type") ?? "";
       if (isStructuralContainerNodeType(ariaType)) {
         return parentEl;
@@ -157,9 +160,8 @@ export function resolveInsertionTarget(
   }
 
   const block =
-    (doc
-      ? findNearestAriaBlockFromPoint(doc, cursorX, cursorY, body)
-      : null) ?? findNearestAriaBlock(hit, body);
+    (doc ? findNearestAriaBlockFromPoint(doc, cursorX, cursorY, body) : null) ??
+    findNearestAriaBlock(hit, body);
 
   if (!block) {
     return {
@@ -201,7 +203,7 @@ export function resolveInsertionTarget(
 
 export function getDroppableChildren(dropZone: Element): HTMLElement[] {
   return Array.from(dropZone.children).filter((el): el is HTMLElement => {
-    if (!(el instanceof HTMLElement)) {
+    if (!isHtmlElement(el)) {
       return false;
     }
 
@@ -212,11 +214,27 @@ export function getDroppableChildren(dropZone: Element): HTMLElement[] {
   });
 }
 
-function readDropAxis(dropZone: HTMLElement): "horizontal" | "vertical" {
+type DropZoneStyle = {
+  display: string;
+  flexDirection: string;
+  flexWrap: string;
+  direction: string;
+  gridTemplateColumns: string;
+};
+
+function readDropStyle(dropZone: HTMLElement): DropZoneStyle {
   const style = dropZone.ownerDocument.defaultView?.getComputedStyle(dropZone);
-  if (!style) {
-    return "vertical";
-  }
+  return {
+    display: style?.display ?? "block",
+    flexDirection: style?.flexDirection ?? "column",
+    flexWrap: style?.flexWrap ?? "nowrap",
+    direction: style?.direction ?? "ltr",
+    gridTemplateColumns: style?.gridTemplateColumns ?? "none",
+  };
+}
+
+function readDropAxis(dropZone: HTMLElement): "horizontal" | "vertical" {
+  const style = readDropStyle(dropZone);
 
   if (style.display.includes("flex")) {
     return style.flexDirection.startsWith("row") ? "horizontal" : "vertical";
@@ -226,8 +244,16 @@ function readDropAxis(dropZone: HTMLElement): "horizontal" | "vertical" {
 }
 
 function isGridDropZone(dropZone: HTMLElement): boolean {
-  const style = dropZone.ownerDocument.defaultView?.getComputedStyle(dropZone);
-  return Boolean(style?.display.includes("grid"));
+  return readDropStyle(dropZone).display.includes("grid");
+}
+
+function isWrappedHorizontalDropZone(dropZone: HTMLElement): boolean {
+  const style = readDropStyle(dropZone);
+  return (
+    style.display.includes("flex") &&
+    style.flexDirection.startsWith("row") &&
+    style.flexWrap !== "nowrap"
+  );
 }
 
 function calculateGridInsertionIndex(
@@ -242,7 +268,9 @@ function calculateGridInsertionIndex(
     const rect = child.getBoundingClientRect();
     const row = rows.find((entries) => {
       const firstRect = entries[0]?.getBoundingClientRect();
-      return firstRect ? Math.abs(firstRect.top - rect.top) <= rowTolerance : false;
+      return firstRect
+        ? Math.abs(firstRect.top - rect.top) <= rowTolerance
+        : false;
     });
 
     if (row) {
@@ -259,8 +287,12 @@ function calculateGridInsertionIndex(
   });
 
   for (const row of rows) {
-    row.sort((a, b) => a.getBoundingClientRect().left - b.getBoundingClientRect().left);
-    const rowTop = Math.min(...row.map((child) => child.getBoundingClientRect().top));
+    row.sort(
+      (a, b) => a.getBoundingClientRect().left - b.getBoundingClientRect().left,
+    );
+    const rowTop = Math.min(
+      ...row.map((child) => child.getBoundingClientRect().top),
+    );
     const rowBottom = Math.max(
       ...row.map((child) => {
         const rect = child.getBoundingClientRect();
@@ -270,16 +302,25 @@ function calculateGridInsertionIndex(
     const rowMidY = rowTop + (rowBottom - rowTop) / 2;
 
     if (cursorY <= rowMidY) {
-      for (const child of row) {
+      const domIndexes = row.map((child) => children.indexOf(child));
+      const ascendingDomOrder =
+        domIndexes.length < 2 ||
+        domIndexes[0] < domIndexes[domIndexes.length - 1];
+      const rowStart = Math.min(...domIndexes);
+
+      for (let visualIndex = 0; visualIndex < row.length; visualIndex += 1) {
+        const child = row[visualIndex];
         const rect = child.getBoundingClientRect();
         const midX = rect.left + rect.width / 2;
         if (cursorX < midX) {
-          return children.indexOf(child);
+          return (
+            rowStart +
+            (ascendingDomOrder ? visualIndex : row.length - visualIndex)
+          );
         }
       }
 
-      const lastInRow = row[row.length - 1];
-      return children.indexOf(lastInRow) + 1;
+      return rowStart + (ascendingDomOrder ? row.length : 0);
     }
   }
 
@@ -299,32 +340,124 @@ export function calculateInsertionIndexMidline(
     return 0;
   }
 
-  if (isGridDropZone(dropZone)) {
+  if (isGridDropZone(dropZone) || isWrappedHorizontalDropZone(dropZone)) {
     return calculateGridInsertionIndex(children, cursorX, cursorY);
   }
 
   const axis = readDropAxis(dropZone);
 
   if (axis === "horizontal") {
-    for (let i = 0; i < children.length; i++) {
-      const rect = children[i].getBoundingClientRect();
+    const firstCenter =
+      children[0].getBoundingClientRect().left +
+      children[0].getBoundingClientRect().width / 2;
+    const lastCenter =
+      children[children.length - 1].getBoundingClientRect().left +
+      children[children.length - 1].getBoundingClientRect().width / 2;
+    const ascending = firstCenter <= lastCenter;
+    const visualChildren = ascending ? children : [...children].reverse();
+    for (let i = 0; i < visualChildren.length; i++) {
+      const rect = visualChildren[i].getBoundingClientRect();
       const midX = rect.left + rect.width / 2;
       if (cursorX < midX) {
-        return i;
+        return ascending ? i : children.length - i;
       }
     }
-    return children.length;
+    return ascending ? children.length : 0;
   }
 
-  for (let i = 0; i < children.length; i++) {
-    const rect = children[i].getBoundingClientRect();
+  const firstCenter =
+    children[0].getBoundingClientRect().top +
+    children[0].getBoundingClientRect().height / 2;
+  const lastCenter =
+    children[children.length - 1].getBoundingClientRect().top +
+    children[children.length - 1].getBoundingClientRect().height / 2;
+  const ascending = firstCenter <= lastCenter;
+  const visualChildren = ascending ? children : [...children].reverse();
+  for (let i = 0; i < visualChildren.length; i++) {
+    const rect = visualChildren[i].getBoundingClientRect();
     const midY = rect.top + rect.height / 2;
     if (cursorY < midY) {
-      return i;
+      return ascending ? i : children.length - i;
     }
   }
 
-  return children.length;
+  return ascending ? children.length : 0;
+}
+
+function sameVisualRow(a: ViewportRect, b: ViewportRect): boolean {
+  return Math.abs(a.top - b.top) <= 8;
+}
+
+function computeHorizontalFlowPlaceholder(
+  dropParent: HTMLElement,
+  parentRect: ViewportRect,
+  children: readonly HTMLElement[],
+  insertionIndex: number,
+): ViewportRect {
+  const barThickness = 3;
+  const style = readDropStyle(dropParent);
+  const reversedByFlex = style.flexDirection === "row-reverse";
+  const reversedByDirection = style.direction === "rtl";
+  const domAscendsVisually = !(reversedByFlex !== reversedByDirection);
+  const next =
+    insertionIndex < children.length
+      ? measureChildBlockRect(children[insertionIndex])
+      : null;
+  const previous =
+    insertionIndex > 0
+      ? measureChildBlockRect(children[insertionIndex - 1])
+      : null;
+
+  if (!previous && next) {
+    return {
+      left: domAscendsVisually
+        ? next.left - barThickness / 2 - 1
+        : next.left + next.width + 1,
+      top: next.top,
+      width: barThickness,
+      height: Math.max(next.height, 48),
+    };
+  }
+
+  if (previous && next && !sameVisualRow(previous, next)) {
+    return {
+      left: parentRect.left,
+      top: (previous.top + previous.height + next.top) / 2 - barThickness / 2,
+      width: parentRect.width,
+      height: barThickness,
+    };
+  }
+
+  const reference = previous ?? next;
+  if (!reference) {
+    return {
+      left: parentRect.left + 8,
+      top: parentRect.top + 4,
+      width: barThickness,
+      height: Math.max(parentRect.height - 8, 48),
+    };
+  }
+
+  const left =
+    previous && next
+      ? (previous.left + previous.width + next.left) / 2 - barThickness / 2
+      : previous
+        ? domAscendsVisually
+          ? previous.left + previous.width + 1
+          : previous.left - barThickness / 2 - 1
+        : reference.left - barThickness / 2 - 1;
+  const top =
+    previous && next ? Math.min(previous.top, next.top) : reference.top;
+  const bottom =
+    previous && next
+      ? Math.max(previous.top + previous.height, next.top + next.height)
+      : reference.top + reference.height;
+  return {
+    left,
+    top,
+    width: barThickness,
+    height: Math.max(bottom - top, 48),
+  };
 }
 
 function measureChildBlockRect(child: HTMLElement): ViewportRect {
@@ -369,39 +502,17 @@ export function computePlaceholderViewportRect(
     };
   }
 
-  if (axis === "horizontal") {
-    if (insertionIndex === 0) {
-      const first = measureChildBlockRect(children[0]);
-      return {
-        left: first.left - barThickness / 2 - 1,
-        top: first.top,
-        width: barThickness,
-        height: Math.max(first.height, 48),
-      };
-    }
-
-    const prev = measureChildBlockRect(children[insertionIndex - 1]);
-    let top = prev.top;
-    let height = prev.height;
-    let left: number;
-
-    if (insertionIndex < children.length) {
-      const next = measureChildBlockRect(children[insertionIndex]);
-      top = Math.min(prev.top, next.top);
-      height =
-        Math.max(prev.top + prev.height, next.top + next.height) - top;
-      left =
-        (prev.left + prev.width + next.left) / 2 - barThickness / 2;
-    } else {
-      left = prev.left + prev.width + 1;
-    }
-
-    return {
-      left,
-      top,
-      width: barThickness,
-      height: Math.max(height, 48),
-    };
+  if (
+    axis === "horizontal" ||
+    isGridDropZone(dropParent) ||
+    isWrappedHorizontalDropZone(dropParent)
+  ) {
+    return computeHorizontalFlowPlaceholder(
+      dropParent,
+      parentRect,
+      children,
+      insertionIndex,
+    );
   }
 
   if (insertionIndex === 0) {
@@ -419,8 +530,7 @@ export function computePlaceholderViewportRect(
 
   if (insertionIndex < children.length) {
     const next = measureChildBlockRect(children[insertionIndex]);
-    top =
-      (prev.top + prev.height + next.top) / 2 - barThickness / 2;
+    top = (prev.top + prev.height + next.top) / 2 - barThickness / 2;
   } else {
     top = prev.top + prev.height + 1;
   }
@@ -460,17 +570,19 @@ export function computeAddElementsDropLayout(
     cursorY,
     dropParent,
   );
-  const axis = readDropAxis(dropParent);
+  const placeholder = computePlaceholderViewportRect(
+    dropParent,
+    children,
+    insertionIndex,
+  );
 
   return {
     insertionIndex,
-    placeholder: computePlaceholderViewportRect(
-      dropParent,
-      children,
-      insertionIndex,
-    ),
+    placeholder,
     target:
       children.length === 0 ? computeTargetViewportRect(dropParent) : undefined,
-    orientation: axis === "horizontal" ? "horizontal" : "vertical",
+    // Orientation describes the measured line, not the parent flow axis.
+    // The rectangle remains authoritative for rendering dimensions.
+    orientation: orientationForRect(placeholder),
   };
 }

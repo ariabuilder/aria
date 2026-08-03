@@ -1,0 +1,1 @@
+export { compileCanonicalAttributes } from "./renderDocumentHtml";

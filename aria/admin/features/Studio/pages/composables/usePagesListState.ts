@@ -4,13 +4,24 @@ import type { Page } from "@/composables/useBuilderData"
 import { resolvePublicPagePath } from "../../../../../lib/pages/publicPaths"
 import { useStudioI18n } from "@/i18n"
 
-export type PagesFilter =
-  | "all"
-  | "published"
-  | "draft"
-  | "scheduled"
-  | "archived"
-  | "modified"
+export const PAGE_FILTERS = [
+  "all",
+  "published",
+  "draft",
+  "scheduled",
+  "archived",
+  "modified",
+] as const
+
+export type PagesFilter = (typeof PAGE_FILTERS)[number]
+
+const PAGE_FILTER_SET = new Set<string>(PAGE_FILTERS)
+
+export function parsePagesFilter(value: unknown): PagesFilter {
+  return typeof value === "string" && PAGE_FILTER_SET.has(value)
+    ? (value as PagesFilter)
+    : "all"
+}
 export type PagesSortKey = "name" | "slug" | "description" | "status" | "updated" | "visits"
 export type PagesSortDirection = "asc" | "desc"
 export interface PagesSort {

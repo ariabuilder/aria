@@ -7,6 +7,7 @@ import {
   deletePageLocale,
   enqueueCacheInvalidationJob,
   failCacheInvalidationJob,
+  getCacheInvalidationJob,
   getLayoutLocaleMeta,
   getLayoutLocaleVersion,
   getPageLocaleMeta,
@@ -57,6 +58,7 @@ export type LocalizationStorageDomain = Pick<
   | "acquireLocaleRouteLease"
   | "releaseLocaleRouteLease"
   | "enqueueCacheInvalidationJob"
+  | "getCacheInvalidationJob"
   | "claimDueCacheInvalidationJobs"
   | "completeCacheInvalidationJob"
   | "failCacheInvalidationJob"
@@ -145,6 +147,7 @@ export function createLocalizationStorageDomain(
       releaseLocaleRouteLease(executor(), input),
     enqueueCacheInvalidationJob: (job) =>
       enqueueCacheInvalidationJob(executor(), job),
+    getCacheInvalidationJob: (id) => getCacheInvalidationJob(executor(), id),
     claimDueCacheInvalidationJobs: (input) =>
       claimDueCacheInvalidationJobs(executor(), input),
     completeCacheInvalidationJob: (input) =>

@@ -7,6 +7,7 @@ import { createCmsAuditEvent } from "../../cms/services/accessPolicy";
 import type { RuntimeLocals } from "../../cloudflare/env";
 import { scheduleIntegrationEventWakeup } from "../../integrations/wakeup";
 import { resolvePagePublicationDependencies } from "../pageDependencies";
+import { createPagePublicationInvalidationJob } from "../../cache/invalidationJobs";
 
 export async function executeCmsEntryPublication(
   adapter: StorageAdapter,
@@ -69,5 +70,11 @@ export async function executePagePublication(
     expectedVersion: page.version,
     scheduleLeaseToken: page.scheduleLeaseToken,
     dependencies: await resolvePagePublicationDependencies(savedPage, adapter),
+    invalidationJob: createPagePublicationInvalidationJob({
+      pageId: savedPage.id,
+      slug: savedPage.slug || savedPage.id,
+      operation: "scheduled-publish",
+      version: page.version,
+    }),
   });
 }

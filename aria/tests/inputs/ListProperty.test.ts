@@ -26,6 +26,23 @@ const previewResponsiveStyleUpdatesMock = vi.fn(() => true);
 const removeClassRuleMock = vi.fn();
 const setClassRuleMock = vi.fn();
 const signalAddBlockMock = vi.fn();
+const replaceSelectedNodeMock = vi.fn(
+  (nodeId: string, replacement: BuilderNodeFixture) => {
+    if (selectedNodeRef.value?.id === nodeId) {
+      selectedNodeRef.value = replacement;
+    }
+    selectionTreeRootNodesRef.value = selectionTreeRootNodesRef.value.map(
+      (node) => (node.id === nodeId ? replacement : node),
+    );
+    return replacement;
+  },
+);
+const executeHistoryMock = vi.fn(
+  async (operation: { redo: () => Promise<void> | void }) => {
+    await operation.redo();
+    return { success: true };
+  },
+);
 
 vi.mock("../../admin/features/Core", async (importOriginal) => {
   const actual =
@@ -39,6 +56,9 @@ vi.mock("../../admin/features/Core", async (importOriginal) => {
     ...actual,
     useSelectionTreeState: () => ({
       selectionTreeRootNodes: selectionTreeRootNodesRef,
+    }),
+    useSelectedNodeState: () => ({
+      replaceSelectedNode: replaceSelectedNodeMock,
     }),
     useStageSignalBridge: () => ({
       signalAddBlock: signalAddBlockMock,
@@ -93,6 +113,12 @@ vi.mock("../../admin/features/Core", async (importOriginal) => {
     }),
   };
 });
+
+vi.mock("../../admin/features/History", () => ({
+  useHistory: () => ({
+    execute: executeHistoryMock,
+  }),
+}));
 
 vi.mock("../../admin/features/Inspector/composables/useClassEditor", () => ({
   useClassEditor: () => ({
@@ -159,7 +185,7 @@ describe("ListProperty", () => {
     selectionTreeRootNodesRef.value = [];
   });
 
-  it("hydrates current list values and toggles ordered lists through prop + style saves", async () => {
+  it("hydrates current list values and toggles ordered lists through a semantic node update", async () => {
     selectedNodeRef.value = {
       id: "list-1",
       type: "list",
@@ -346,27 +372,17 @@ describe("ListProperty", () => {
       .trigger("click");
     await flushPromises();
 
-    expect(savePropertyMock).toHaveBeenCalledWith(
-      "ordered",
-      false,
-      "page",
-      "home",
+    expect(executeHistoryMock).toHaveBeenCalledTimes(1);
+    expect(replaceSelectedNodeMock).toHaveBeenCalledWith(
       "list-1",
+      expect.objectContaining({
+        props: expect.objectContaining({ element: "ul", ordered: false }),
+        styles: expect.objectContaining({
+          listStyleType: expect.objectContaining({ base: "none" }),
+        }),
+      }),
     );
-    expect(previewPropsMock).toHaveBeenCalledWith({ ordered: false }, "list-1");
-    expect(previewStylePropertiesMock).toHaveBeenCalledWith(
-      {
-        listStyleType: "none",
-      },
-      "list-1",
-    );
-    expect(savePropertyMock).toHaveBeenCalledWith(
-      "listStyleType",
-      "none",
-      "page",
-      "home",
-      "list-1",
-    );
+    expect(savePropertyMock).not.toHaveBeenCalled();
   });
 
   it("saves marker style and marker position as style properties", async () => {
@@ -589,9 +605,36 @@ describe("ListProperty", () => {
             },
           }),
           InspectorBreakpointIndicators: true,
-          Tabs: true,
-          TabsList: true,
-          TabsTrigger: true,
+          Tabs: defineComponent({
+            props: { modelValue: { type: String, default: "unordered" } },
+            emits: ["update:model-value"],
+            setup(props, { emit, attrs, slots }) {
+              provide(tabsSelectionKey, {
+                modelValue: computed(() => props.modelValue),
+                select: (value: string) => emit("update:model-value", value),
+              });
+              return () => h("div", attrs, slots.default?.());
+            },
+          }),
+          TabsList: defineComponent({
+            setup(_, { slots, attrs }) {
+              return () => h("div", attrs, slots.default?.());
+            },
+          }),
+          TabsTrigger: defineComponent({
+            props: { value: { type: String, required: true } },
+            setup(props, { slots, attrs }) {
+              const tabs = inject<{ select: (value: string) => void }>(
+                tabsSelectionKey,
+              );
+              return () =>
+                h(
+                  "button",
+                  { ...attrs, onClick: () => tabs?.select(props.value) },
+                  slots.default?.(),
+                );
+            },
+          }),
           Select: true,
           SelectTrigger: true,
           SelectValue: true,
@@ -628,7 +671,7 @@ describe("ListProperty", () => {
     ).toBe("icon");
   });
 
-  it("suppresses ordinary list authoring controls for description lists", async () => {
+  it("shows semantic type and add controls for description lists", async () => {
     selectedNodeRef.value = {
       id: "list-1",
       type: "list",
@@ -654,9 +697,35 @@ describe("ListProperty", () => {
             },
           }),
           InspectorBreakpointIndicators: true,
-          Tabs: true,
-          TabsList: true,
-          TabsTrigger: true,
+          Tabs: defineComponent({
+            props: { modelValue: { type: String, default: "unordered" } },
+            emits: ["update:model-value"],
+            setup(_props, { emit, attrs, slots }) {
+              provide(tabsSelectionKey, {
+                select: (value: string) => emit("update:model-value", value),
+              });
+              return () => h("div", attrs, slots.default?.());
+            },
+          }),
+          TabsList: defineComponent({
+            setup(_, { slots, attrs }) {
+              return () => h("div", attrs, slots.default?.());
+            },
+          }),
+          TabsTrigger: defineComponent({
+            props: { value: { type: String, required: true } },
+            setup(props, { slots, attrs }) {
+              const tabs = inject<{ select: (value: string) => void }>(
+                tabsSelectionKey,
+              );
+              return () =>
+                h(
+                  "button",
+                  { ...attrs, onClick: () => tabs?.select(props.value) },
+                  slots.default?.(),
+                );
+            },
+          }),
           Select: true,
           SelectTrigger: true,
           SelectValue: true,
@@ -670,17 +739,67 @@ describe("ListProperty", () => {
     await flushPromises();
 
     expect(wrapper.find('[data-testid="list-add-item-button"]').exists()).toBe(
-      false,
+      true,
     );
     expect(wrapper.find('[data-testid="list-ordered-tabs"]').exists()).toBe(
-      false,
+      true,
     );
+    expect(
+      wrapper.find('[data-testid="list-type-description-tab"]').exists(),
+    ).toBe(true);
+    expect(
+      wrapper.get('[data-testid="list-type-unordered-tab"]').text(),
+    ).toBe("Bulleted list");
+    expect(
+      wrapper.get('[data-testid="list-type-ordered-tab"]').text(),
+    ).toBe("Numbered list");
+    expect(
+      wrapper.get('[data-testid="list-type-description-tab"]').text(),
+    ).toBe("Description list");
+    expect(
+      wrapper
+        .get('[data-testid="list-type-description-tab"] [aria-hidden="true"]')
+        .classes(),
+    ).toContain("i-hugeicons:list-tree");
+    expect(
+      wrapper
+        .get('[data-testid="list-add-item-button"]')
+        .attributes("aria-label"),
+    ).toBe("Add list item");
     expect(
       wrapper.find('[data-testid="list-style-type-select"]').exists(),
     ).toBe(false);
     expect(
       wrapper.find('[data-testid="list-style-position-select"]').exists(),
     ).toBe(false);
+
+    await wrapper.get('[data-testid="list-add-item-button"]').trigger("click");
+
+    expect(signalAddBlockMock).toHaveBeenCalledTimes(1);
+    expect(signalAddBlockMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        parentId: "list-1",
+        block: expect.objectContaining({
+          type: "container",
+          children: [
+            expect.objectContaining({ props: { element: "dt" } }),
+            expect.objectContaining({ props: { element: "dd" } }),
+          ],
+        }),
+      }),
+    );
+
+    await wrapper
+      .get('[data-testid="list-type-unordered-tab"]')
+      .trigger("click");
+    await flushPromises();
+
+    expect(replaceSelectedNodeMock).toHaveBeenCalledWith(
+      "list-1",
+      expect.objectContaining({
+        props: expect.objectContaining({ element: "ul", ordered: false }),
+      }),
+    );
   });
 
   it("cascades desktop list marker values to smaller breakpoints when reading", async () => {

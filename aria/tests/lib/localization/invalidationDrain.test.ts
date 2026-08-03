@@ -36,8 +36,16 @@ describe("drainLocalizationInvalidations", () => {
       leaseToken: "worker",
       deliver: vi.fn(async () => undefined),
     });
-    expect(result).toEqual({ claimed: 1, completed: 1, failed: 0 });
-    expect(adapter.completeCacheInvalidationJob).toHaveBeenCalledWith(expect.objectContaining({ id: job.id, leaseToken: "worker" }));
+    expect(result).toEqual({
+      claimed: 1,
+      completed: 1,
+      failed: 0,
+      completedJobIds: [job.id],
+      failedJobIds: [],
+    });
+    expect(adapter.completeCacheInvalidationJob).toHaveBeenCalledWith(
+      expect.objectContaining({ id: job.id, leaseToken: "worker" }),
+    );
   });
 
   it("keeps failed delivery retryable", async () => {
@@ -45,13 +53,23 @@ describe("drainLocalizationInvalidations", () => {
     const result = await drainLocalizationInvalidations({
       adapter,
       leaseToken: "worker",
-      deliver: async () => { throw new Error("purge unavailable"); },
+      deliver: async () => {
+        throw new Error("purge unavailable");
+      },
     });
-    expect(result).toEqual({ claimed: 1, completed: 0, failed: 1 });
-    expect(adapter.failCacheInvalidationJob).toHaveBeenCalledWith(expect.objectContaining({
-      id: job.id,
-      leaseToken: "worker",
-      lastError: "purge unavailable",
-    }));
+    expect(result).toEqual({
+      claimed: 1,
+      completed: 0,
+      failed: 1,
+      completedJobIds: [],
+      failedJobIds: [job.id],
+    });
+    expect(adapter.failCacheInvalidationJob).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: job.id,
+        leaseToken: "worker",
+        lastError: "purge unavailable",
+      }),
+    );
   });
 });

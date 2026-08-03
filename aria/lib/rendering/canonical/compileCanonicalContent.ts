@@ -1,0 +1,1 @@
+export { compileCanonicalContent } from "./renderDocumentHtml";

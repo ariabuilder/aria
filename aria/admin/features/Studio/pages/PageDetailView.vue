@@ -1477,7 +1477,8 @@ async function executeDelete() {
 const isModified = computed(
   () =>
     currentBuilderPage.value?.status === "published" &&
-    (currentBuilderPage.value?.isModifiedSincePublish ||
+    ((page.value?.isModifiedSincePublish ??
+      currentBuilderPage.value?.isModifiedSincePublish) ||
       hasUnsavedPageChanges.value),
 );
 
@@ -1988,7 +1989,8 @@ function handleDeleteClick() {
             :status="pageStatus"
             :is-modified-since-publish="
               Boolean(
-                currentBuilderPage?.isModifiedSincePublish ||
+                (page?.isModifiedSincePublish ??
+                  currentBuilderPage?.isModifiedSincePublish) ||
                 hasUnsavedPageChanges,
               )
             "

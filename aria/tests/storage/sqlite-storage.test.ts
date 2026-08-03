@@ -26,6 +26,7 @@ import type {
 } from "../../lib/cloudflare/env";
 import { createD1Mock } from "../helpers/d1Mock";
 import { normalizeSurfaceForPersistence } from "../../lib/storage/internal/domains/surfaceNormalization";
+import { createPagePublicationInvalidationJob } from "../../lib/cache/invalidationJobs";
 
 const samplePage: PageDSL = {
   id: "page-home",
@@ -876,10 +877,17 @@ describe("SQLiteStorageAdapter", () => {
       return originalBatch(...args);
     };
 
+    const invalidationJob = createPagePublicationInvalidationJob({
+      pageId: samplePage.id,
+      slug: samplePage.slug,
+      operation: "publish",
+      version: "publish-pin-race-v1",
+    });
     await expect(
       adapter.publishPageDSL(samplePage.id, undefined, {
         expectedVersion: "publish-pin-race-v1",
         dependencies: { components: { "hero-banner": "component-v1" } },
+        invalidationJob,
       }),
     ).rejects.toBeInstanceOf(VersionConflictError);
 
@@ -890,6 +898,71 @@ describe("SQLiteStorageAdapter", () => {
       args: [samplePage.id, "publish-pin-race-v1"],
     });
     expect(dependencyRow.rows[0]?.dependency_versions_json).toBeNull();
+    await expect(
+      adapter.claimDueCacheInvalidationJobs({
+        now: "9999-12-31T23:59:59.999Z",
+        leaseToken: "conflicted-publish",
+        leaseExpiresAt: "9999-12-31T23:59:59.999Z",
+        updatedAt: "2026-08-03T12:00:00.000Z",
+        limit: 1,
+        jobId: invalidationJob.id,
+      }),
+    ).resolves.toEqual([]);
+  });
+
+  it("atomically commits the page pointer with its durable cache job", async () => {
+    await adapter.savePageDSL(samplePage.id, samplePage, {
+      preserveVersion: true,
+      versionHint: "atomic-publish-v1",
+    });
+    const job = createPagePublicationInvalidationJob({
+      pageId: samplePage.id,
+      slug: samplePage.slug,
+      operation: "publish",
+      version: "atomic-publish-v1",
+    });
+
+    await adapter.publishPageDSL(samplePage.id, undefined, {
+      expectedVersion: "atomic-publish-v1",
+      invalidationJob: job,
+    });
+
+    expect(
+      (await adapter.getPageVersionPins(samplePage.id))?.publishedVersion,
+    ).toBe("atomic-publish-v1");
+    const claimed = await adapter.claimDueCacheInvalidationJobs({
+      now: "9999-12-31T23:59:59.999Z",
+      leaseToken: "sqlite-atomic-publish",
+      leaseExpiresAt: "9999-12-31T23:59:59.999Z",
+      updatedAt: "2026-08-03T12:00:00.000Z",
+      limit: 1,
+      jobId: job.id,
+    });
+    expect(claimed.map((entry) => entry.id)).toEqual([job.id]);
+
+    const unpublishJob = createPagePublicationInvalidationJob({
+      pageId: samplePage.id,
+      slug: samplePage.slug,
+      operation: "unpublish",
+      version: "atomic-publish-v1",
+    });
+    await adapter.unpublishPageDSL(samplePage.id, {
+      invalidationJob: unpublishJob,
+    });
+    expect(
+      (await adapter.getPageVersionPins(samplePage.id))?.publishedVersion,
+    ).toBeNull();
+    const claimedUnpublish = await adapter.claimDueCacheInvalidationJobs({
+      now: "9999-12-31T23:59:59.999Z",
+      leaseToken: "sqlite-atomic-unpublish",
+      leaseExpiresAt: "9999-12-31T23:59:59.999Z",
+      updatedAt: "2026-08-03T12:00:00.000Z",
+      limit: 1,
+      jobId: unpublishJob.id,
+    });
+    expect(claimedUnpublish.map((entry) => entry.id)).toEqual([
+      unpublishJob.id,
+    ]);
   });
 
   it("does not create a draft revision when resaving an enriched published page", async () => {

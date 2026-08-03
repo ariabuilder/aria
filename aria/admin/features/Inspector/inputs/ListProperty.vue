@@ -10,6 +10,13 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { studioIcons } from "@/lib/icons";
 
 import BaseProperty from "./BaseProperty.vue";
 import InspectorBreakpointIndicators from "./InspectorBreakpointIndicators.vue";
@@ -20,17 +27,20 @@ import {
 } from "../../Core";
 import { useInspectorPropertyOverrides } from "../composables/useInspectorPropertyOverrides";
 import { useInspectorPanelControls } from "../composables/useInspectorPanelControls";
+import { useListSemanticMutation } from "../composables/useListSemanticMutation";
 import { useInspectorStyleTarget } from "../composables/useInspectorStyleTarget";
 import { usePropertySchema } from "../composables/usePropertySchema";
 import {
+  createDescriptionListGroupNode,
   createIconListItemNode,
   createTextListItemNode,
+  LIST_SEMANTIC_MODES,
+  resolveListSemanticMode,
+  type ListSemanticMode,
 } from "../../../../lib/blocks/listNodes";
 import type { BuilderNode } from "../../../../lib/types/nodes";
 import {
   DEFAULT_LIST,
-  ORDERED_LIST_STYLE_TYPES,
-  UNORDERED_LIST_STYLE_TYPES,
   ListStylePositionSchema,
   ListStyleTypeSchema,
   type ListStylePosition,
@@ -58,10 +68,7 @@ const emit = defineEmits<{
 const { t } = useStudioI18n();
 
 const LIST_STYLE_KEYS = ["listStyleType", "listStylePosition"] as const;
-const ORDER_MODE_VALUES = ["unordered", "ordered"] as const;
-
 type ListStyleKey = (typeof LIST_STYLE_KEYS)[number];
-type OrderModeValue = (typeof ORDER_MODE_VALUES)[number];
 
 const ORDERED_STYLE_OPTIONS: Array<{ value: ListStyleType; label: string }> = [
   { value: "decimal", label: "Decimal" },
@@ -93,6 +100,7 @@ const propertySave = usePropertySave();
 const { selectedNode, selectedNodeId, breakpointName } = propertySave;
 const { selectionTreeRootNodes } = useSelectionTreeState();
 const { signalAddBlock } = useStageSignalBridge();
+const listSemanticMutation = useListSemanticMutation();
 
 function findNodeInSelectionTree(
   nodes: unknown,
@@ -195,9 +203,28 @@ const showSectionReset = computed(
     orderedHasChanges.value || listOverrides.hasCurrentBreakpointOverride.value,
 );
 
-const orderedMode = computed<OrderModeValue>(() =>
-  ordered.value ? "ordered" : "unordered",
+const listSemanticMode = computed<ListSemanticMode>(() =>
+  resolveListSemanticMode(targetNode.value),
 );
+const listSemanticOptions = computed<
+  Array<{ value: ListSemanticMode; label: string; icon: string }>
+>(() => [
+  {
+    value: "unordered",
+    label: t("inspector.list.bullets"),
+    icon: studioIcons.listBulleted,
+  },
+  {
+    value: "ordered",
+    label: t("inspector.list.numbers"),
+    icon: studioIcons.listNumbered,
+  },
+  {
+    value: "description",
+    label: t("inspector.list.description"),
+    icon: studioIcons.listDescription,
+  },
+]);
 
 const listStyleOptions = computed(() =>
   ordered.value ? ORDERED_STYLE_OPTIONS : UNORDERED_STYLE_OPTIONS,
@@ -222,13 +249,12 @@ const isIconList = computed(() => isIconListNode(targetNode.value));
 const isDescriptionList = computed(
   () => targetNode.value?.props?.element === "dl",
 );
-const showStandardListControls = computed(
+const showListTypeControl = computed(() => !isIconList.value);
+const showMarkerControls = computed(
   () => !isIconList.value && !isDescriptionList.value,
 );
 const canAddListItem = computed(
-  () =>
-    targetNode.value?.type?.toLowerCase() === "list" &&
-    !isDescriptionList.value,
+  () => targetNode.value?.type?.toLowerCase() === "list",
 );
 
 function isIconListNode(node: BuilderNode | null | undefined): boolean {
@@ -258,9 +284,15 @@ function addListItem(): void {
   const nextItemNumber = listNode.children.length + 1;
   const nextLabel = `Item ${nextItemNumber}`;
   const nextContent = `List item ${nextItemNumber}`;
-  const nextBlock = isIconListNode(listNode)
-    ? createIconListItemNode(nextContent, { label: nextLabel })
-    : createTextListItemNode(nextContent, nextLabel);
+  const nextBlock = isDescriptionList.value
+    ? createDescriptionListGroupNode(
+        `Term ${nextItemNumber}`,
+        `Description ${nextItemNumber}`,
+        nextLabel,
+      )
+    : isIconListNode(listNode)
+      ? createIconListItemNode(nextContent, { label: nextLabel })
+      : createTextListItemNode(nextContent, nextLabel);
 
   signalAddBlock({
     block: nextBlock,
@@ -343,21 +375,6 @@ watch(
   { flush: "post", immediate: true },
 );
 
-function resolveCompatibleListStyleType(
-  nextOrdered: boolean,
-  currentType: ListStyleType,
-): ListStyleType {
-  const allowedTypes = nextOrdered
-    ? ORDERED_LIST_STYLE_TYPES
-    : UNORDERED_LIST_STYLE_TYPES;
-
-  if (allowedTypes.includes(currentType as never)) {
-    return currentType;
-  }
-
-  return nextOrdered ? "decimal" : "none";
-}
-
 function validateList(
   nextOrdered: boolean,
   nextListStyleType: ListStyleType,
@@ -387,78 +404,36 @@ function validateList(
   return true;
 }
 
-async function saveOrdered(nextOrdered: boolean): Promise<void> {
-  if (!hasSaveContext()) {
+async function replaceListSemanticMode(
+  nextMode: ListSemanticMode,
+): Promise<void> {
+  const listNode = targetNode.value;
+  if (!listNode || nextMode === listSemanticMode.value) {
     return;
   }
 
-  const previousOrdered = ordered.value;
-  const previousListType = listStyleType.value;
-  const nextListType = resolveCompatibleListStyleType(
-    nextOrdered,
-    previousListType,
+  const result = await listSemanticMutation.replaceListSemanticMode(
+    listNode,
+    nextMode,
   );
 
-  if (!validateList(nextOrdered, nextListType, listStylePosition.value)) {
+  if (!result.success) {
+    validationError.value =
+      result.error ?? t("inspector.validation.invalidList");
     return;
   }
 
-  if (nextOrdered === previousOrdered && nextListType === previousListType) {
-    return;
-  }
-
-  const activeTargetNodeId = targetNodeId.value ?? undefined;
-  propertySave.previewProps({ ordered: nextOrdered }, activeTargetNodeId);
-  if (nextListType !== previousListType) {
-    listStyleTarget.previewStyleProperties({ listStyleType: nextListType });
-  }
-
-  ordered.value = nextOrdered;
-  listStyleType.value = nextListType;
-
-  const orderedSaved = await propertySave.saveProperty(
-    "ordered",
-    nextOrdered,
-    props.currentItemType,
-    props.currentItemSlug,
-    activeTargetNodeId,
-  );
-
-  if (!orderedSaved) {
-    propertySave.previewProps({ ordered: previousOrdered }, activeTargetNodeId);
-    if (nextListType !== previousListType) {
-      listStyleTarget.previewStyleProperties({
-        listStyleType: previousListType,
-      });
-    }
-
-    ordered.value = previousOrdered;
-    listStyleType.value = previousListType;
-    return;
-  }
-
-  let listTypeSaved = true;
-  if (nextListType !== previousListType && hasStyleSaveContext()) {
-    listTypeSaved = await listStyleTarget.saveStyleProperty(
-      "listStyleType",
-      nextListType,
-      props.currentItemType,
-      props.currentItemSlug,
-    );
-  }
-
-  if (!listTypeSaved) {
-    listStyleTarget.previewStyleProperties({ listStyleType: previousListType });
-    listStyleType.value = previousListType;
-  }
+  validationError.value = null;
+  syncListValues();
 }
 
-async function saveOrderedMode(value: string): Promise<void> {
-  if (!ORDER_MODE_VALUES.includes(value as OrderModeValue)) {
+async function saveListSemanticMode(value: string): Promise<void> {
+  if (!LIST_SEMANTIC_MODES.includes(value as ListSemanticMode)) {
     return;
   }
 
-  await saveOrdered(value === "ordered");
+  const nextMode = value as ListSemanticMode;
+  await replaceListSemanticMode(nextMode);
 }
 
 async function saveListStyleType(value: string): Promise<void> {
@@ -596,22 +571,8 @@ async function resetList(): Promise<void> {
     </template>
 
     <div class="space-y-3">
-      <div v-if="canAddListItem" class="flex justify-end">
-        <Button
-          data-testid="list-add-item-button"
-          type="button"
-          variant="default"
-          size="sm"
-          class="text-xs font-medium"
-          :disabled="isPanelDisabled"
-          @click="addListItem"
-        >
-          {{ t("inspector.list.addItem") }}
-        </Button>
-      </div>
-
       <div
-        v-if="showStandardListControls"
+        v-if="showListTypeControl"
         class="grid grid-cols-[72px_minmax(0,1fr)] items-center gap-2"
       >
         <label
@@ -619,39 +580,105 @@ async function resetList(): Promise<void> {
         >
           {{ t("inspector.list.type") }}
         </label>
-        <Tabs
-          data-testid="list-ordered-tabs"
-          class="w-full gap-0"
-          :model-value="orderedMode"
-          @update:model-value="
-            (value) => void saveOrderedMode(String(value ?? ''))
-          "
-        >
-          <TabsList
-            class="h-8 w-full rounded-md border border-dashed border-border/50 bg-sidebar p-[3px]"
+        <div class="flex min-w-0 items-center gap-2">
+          <Tabs
+            data-testid="list-ordered-tabs"
+            class="min-w-0 flex-1 gap-0"
+            :model-value="listSemanticMode"
+            @update:model-value="
+              (value) => void saveListSemanticMode(String(value ?? ''))
+            "
           >
-            <TabsTrigger
-              value="unordered"
-              data-testid="list-type-unordered-tab"
-              class="px-3"
-              :disabled="isPanelDisabled"
+            <TabsList
+              class="h-8 w-full rounded-md border border-solid border-border/50 bg-sidebar/50 p-[3px]"
             >
-              {{ t("inspector.list.bullets") }}
-            </TabsTrigger>
-            <TabsTrigger
-              value="ordered"
-              data-testid="list-type-ordered-tab"
-              class="px-3"
-              :disabled="isPanelDisabled"
-            >
-              {{ t("inspector.list.numbers") }}
-            </TabsTrigger>
-          </TabsList>
-        </Tabs>
+              <TooltipProvider
+                v-for="option in listSemanticOptions"
+                :key="option.value"
+                :delay-duration="250"
+              >
+                <Tooltip>
+                  <TooltipTrigger as-child>
+                    <TabsTrigger
+                      :value="option.value"
+                      :data-testid="`list-type-${option.value}-tab`"
+                      class="min-w-0 px-0"
+                      :disabled="isPanelDisabled"
+                    >
+                      <span class="sr-only">{{ option.label }}</span>
+                      <span
+                        aria-hidden="true"
+                        :class="[option.icon, 'size-4.5 shrink-0']"
+                      />
+                    </TabsTrigger>
+                  </TooltipTrigger>
+                  <TooltipContent side="bottom" class="text-xs">
+                    {{ option.label }}
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            </TabsList>
+          </Tabs>
+
+          <TooltipProvider v-if="canAddListItem" :delay-duration="250">
+            <Tooltip>
+              <TooltipTrigger as-child>
+                <Button
+                  data-testid="list-add-item-button"
+                  type="button"
+                  variant="secondary"
+                  size="icon-sm"
+                  class="h-8! w-8! shrink-0 rounded-md! p-0! transition-transform active:scale-[0.96]"
+                  :disabled="isPanelDisabled"
+                  :aria-label="t('inspector.list.addItem')"
+                  @click="addListItem"
+                >
+                  <span
+                    aria-hidden="true"
+                    :class="[studioIcons.plus, 'size-4 shrink-0']"
+                  />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" class="text-xs">
+                {{ t("inspector.list.addItem") }}
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        </div>
       </div>
 
       <div
-        v-if="showStandardListControls"
+        v-else-if="canAddListItem"
+        class="flex justify-end"
+      >
+        <TooltipProvider :delay-duration="250">
+          <Tooltip>
+            <TooltipTrigger as-child>
+              <Button
+                data-testid="list-add-item-button"
+                type="button"
+                variant="secondary"
+                size="xs"
+                class="h-8! gap-1.5 rounded-md! px-2.5! transition-transform active:scale-[0.96]"
+                :disabled="isPanelDisabled"
+                @click="addListItem"
+              >
+                <span
+                  aria-hidden="true"
+                  :class="[studioIcons.plus, 'size-4 shrink-0']"
+                />
+                {{ t("inspector.list.addItem") }}
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom" class="text-xs">
+              {{ t("inspector.list.addItem") }}
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      </div>
+
+      <div
+        v-if="showMarkerControls"
         class="grid grid-cols-[72px_minmax(0,1fr)] items-center gap-2"
       >
         <label
@@ -683,7 +710,7 @@ async function resetList(): Promise<void> {
       </div>
 
       <div
-        v-if="showStandardListControls"
+        v-if="showMarkerControls"
         class="grid grid-cols-[72px_minmax(0,1fr)] items-center gap-2"
       >
         <label

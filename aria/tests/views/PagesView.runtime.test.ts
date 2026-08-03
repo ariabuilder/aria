@@ -1,15 +1,11 @@
-import { computed, defineComponent, h, ref } from "vue";
+import { computed, defineComponent, h, nextTick, ref } from "vue";
 import { mount } from "@vue/test-utils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { useAppProvides } from "../../admin/features/Core";
 
 vi.mock("vue-router", () => ({
-  useRoute: () => ({
-    path: "/studio/pages",
-    query: {},
-    fullPath: "/studio/pages",
-  }),
+  useRoute: () => testState.routeState,
   useRouter: () => ({
     push: vi.fn(),
     replace: vi.fn(),
@@ -17,6 +13,7 @@ vi.mock("vue-router", () => ({
 }));
 
 const testState = vi.hoisted(() => {
+  const { reactive } = require("vue") as typeof import("vue");
   const samplePage = {
     id: "page-1",
     slug: "home",
@@ -28,6 +25,11 @@ const testState = vi.hoisted(() => {
 
   return {
     samplePage,
+    routeState: reactive({
+      path: "/studio/pages",
+      query: {} as Record<string, string | string[] | undefined>,
+      fullPath: "/studio/pages",
+    }),
     pageActionsOptions: [] as unknown[],
     refreshPagesMock: vi.fn(async () => undefined),
     refreshPagesNowMock: vi.fn(async () => undefined),
@@ -258,6 +260,8 @@ describe("Pages runtime injections", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     testState.pageActionsOptions.length = 0;
+    testState.routeState.query = {};
+    testState.routeState.fullPath = "/studio/pages";
   });
 
   it("mounts without the removed eager page-prefetch provider", async () => {
@@ -300,4 +304,26 @@ describe("Pages runtime injections", () => {
     expect(prewarmBuilder).toBeDefined();
   });
 
+  it("syncs supported route filters on initial load and browser navigation", async () => {
+    testState.routeState.query = { filter: "scheduled" };
+    testState.routeState.fullPath = "/studio/pages?filter=scheduled";
+
+    const PagesView = (
+      await import("../../admin/features/Studio/pages/PagesView.vue")
+    ).default;
+    const wrapper = mount(PagesView, mountOptions);
+    const filterMenu = wrapper.findComponent({ name: "FilterIconMenu" });
+
+    expect(filterMenu.props("modelValue")).toBe("scheduled");
+
+    testState.routeState.query = { filter: "modified" };
+    testState.routeState.fullPath = "/studio/pages?filter=modified";
+    await nextTick();
+    expect(filterMenu.props("modelValue")).toBe("modified");
+
+    testState.routeState.query = { filter: "unsupported" };
+    testState.routeState.fullPath = "/studio/pages?filter=unsupported";
+    await nextTick();
+    expect(filterMenu.props("modelValue")).toBe("all");
+  });
 });

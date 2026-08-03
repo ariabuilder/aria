@@ -56,7 +56,8 @@ interface UseCanvasDropReturn {
 }
 
 const ROOT_DROP_ZONE_ID = "__aria-root__" as const;
-const INSERTION_UPDATE_MS = 100;
+const AUTO_SCROLL_EDGE_PX = 56;
+const AUTO_SCROLL_MAX_STEP_PX = 22;
 
 function createInitialDragState(): DragState {
   return {
@@ -70,25 +71,6 @@ function createInitialDragState(): DragState {
     lastWorldX: 0,
     lastWorldY: 0,
   };
-}
-
-class RateLimiter {
-  private lastRun = 0;
-
-  constructor(private readonly intervalMs: number) {}
-
-  shouldRun(): boolean {
-    const now = Date.now();
-    if (now - this.lastRun < this.intervalMs) {
-      return false;
-    }
-    this.lastRun = now;
-    return true;
-  }
-
-  reset(): void {
-    this.lastRun = 0;
-  }
 }
 
 function resolveStageContentRoot(body: HTMLElement): HTMLElement {
@@ -114,7 +96,10 @@ function dispatchDropEvent(detail: {
 
   if (!payload.success) {
     if (import.meta.env.DEV) {
-      console.warn("[useCanvasDrop] Invalid canvas:drop payload", payload.error);
+      console.warn(
+        "[useCanvasDrop] Invalid canvas:drop payload",
+        payload.error,
+      );
     }
     return;
   }
@@ -180,7 +165,6 @@ export function useCanvasDrop(
 ): UseCanvasDropReturn {
   const state = ref(createInitialDragState() as unknown) as Ref<DragState>;
 
-  const insertionRateLimiter = new RateLimiter(INSERTION_UPDATE_MS);
   const { getComputedScale } = useFrameCoords(iframeElement);
 
   const isDragging = computed(() => state.value.isDragging);
@@ -188,6 +172,9 @@ export function useCanvasDrop(
   const currentInsertionIndex = computed(() => state.value.currentChildIndex);
 
   let scrollCleanup: (() => void) | null = null;
+  let feedbackFrame: number | null = null;
+  let autoScrollFrame: number | null = null;
+  let pendingFeedbackPoint: NormalizedDragPoint | null = null;
 
   function attachScrollListener(): void {
     detachScrollListener();
@@ -196,15 +183,12 @@ export function useCanvasDrop(
 
     const onScroll = () => {
       if (!state.value.isDragging) return;
-      updateDropFeedback(
-        {
-          frameX: state.value.lastFrameX,
-          frameY: state.value.lastFrameY,
-          worldX: state.value.lastWorldX,
-          worldY: state.value.lastWorldY,
-        },
-        true,
-      );
+      scheduleDropFeedback({
+        frameX: state.value.lastFrameX,
+        frameY: state.value.lastFrameY,
+        worldX: state.value.lastWorldX,
+        worldY: state.value.lastWorldY,
+      });
     };
 
     iframeWindow.addEventListener("scroll", onScroll, { passive: true });
@@ -229,7 +213,9 @@ export function useCanvasDrop(
 
     const currentTarget = event.currentTarget;
     const targetDocument =
-      event.target && typeof event.target === "object" && "ownerDocument" in event.target
+      event.target &&
+      typeof event.target === "object" &&
+      "ownerDocument" in event.target
         ? (event.target as { ownerDocument?: Document | null }).ownerDocument
         : null;
     const isIframeEvent =
@@ -268,12 +254,8 @@ export function useCanvasDrop(
     hideAddElementsInsertion();
   }
 
-  function updateDropFeedback(point: NormalizedDragPoint, force = false): void {
+  function updateDropFeedback(point: NormalizedDragPoint): void {
     if (!state.value.isDragging) return;
-
-    if (!force && !insertionRateLimiter.shouldRun()) {
-      return;
-    }
 
     const iframeDoc = iframeElement.value?.contentDocument ?? null;
     const body = iframeDoc?.body ?? null;
@@ -322,13 +304,82 @@ export function useCanvasDrop(
           )
         : { left: 0, top: 0, width: 0, height: 0 },
       targetViewport: intent.visualRects?.target
-        ? toLegacyViewportRect(createFrameViewportRect(intent.visualRects.target))
+        ? toLegacyViewportRect(
+            createFrameViewportRect(intent.visualRects.target),
+          )
         : undefined,
       orientation:
         insertionOverlay?.kind === "insertion"
           ? insertionOverlay.orientation
           : "horizontal",
     });
+  }
+
+  function cancelFeedbackFrame(): void {
+    if (feedbackFrame !== null) {
+      window.cancelAnimationFrame(feedbackFrame);
+      feedbackFrame = null;
+    }
+    pendingFeedbackPoint = null;
+  }
+
+  function scheduleDropFeedback(point: NormalizedDragPoint): void {
+    pendingFeedbackPoint = point;
+    if (feedbackFrame !== null) return;
+
+    feedbackFrame = window.requestAnimationFrame(() => {
+      feedbackFrame = null;
+      const latest = pendingFeedbackPoint;
+      pendingFeedbackPoint = null;
+      if (latest) updateDropFeedback(latest);
+    });
+  }
+
+  function autoScrollVelocity(position: number, extent: number): number {
+    if (position < AUTO_SCROLL_EDGE_PX) {
+      return -Math.ceil(
+        AUTO_SCROLL_MAX_STEP_PX *
+          (1 - Math.max(position, 0) / AUTO_SCROLL_EDGE_PX),
+      );
+    }
+    if (position > extent - AUTO_SCROLL_EDGE_PX) {
+      return Math.ceil(
+        AUTO_SCROLL_MAX_STEP_PX *
+          (1 - Math.max(extent - position, 0) / AUTO_SCROLL_EDGE_PX),
+      );
+    }
+    return 0;
+  }
+
+  function stopAutoScroll(): void {
+    if (autoScrollFrame !== null) {
+      window.cancelAnimationFrame(autoScrollFrame);
+      autoScrollFrame = null;
+    }
+  }
+
+  function updateAutoScroll(point: NormalizedDragPoint): void {
+    stopAutoScroll();
+    const iframeWindow = iframeElement.value?.contentWindow;
+    if (!iframeWindow) return;
+
+    const step = () => {
+      if (!state.value.isDragging) {
+        autoScrollFrame = null;
+        return;
+      }
+      const x = autoScrollVelocity(point.frameX, iframeWindow.innerWidth);
+      const y = autoScrollVelocity(point.frameY, iframeWindow.innerHeight);
+      if (x === 0 && y === 0) {
+        autoScrollFrame = null;
+        return;
+      }
+      iframeWindow.scrollBy(x, y);
+      scheduleDropFeedback(point);
+      autoScrollFrame = window.requestAnimationFrame(step);
+    };
+
+    autoScrollFrame = window.requestAnimationFrame(step);
   }
 
   function resolveCurrentDrop(point: NormalizedDragPoint): DropZone | null {
@@ -387,7 +438,8 @@ export function useCanvasDrop(
     state.value.lastFrameY = point.frameY;
     state.value.lastWorldX = point.worldX;
     state.value.lastWorldY = point.worldY;
-    updateDropFeedback(point);
+    scheduleDropFeedback(point);
+    updateAutoScroll(point);
   }
 
   function handleDrop(event: DragEvent): void {
@@ -397,8 +449,12 @@ export function useCanvasDrop(
 
     event.preventDefault();
 
+    cancelFeedbackFrame();
+    stopAutoScroll();
     const point = resolveDragPoint(event);
-    const resolvedDropZone = point ? resolveCurrentDrop(point) : state.value.currentDropZone;
+    const resolvedDropZone = point
+      ? resolveCurrentDrop(point)
+      : state.value.currentDropZone;
 
     if (resolvedDropZone) {
       dispatchDropEvent({
@@ -414,28 +470,32 @@ export function useCanvasDrop(
     endDrag();
   }
 
-  function handleDragEnd(event: DragEvent): void {
-    if (
-      state.value.isDragging &&
-      state.value.currentDropZone &&
-      state.value.draggedData &&
-      !state.value.dropDispatched
-    ) {
-      const point = resolveDragPoint(event);
-      const resolvedDropZone = point ? resolveCurrentDrop(point) : state.value.currentDropZone;
-
-      if (resolvedDropZone) {
-        dispatchDropEvent({
-          zone: resolvedDropZone,
-          data: state.value.draggedData,
-          x: point?.worldX ?? state.value.lastWorldX ?? event.clientX,
-          y: point?.worldY ?? state.value.lastWorldY ?? event.clientY,
-          insertionIndex: state.value.currentChildIndex,
-        });
-      }
-    }
-
+  function handleDragEnd(): void {
     endDrag();
+  }
+
+  function handleCanvasExit(event: DragEvent): void {
+    if (!state.value.isDragging) return;
+    if (event.relatedTarget) return;
+    const eventDocument =
+      event.target &&
+      typeof event.target === "object" &&
+      "ownerDocument" in event.target
+        ? (event.target as { ownerDocument?: Document | null }).ownerDocument
+        : null;
+    const eventWindow = eventDocument?.defaultView ?? window;
+    const outsideViewport =
+      event.clientX <= 0 ||
+      event.clientY <= 0 ||
+      event.clientX >= eventWindow.innerWidth ||
+      event.clientY >= eventWindow.innerHeight;
+    if (outsideViewport) endDrag();
+  }
+
+  function handleKeyDown(event: KeyboardEvent): void {
+    if (event.key === "Escape" && state.value.isDragging) {
+      endDrag();
+    }
   }
 
   function startDrag(data: LibraryDragPayload): void {
@@ -447,7 +507,6 @@ export function useCanvasDrop(
       return;
     }
 
-    insertionRateLimiter.reset();
     state.value.isDragging = true;
     state.value.dropDispatched = false;
     state.value.draggedData = parsed.data;
@@ -464,6 +523,8 @@ export function useCanvasDrop(
     window.addEventListener("dragover", handleDragOver, true);
     window.addEventListener("drop", handleDrop, true);
     window.addEventListener("dragend", handleDragEnd, true);
+    window.addEventListener("dragleave", handleCanvasExit, true);
+    window.addEventListener("keydown", handleKeyDown, true);
 
     const iframeDoc = iframeElement.value?.contentDocument;
     const iframeWindow = iframeElement.value?.contentWindow;
@@ -476,6 +537,8 @@ export function useCanvasDrop(
   }
 
   function endDrag(): void {
+    cancelFeedbackFrame();
+    stopAutoScroll();
     hideAddElementsInsertion();
     detachScrollListener();
 
@@ -488,6 +551,8 @@ export function useCanvasDrop(
     window.removeEventListener("dragover", handleDragOver, true);
     window.removeEventListener("drop", handleDrop, true);
     window.removeEventListener("dragend", handleDragEnd, true);
+    window.removeEventListener("dragleave", handleCanvasExit, true);
+    window.removeEventListener("keydown", handleKeyDown, true);
 
     const iframeDoc = iframeElement.value?.contentDocument;
     const iframeWindow = iframeElement.value?.contentWindow;

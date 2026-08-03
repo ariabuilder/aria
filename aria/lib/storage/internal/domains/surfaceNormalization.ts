@@ -5,12 +5,47 @@ import {
 } from "../../../rendering/canonical";
 import { log } from "../../../utils/logger";
 
+type PreparedSurfaceEntry = {
+  kind: RenderSurfaceKind;
+  normalized: NormalizedRenderSurface;
+};
+
+/**
+ * One-use handoff for callers that validate a complete proposal before entering
+ * storage. The WeakMap keeps the optimization process-local and impossible to
+ * serialize across an action boundary; storage still normalizes every value
+ * that was not produced by this module in the current isolate.
+ */
+const preparedSurfaces = new WeakMap<object, PreparedSurfaceEntry>();
+
+export async function prepareSurfaceForPersistence<K extends RenderSurfaceKind>(
+  kind: K,
+  source: unknown,
+): Promise<NormalizedRenderSurface<K>> {
+  const normalized = await normalizeEditableSurface(
+    { kind, source },
+    { freeze: true },
+  );
+  preparedSurfaces.set(normalized.source as object, {
+    kind,
+    normalized,
+  });
+  return normalized;
+}
+
 /**
  * Storage-side entry point for the portable normalizer.
  */
 export async function normalizeSurfaceForPersistence<
   K extends RenderSurfaceKind,
 >(kind: K, source: unknown): Promise<NormalizedRenderSurface<K>> {
+  if (typeof source === "object" && source !== null) {
+    const prepared = preparedSurfaces.get(source);
+    if (prepared?.kind === kind) {
+      preparedSurfaces.delete(source);
+      return prepared.normalized as NormalizedRenderSurface<K>;
+    }
+  }
   return normalizeEditableSurface({ kind, source });
 }
 
@@ -52,6 +87,17 @@ export async function resolveStoredSemanticSourceHash(input: {
   fallback: () => Promise<string>;
 }): Promise<string> {
   try {
+    const contentHash = input.row.content_hash ?? input.row.contentHash;
+    const compilerMetadata =
+      input.row.compiler_metadata_json ?? input.row.compilerMetadataJson;
+    if (
+      typeof contentHash === "string" &&
+      /^[a-f0-9]{64}$/u.test(contentHash) &&
+      hasCanonicalSourceHashMarker(compilerMetadata)
+    ) {
+      return contentHash;
+    }
+
     const dslJson = input.row.dsl_json ?? input.row.dslJson;
     if (typeof dslJson !== "string") {
       return input.fallback();
@@ -70,5 +116,20 @@ export async function resolveStoredSemanticSourceHash(input: {
       error,
     });
     return input.fallback();
+  }
+}
+
+function hasCanonicalSourceHashMarker(value: unknown): boolean {
+  try {
+    const parsed = typeof value === "string" ? JSON.parse(value) : value;
+    return (
+      typeof parsed === "object" &&
+      parsed !== null &&
+      "renderSourceHashVersion" in parsed &&
+      (parsed as { renderSourceHashVersion?: unknown })
+        .renderSourceHashVersion === 1
+    );
+  } catch {
+    return false;
   }
 }

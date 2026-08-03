@@ -16,6 +16,7 @@ export interface AriaCompilerMetadata {
   };
   runtime: AriaRuntimeTarget;
   storageSchemaVersion: string;
+  renderSourceHashVersion: 1;
   capturedAt: string;
 }
 
@@ -108,6 +109,7 @@ export function buildCurrentCompilerMetadata(
     },
     runtime: runtimeEnv(readRuntimeEnv()),
     storageSchemaVersion: ARIA_STORAGE_SCHEMA_VERSION,
+    renderSourceHashVersion: 1,
     capturedAt,
   };
 }

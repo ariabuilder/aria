@@ -1,7 +1,10 @@
 import { ref } from "vue";
 import { describe, expect, it } from "vitest";
 import type { Page } from "@/composables/useBuilderData";
-import { usePagesListState } from "../../../../admin/features/Studio/pages/composables/usePagesListState";
+import {
+  parsePagesFilter,
+  usePagesListState,
+} from "../../../../admin/features/Studio/pages/composables/usePagesListState";
 
 function makePage(overrides: Partial<Page> = {}): Page {
   return {
@@ -20,7 +23,7 @@ function makePage(overrides: Partial<Page> = {}): Page {
   };
 }
 
-describe("usePagesListState description support", () => {
+describe("usePagesListState", () => {
   it("filters pages by description in search", () => {
     const pages = ref<Page[]>([
       makePage({ id: "home", slug: "home", title: "Home" }),
@@ -63,5 +66,48 @@ describe("usePagesListState description support", () => {
       "a-page",
       "z-page",
     ]);
+  });
+
+  it("filters scheduled and modified pages with matching counts", () => {
+    const pages = ref<Page[]>([
+      makePage({ id: "draft", slug: "draft", status: "draft" }),
+      makePage({ id: "scheduled", slug: "scheduled", status: "scheduled" }),
+      makePage({ id: "archived", slug: "archived", status: "archived" }),
+      makePage({ id: "published", slug: "published", status: "published" }),
+      makePage({
+        id: "modified",
+        slug: "modified",
+        status: "published",
+        isModifiedSincePublish: true,
+      }),
+    ]);
+
+    const state = usePagesListState(pages);
+
+    state.activeFilter.value = "scheduled";
+    expect(state.filteredTree.value.map((node) => node.page.slug)).toEqual([
+      "scheduled",
+    ]);
+
+    state.activeFilter.value = "modified";
+    expect(state.filteredTree.value.map((node) => node.page.slug)).toEqual([
+      "modified",
+    ]);
+    expect(state.counts.value).toEqual({
+      all: 5,
+      published: 2,
+      draft: 1,
+      scheduled: 1,
+      archived: 1,
+      modified: 1,
+    });
+  });
+
+  it("parses supported route filters and falls back to all", () => {
+    expect(parsePagesFilter("scheduled")).toBe("scheduled");
+    expect(parsePagesFilter("modified")).toBe("modified");
+    expect(parsePagesFilter("unsupported")).toBe("all");
+    expect(parsePagesFilter(["scheduled"])).toBe("all");
+    expect(parsePagesFilter(undefined)).toBe("all");
   });
 });

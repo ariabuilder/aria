@@ -13,6 +13,11 @@ import {
   purgePublicPageCache,
 } from "../lib/cache/service";
 import {
+  createPagePublicationInvalidationJob,
+  deliverCacheInvalidationJob,
+} from "../lib/cache/invalidationJobs";
+import { drainCacheInvalidations } from "../lib/localization/invalidationDrain";
+import {
   buildAuthorshipSaveContext,
   parseAuthorshipSaveContext,
 } from "../lib/authorship/stamping";
@@ -101,11 +106,6 @@ async function runCommittedPublishDelivery(
         publishedVersion,
         "publishing",
       ),
-    () =>
-      purgePublicPageCache(context, {
-        id: page.id,
-        slug: page.slug || page.id,
-      }),
     async () => {
       const publishedPage = await adapter.getPublishedPageDSL(page.id);
       if (!publishedPage) return;
@@ -118,6 +118,25 @@ async function runCommittedPublishDelivery(
       );
     },
   ]);
+}
+
+async function deliverCommittedInvalidation(
+  adapter: PublishingStorageAdapter,
+  context: PublishingActionContext,
+  jobId: string,
+  force = false,
+): Promise<"ready" | "pending"> {
+  const existing = await adapter.getCacheInvalidationJob(jobId);
+  if (existing?.status === "succeeded") return "ready";
+  const result = await drainCacheInvalidations({
+    adapter,
+    jobId,
+    limit: 1,
+    deliveryAttempts: 3,
+    force,
+    deliver: (job) => deliverCacheInvalidationJob(context, job),
+  });
+  return result.completedJobIds.includes(jobId) ? "ready" : "pending";
 }
 
 async function scheduleCommittedPublishDelivery(
@@ -287,6 +306,12 @@ async function publishPageHandler(
       };
     }
 
+    const invalidationJob = createPagePublicationInvalidationJob({
+      pageId: currentPage.id,
+      slug: canonicalSlug,
+      operation: "publish",
+      version: input.expectedVersion,
+    });
     const publishedVersion = await adapter.publishPageDSL(
       input.id,
       parsedAuthorship,
@@ -299,6 +324,7 @@ async function publishPageHandler(
           "this page",
         ),
         dependencies: publicationDependencies,
+        invalidationJob,
       },
     );
     if (!publishedVersion) {
@@ -309,6 +335,21 @@ async function publishPageHandler(
           message: `Unable to publish page "${canonicalSlug}"`,
         },
       };
+    }
+
+    const delivery = await deliverCommittedInvalidation(
+      adapter,
+      context,
+      invalidationJob.id,
+    );
+    const versionPins = await adapter.getPageVersionPins(currentPage.id);
+    if (
+      versionPins?.draftVersion !== publishedVersion ||
+      versionPins.publishedVersion !== publishedVersion
+    ) {
+      throw new Error(
+        "Published page revision could not be reconciled with its saved draft.",
+      );
     }
 
     await scheduleCommittedPublishDelivery(
@@ -341,6 +382,10 @@ async function publishPageHandler(
         timestamp: new Date().toISOString(),
         published: true,
         version: publishedVersion,
+        draftVersion: versionPins.draftVersion,
+        publishedVersion: versionPins.publishedVersion,
+        delivery,
+        deliveryJobId: invalidationJob.id,
       },
     };
   } catch (error) {
@@ -365,6 +410,22 @@ async function publishPageHandler(
 }
 
 export const publishing = {
+  deliveryStatus: defineAction({
+    accept: "json",
+    input: z.object({ jobId: z.string().trim().min(1).max(160) }).strict(),
+    handler: async ({ jobId }, context) => {
+      await requireOperation(context, "publishing.publish");
+      const adapter = await getStorageAdapterAsync(context.locals);
+      const delivery = await deliverCommittedInvalidation(
+        adapter,
+        context,
+        jobId,
+        true,
+      );
+      return { success: true, data: { jobId, delivery } };
+    },
+  }),
+
   /**
    * Publish page by advancing the published revision pointer.
    *
@@ -420,7 +481,19 @@ export const publishing = {
 
         const adapter = await getStorageAdapterAsync(context.locals);
 
-        await adapter.unpublishPageDSL(id);
+        const currentPage = await adapter.getPageDSL(id);
+        const invalidationJob = createPagePublicationInvalidationJob({
+          pageId: id,
+          slug,
+          operation: "unpublish",
+          version: currentPage?.version ?? null,
+        });
+        await adapter.unpublishPageDSL(id, { invalidationJob });
+        const delivery = await deliverCommittedInvalidation(
+          adapter,
+          context,
+          invalidationJob.id,
+        );
         await settlePublishSideEffects("Unpublish", [
           async () => {
             const { deletePageSnapshots } =
@@ -446,7 +519,6 @@ export const publishing = {
               undefined,
               "publishing",
             ),
-          () => purgePublicPageCache(context, { id, slug }),
         ]);
 
         log("info", `Page "${slug}" unpublished`);
@@ -454,6 +526,8 @@ export const publishing = {
         return {
           success: true,
           slug,
+          delivery,
+          deliveryJobId: invalidationJob.id,
         };
       } catch (error) {
         log("error", "Unpublish failed", { error });

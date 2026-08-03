@@ -1,5 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+const { purgeMock } = vi.hoisted(() => ({ purgeMock: vi.fn() }));
+
+vi.mock("cloudflare:workers", () => ({
+  cache: { purge: purgeMock },
+}));
+
 vi.mock("../../lib/cloudflare/env", () => ({
   getCloudflareEnv: vi.fn(() => ({
     CLOUDFLARE_API_TOKEN: "test-token",
@@ -19,17 +25,11 @@ import {
 } from "../../lib/content-sync/mutations";
 
 describe("public page cache", () => {
-  const originalFetch = globalThis.fetch;
-
   beforeEach(() => {
-    globalThis.fetch = vi.fn(async () => ({
-      ok: true,
-      json: async () => ({ success: true }),
-    })) as unknown as typeof fetch;
+    purgeMock.mockResolvedValue({ success: true, errors: [] });
   });
 
   afterEach(() => {
-    globalThis.fetch = originalFetch;
     vi.restoreAllMocks();
   });
 
@@ -73,14 +73,20 @@ describe("public page cache", () => {
       ]),
     ).resolves.toBe(true);
 
-    expect(globalThis.fetch).toHaveBeenCalledWith(
-      "https://api.cloudflare.com/client/v4/zones/test-zone/purge_cache",
-      expect.objectContaining({
-        body: JSON.stringify({
-          tags: ["aria-page-id:about", "aria-layout-id:marketing-shell"],
-        }),
-      }),
-    );
+    expect(purgeMock).toHaveBeenCalledWith({
+      tags: ["aria-page-id:about", "aria-layout-id:marketing-shell"],
+    });
+  });
+
+  it("rejects an explicit Workers cache purge failure", async () => {
+    purgeMock.mockResolvedValueOnce({
+      success: false,
+      errors: [{ code: 1001, message: "purge unavailable" }],
+    });
+
+    await expect(
+      purgePublicCacheTags({ locals: {} }, ["aria-page-id:about"]),
+    ).resolves.toBe(false);
   });
 
   it("purges all public pages when shared dependencies change", async () => {
@@ -98,14 +104,10 @@ describe("public page cache", () => {
     );
 
     expect(adapter.touchContentRevision).toHaveBeenCalledTimes(1);
-    expect(globalThis.fetch).toHaveBeenCalledTimes(1);
-    expect(globalThis.fetch).toHaveBeenCalledWith(
-      "https://api.cloudflare.com/client/v4/zones/test-zone/purge_cache",
-      expect.objectContaining({
-        method: "POST",
-        body: JSON.stringify({ tags: [getAllPublicPagesCacheTag()] }),
-      }),
-    );
+    expect(purgeMock).toHaveBeenCalledTimes(1);
+    expect(purgeMock).toHaveBeenCalledWith({
+      tags: [getAllPublicPagesCacheTag()],
+    });
   });
 
   it("does not purge public pages for a draft component delivery", async () => {
@@ -126,6 +128,6 @@ describe("public page cache", () => {
       { purgePublicPages: false },
     );
 
-    expect(globalThis.fetch).not.toHaveBeenCalled();
+    expect(purgeMock).not.toHaveBeenCalled();
   });
 });

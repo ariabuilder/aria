@@ -27,6 +27,7 @@ import type {
 } from "../../lib/cloudflare/env";
 import { createD1Mock } from "../helpers/d1Mock";
 import { normalizeSurfaceForPersistence } from "../../lib/storage/internal/domains/surfaceNormalization";
+import { createPagePublicationInvalidationJob } from "../../lib/cache/invalidationJobs";
 
 class MemoryKv {
   private store = new Map<string, string>();
@@ -593,6 +594,64 @@ describe("CloudflareStorageAdapter", () => {
     expect(versions.map((entry) => entry.version)).toEqual(
       savedVersions.slice(-DEFAULT_RECENT_VERSION_LIMIT).reverse(),
     );
+  });
+
+  it("atomically commits the D1 page pointer with its durable cache job", async () => {
+    const adapter = new CloudflareStorageAdapter({
+      aria_db: createD1Mock(client),
+    });
+    await adapter.savePageDSL(samplePage.id, samplePage, {
+      preserveVersion: true,
+      versionHint: "d1-atomic-publish-v1",
+    });
+    const job = createPagePublicationInvalidationJob({
+      pageId: samplePage.id,
+      slug: samplePage.slug,
+      operation: "publish",
+      version: "d1-atomic-publish-v1",
+    });
+
+    await adapter.publishPageDSL(samplePage.id, undefined, {
+      expectedVersion: "d1-atomic-publish-v1",
+      invalidationJob: job,
+    });
+
+    expect(
+      (await adapter.getPageVersionPins(samplePage.id))?.publishedVersion,
+    ).toBe("d1-atomic-publish-v1");
+    const claimed = await adapter.claimDueCacheInvalidationJobs({
+      now: "9999-12-31T23:59:59.999Z",
+      leaseToken: "d1-atomic-publish",
+      leaseExpiresAt: "9999-12-31T23:59:59.999Z",
+      updatedAt: "2026-08-03T12:00:00.000Z",
+      limit: 1,
+      jobId: job.id,
+    });
+    expect(claimed.map((entry) => entry.id)).toEqual([job.id]);
+
+    const unpublishJob = createPagePublicationInvalidationJob({
+      pageId: samplePage.id,
+      slug: samplePage.slug,
+      operation: "unpublish",
+      version: "d1-atomic-publish-v1",
+    });
+    await adapter.unpublishPageDSL(samplePage.id, {
+      invalidationJob: unpublishJob,
+    });
+    expect(
+      (await adapter.getPageVersionPins(samplePage.id))?.publishedVersion,
+    ).toBeNull();
+    const claimedUnpublish = await adapter.claimDueCacheInvalidationJobs({
+      now: "9999-12-31T23:59:59.999Z",
+      leaseToken: "d1-atomic-unpublish",
+      leaseExpiresAt: "9999-12-31T23:59:59.999Z",
+      updatedAt: "2026-08-03T12:00:00.000Z",
+      limit: 1,
+      jobId: unpublishJob.id,
+    });
+    expect(claimedUnpublish.map((entry) => entry.id)).toEqual([
+      unpublishJob.id,
+    ]);
   });
 
   it("keeps draft and published page revisions separate", async () => {

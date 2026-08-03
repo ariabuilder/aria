@@ -383,7 +383,9 @@ const pageNavChildren = computed<SidebarFilterChild[]>(() => [
   { label: t("sidebar.allPages"), path: "/pages" },
   { label: t("sidebar.published"), path: "/pages?filter=published", filter: "published" },
   { label: t("sidebar.draft"), path: "/pages?filter=draft", filter: "draft" },
+  { label: t("sidebar.scheduled"), path: "/pages?filter=scheduled", filter: "scheduled" },
   { label: t("sidebar.archived"), path: "/pages?filter=archived", filter: "archived" },
+  { label: t("sidebar.modified"), path: "/pages?filter=modified", filter: "modified" },
 ]);
 
 const layoutNavChildren = computed<SidebarFilterChild[]>(() => [

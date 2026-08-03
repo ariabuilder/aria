@@ -1174,6 +1174,37 @@ export function cacheInvalidationInsert(
   };
 }
 
+export function cacheInvalidationInsertWhenPageState(
+  job: CacheInvalidationJob,
+  pageState: {
+    pageId: string;
+    status: "published" | "draft";
+    publishedVersion: string | null;
+    updatedAt: string;
+  },
+): LocalizationStatement {
+  const insert = cacheInvalidationInsert(job);
+  return {
+    sql: `INSERT INTO aria_cache_invalidation_jobs
+      (id, idempotency_key, scope, payload_json, status, attempt_count,
+       next_attempt_at, lease_token, lease_expires_at, last_error,
+       created_at, updated_at, completed_at)
+      SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?
+      WHERE EXISTS (
+        SELECT 1 FROM aria_page_meta
+        WHERE id = ? AND status = ? AND published_version IS ? AND updated_at = ?
+      )
+      ON CONFLICT(idempotency_key) DO NOTHING`,
+    args: [
+      ...(insert.args ?? []),
+      pageState.pageId,
+      pageState.status,
+      pageState.publishedVersion,
+      pageState.updatedAt,
+    ],
+  };
+}
+
 /**
  * A lease is intentionally narrow (one locale) and short lived. The
  * caller must acquire it immediately before the route ownership check and.
@@ -1240,6 +1271,17 @@ export async function enqueueCacheInvalidationJob(
   return toCacheInvalidationJob(row);
 }
 
+export async function getCacheInvalidationJob(
+  executor: LocalizationStorageExecutor,
+  id: string,
+): Promise<CacheInvalidationJob | null> {
+  const row = await executor.first(
+    `SELECT * FROM aria_cache_invalidation_jobs WHERE id = ? LIMIT 1`,
+    [id],
+  );
+  return row ? toCacheInvalidationJob(row) : null;
+}
+
 export async function claimDueCacheInvalidationJobs(
   executor: LocalizationStorageExecutor,
   input: {
@@ -1248,16 +1290,24 @@ export async function claimDueCacheInvalidationJobs(
     leaseExpiresAt: string;
     updatedAt: string;
     limit: number;
+    jobId?: string;
+    force?: boolean;
   },
 ): Promise<CacheInvalidationJob[]> {
   const rows = await executor.all<{ id: string }>(
     `SELECT id FROM aria_cache_invalidation_jobs
       WHERE status IN ('pending', 'failed')
-        AND next_attempt_at <= ?
+        ${input.force ? "" : "AND next_attempt_at <= ?"}
         AND (lease_expires_at IS NULL OR lease_expires_at <= ?)
+        ${input.jobId ? "AND id = ?" : ""}
       ORDER BY next_attempt_at ASC, created_at ASC
       LIMIT ?`,
-    [input.now, input.now, input.limit],
+    [
+      ...(!input.force ? [input.now] : []),
+      input.now,
+      ...(input.jobId ? [input.jobId] : []),
+      input.limit,
+    ],
   );
   const claimed: CacheInvalidationJob[] = [];
   for (const row of rows) {
@@ -1267,14 +1317,14 @@ export async function claimDueCacheInvalidationJobs(
              SET status = 'processing', attempt_count = attempt_count + 1,
                  lease_token = ?, lease_expires_at = ?, updated_at = ?, last_error = NULL
              WHERE id = ? AND status IN ('pending', 'failed')
-               AND next_attempt_at <= ?
+               ${input.force ? "" : "AND next_attempt_at <= ?"}
                AND (lease_expires_at IS NULL OR lease_expires_at <= ?)`,
         args: [
           input.leaseToken,
           input.leaseExpiresAt,
           input.updatedAt,
           row.id,
-          input.now,
+          ...(!input.force ? [input.now] : []),
           input.now,
         ],
       },

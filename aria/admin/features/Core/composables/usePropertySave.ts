@@ -6,6 +6,10 @@ import {
   type ComputedRef,
   type Ref,
 } from "vue";
+import {
+  isEditorMutationLocked,
+  trackEditorCommit,
+} from "./editorCommitCoordinator";
 import type {
   BuilderNode,
   JsonValue,
@@ -1850,12 +1854,24 @@ export function usePropertySave(
     isSaving,
     hasTarget,
 
-    saveProperty,
-    saveProperties,
-    previewStyleProperties,
-    previewResponsiveStyleUpdates,
-    previewProps,
-    saveNodeUpdates,
+    saveProperty: (...args) =>
+      isEditorMutationLocked()
+        ? Promise.resolve(false)
+        : trackEditorCommit(saveProperty(...args), "Property change"),
+    saveProperties: (...args) =>
+      isEditorMutationLocked()
+        ? Promise.resolve(false)
+        : trackEditorCommit(saveProperties(...args), "Property changes"),
+    previewStyleProperties: (...args) =>
+      isEditorMutationLocked() ? false : previewStyleProperties(...args),
+    previewResponsiveStyleUpdates: (...args) =>
+      isEditorMutationLocked() ? false : previewResponsiveStyleUpdates(...args),
+    previewProps: (...args) =>
+      isEditorMutationLocked() ? false : previewProps(...args),
+    saveNodeUpdates: (...args) =>
+      isEditorMutationLocked()
+        ? Promise.resolve(false)
+        : trackEditorCommit(saveNodeUpdates(...args), "Node property change"),
     clearError,
 
     isStyleProperty,

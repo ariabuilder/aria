@@ -1,4 +1,5 @@
 import { onBeforeUnmount } from "vue";
+import { registerEditorCommitFlusher } from "../../Core/composables/editorCommitCoordinator";
 
 interface UseStylePreviewQueueOptions<
   TUpdates extends Record<string, string | undefined>,
@@ -23,6 +24,7 @@ export function useStylePreviewQueue<
 ): UseStylePreviewQueueReturn<TUpdates> {
   let pendingPreviewFrame: number | null = null;
   let pendingPreviewUpdates: Partial<TUpdates> | null = null;
+  const unregisterCommitFlusher = registerEditorCommitFlusher(flush);
 
   function cancel(): void {
     if (pendingPreviewFrame !== null) {
@@ -65,6 +67,7 @@ export function useStylePreviewQueue<
   }
 
   onBeforeUnmount(() => {
+    unregisterCommitFlusher();
     cancel();
   });
 
